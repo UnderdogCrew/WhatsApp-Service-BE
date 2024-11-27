@@ -20,5 +20,6 @@ from ai_apis import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('send/message', views.SendMessage.as_view(), name='SendMessage')
+    path('send/message', views.SendMessage.as_view(), name='SendMessage'),
+    path('webhook', views.FacebookWebhook.as_view(), name='FacebookWebhook'),
 ]

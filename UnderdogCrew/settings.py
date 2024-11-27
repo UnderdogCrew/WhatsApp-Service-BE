@@ -16,8 +16,11 @@ import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Get the current directory path
+current_directory = os.getcwd()
 
-env_path = "/opt/UnderDogCrew/UnderdogCrew/env"
+print(f"Current Directory: {current_directory}")
+env_path = current_directory+"/env"
 # env_path = "/Users/neelpatel/Desktop/project-ai/UnderdogCrew/env"
 load_dotenv(dotenv_path=env_path)
 API_KEY = os.getenv("API_KEY")
