@@ -51,7 +51,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
-    'ai_apis'
+    'ai_apis',
+    'whatsapp_apis'
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True

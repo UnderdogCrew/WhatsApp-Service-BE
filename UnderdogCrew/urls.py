@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from ai_apis import views
+from whatsapp_apis import views as whatsapp_apis
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,4 +25,6 @@ urlpatterns = [
     path('webhook', views.FacebookWebhook.as_view(), name='FacebookWebhook'),
     path('image-generation', views.ImageGeneration.as_view(), name='ImageGeneration'),
     path('text-generation', views.TextGeneration.as_view(), name='TextGeneration'),
+    path('verify-business-number', whatsapp_apis.VerifyBusinessPhoneNumber.as_view(), name='VerifyBusinessPhoneNumber'),
+    path('message_templates', whatsapp_apis.MessageTemplates.as_view(), name='MessageTemplates'),
 ]
