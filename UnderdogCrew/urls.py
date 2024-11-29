@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from ai_apis import views
 from whatsapp_apis import views as whatsapp_apis
+from loginService import views as login_service
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -27,4 +28,6 @@ urlpatterns = [
     path('text-generation', views.TextGeneration.as_view(), name='TextGeneration'),
     path('verify-business-number', whatsapp_apis.VerifyBusinessPhoneNumber.as_view(), name='VerifyBusinessPhoneNumber'),
     path('message_templates', whatsapp_apis.MessageTemplates.as_view(), name='MessageTemplates'),
+    path('sign_up',login_service.SignupView.as_view(),name='SignupView'),
+    path('login',login_service.LoginView.as_view(),name='LoginView'),
 ]
