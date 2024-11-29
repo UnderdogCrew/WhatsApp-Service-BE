@@ -22,4 +22,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('send/message', views.SendMessage.as_view(), name='SendMessage'),
     path('webhook', views.FacebookWebhook.as_view(), name='FacebookWebhook'),
+    path('image-generation', views.ImageGeneration.as_view(), name='ImageGeneration'),
+    path('text-generation', views.TextGeneration.as_view(), name='TextGeneration'),
 ]

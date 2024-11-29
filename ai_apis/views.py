@@ -6,8 +6,9 @@ from django.http import HttpResponse, JsonResponse
 import sys
 import requests
 import json
-from UnderdogCrew.settings import API_KEY
+from UnderdogCrew.settings import API_KEY, OPEN_AI_KEY
 import pandas as pd
+import openai
 
 
 '''
@@ -180,3 +181,128 @@ class FacebookWebhook(APIView):
             }
             return JsonResponse("EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT", safe=False,
                                 status=500)
+
+
+
+class ImageGeneration(APIView):
+    def post(self, request):
+        try:
+            request_data = request.data
+            if len(request_data) == 0:
+                response_data = {
+                    "message": "request body is missing",
+                }
+                return JsonResponse(response_data, safe=False, status=422)
+            elif "text" not in request_data:
+                response_data = {
+                    "message": "text is missing",
+                }
+                return JsonResponse(response_data, safe=False, status=422)
+            else:
+                text = request_data['text']
+                openai.api_key = OPEN_AI_KEY
+                response = openai.images.generate(
+                    model="dall-e-3",
+                    prompt=text,
+                    size="1024x1024",
+                    quality="hd",
+                    n=1,
+                )
+                image_url = response.data[0].url
+                response_data = {
+                    "url": image_url,
+                    "message": "Data Found"
+                }
+                return JsonResponse(response_data, safe=False, status=200)
+        except Exception as ex:
+            print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
+            error = {
+                "message": "something went wrong"
+            }
+            return JsonResponse(error, safe=False, status=500)
+
+
+class TextGeneration(APIView):
+    def post(self, request):
+        try:
+            request_data = request.data
+            if len(request_data) == 0:
+                response_data = {
+                    "message": "request body is missing",
+                }
+                return JsonResponse(response_data, safe=False, status=422)
+            elif "text" not in request_data:
+                response_data = {
+                    "message": "text is missing",
+                }
+                return JsonResponse(response_data, safe=False, status=422)
+            else:
+                text = request_data['text']
+                text_type = request_data['textType'] if "textType" in request_data else 1
+                openai_api_key = OPEN_AI_KEY
+                headers = {
+                    "Authorization": f"Bearer {openai_api_key}",
+                    "Content-Type": "application/json",
+                }
+
+                if text_type == 1:
+                    pass
+                elif text_type == 2:
+                    text = text + " and make it formal"
+                elif text_type == 3:
+                    text = text + " and make it Fun"
+                elif text_type == 4:
+                    text = text + " translate the text to tamil"
+                elif text_type == 5:
+                    text = text + " translate the text to hindi"
+                elif text_type == 6:
+                    text = text + " rewrite the above text"
+                elif text_type == 7:
+                    text = text + " make the above text formal"
+                elif text_type == 8:
+                    text = text + " make the above text fun"
+                else:
+                    pass
+
+                text = text + "\n Return only message without any explanation"
+
+                data = {
+                    "model": "gpt-4o-mini",
+                    "messages": [
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": text}
+                    ]
+                }
+
+                response = requests.post("https://api.openai.com/v1/chat/completions", json=data, headers=headers)
+                print(response.json())
+                response_text = response.json()['choices'][0]['message']['content']
+                if text_type == 1:
+                    if ":\n" in response_text:
+                        response_text = response_text.split(":\n")[1]
+                    if '\" \'' in response_text:
+                        response_text = response_text.split('\" \'')[0]
+                    if '\n\n' in response_text:
+                        response_text = response_text.split('\n\n')[0]
+                    if " (" in response_text:
+                        response_text = response_text.split(" (")[0]
+                    if ": " in response_text:
+                        response_text = response_text.split(": ")[1]
+
+                    response_text = response_text.replace("\"", "")
+                    response_text.replace("\n", "")
+
+                if "Hindi:" in response_text and text_type == 5:
+                    response_text = response_text.split("Hindi:")[1]
+
+                response_data = {
+                    "text": response_text,
+                    "message": "Data Found"
+                }
+                return JsonResponse(response_data, safe=False, status=200)
+        except Exception as ex:
+            print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
+            error = {
+                "message": "something went wrong"
+            }
+            return JsonResponse(error, safe=False, status=500)
