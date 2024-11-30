@@ -60,8 +60,7 @@ CORS_ORIGIN_ALLOW_ALL = True
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Replace with your frontend URL
-    "https://whatsapp-api.theunderdogcrew.com",
-    "*"
+    "https://whatsapp-api.theunderdogcrew.com"
 ]
 
 CORS_ALLOW_METHODS = (
