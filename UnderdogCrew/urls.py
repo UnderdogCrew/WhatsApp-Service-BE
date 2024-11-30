@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from ai_apis import views
 from whatsapp_apis import views as whatsapp_apis
-from loginService import views as login_service
+from login_apis import views as login_service
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
@@ -34,7 +34,8 @@ schema_view = get_schema_view(
    ),
    public=True,
    permission_classes=(permissions.AllowAny,),
-   url='https://whatsapp-api.theunderdogcrew.com/',
+#    url='https://whatsapp-api.theunderdogcrew.com/',
+
 )
 
 urlpatterns = [

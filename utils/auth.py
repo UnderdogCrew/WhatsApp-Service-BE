@@ -4,15 +4,17 @@ from functools import wraps
 from django.conf import settings
 from django.http import JsonResponse
 
-def generate_tokens(user_id):
+def generate_tokens(user_id,user_email):
     access_token = jwt.encode({
         'user_id': str(user_id),
-        'exp': datetime.utcnow() + timedelta(hours=1),
+        'user_email':user_email,
+        'exp': datetime.utcnow() + timedelta(days=1),
         'type': 'access'
     }, settings.SECRET_KEY, algorithm='HS256')
     
     refresh_token = jwt.encode({
         'user_id': str(user_id),
+        'user_email':user_email,
         'exp': datetime.utcnow() + timedelta(days=7),
         'type': 'refresh'
     }, settings.SECRET_KEY, algorithm='HS256')

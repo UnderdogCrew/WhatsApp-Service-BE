@@ -19,14 +19,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Get the current directory path
 current_directory = os.getcwd()
 
-print(f"Current Directory: {current_directory}")
 env_path = current_directory+"/env"
 # env_path = "/Users/neelpatel/Desktop/project-ai/UnderdogCrew/env"
 load_dotenv(dotenv_path=env_path)
 API_KEY = os.getenv("API_KEY")
 OPEN_AI_KEY=os.getenv("OPEN_AI_KEY")
 MONGODB_ATLAS_CLUSTER_URI = os.getenv("MONGODB_ATLAS_CLUSTER_URI")
-DB_NAME = os.getenv("DB_NAME")
+MONGODB_NAME = os.getenv("DB_NAME")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
@@ -54,6 +53,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'ai_apis',
     'whatsapp_apis',
+    'login_apis',
     'drf_yasg',
 ]
 
@@ -156,7 +156,3 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# MongoDB settings
-MONGODB_URI = 'your_mongodb_atlas_connection_string'
-MONGODB_NAME = 'your_database_name'

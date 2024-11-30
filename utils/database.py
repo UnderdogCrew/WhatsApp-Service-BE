@@ -8,7 +8,7 @@ class MongoDB:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(MongoDB, cls).__new__(cls)
-            cls._instance.client = MongoClient(settings.MONGODB_URI)
+            cls._instance.client = MongoClient(settings.MONGODB_ATLAS_CLUSTER_URI)
             cls._instance.db = cls._instance.client[settings.MONGODB_NAME]
         return cls._instance
 
