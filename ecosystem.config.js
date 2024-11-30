@@ -1,6 +1,6 @@
 module.exports = {
   apps : [{
-    name: 'underdog-crew',
+    name: 'whatsapp-service',
     script: 'manage.py',
     args: 'runserver 0.0.0.0:8000',
     instances: 1,
