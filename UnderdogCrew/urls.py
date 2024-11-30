@@ -24,11 +24,11 @@ from drf_yasg import openapi
 
 schema_view = get_schema_view(
    openapi.Info(
-      title="Your API Title",
+      title="Whatsapp-Service-API",
       default_version='v1',
       description="API documentation",
-      terms_of_service="https://www.google.com/policies/terms/",
-      contact=openapi.Contact(email="contact@yourapi.local"),
+      terms_of_service="https://privacy-policy.theunderdogcrew.com/",
+      contact=openapi.Contact(email="hello@theunderdogcrew.com"),
       license=openapi.License(name="BSD License"),
    ),
    public=True,
