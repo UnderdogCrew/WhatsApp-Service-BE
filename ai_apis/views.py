@@ -9,6 +9,9 @@ import json
 from UnderdogCrew.settings import API_KEY, OPEN_AI_KEY
 import pandas as pd
 import openai
+from rest_framework import status
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 
 '''
@@ -19,6 +22,28 @@ API_TOKEN = API_KEY
 
 
 class SendMessage(APIView):
+    @swagger_auto_schema(
+        operation_description="Send a message via WhatsApp",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'text': openapi.Schema(type=openapi.TYPE_STRING, description='Text message to send'),
+                'fileUrl': openapi.Schema(type=openapi.TYPE_STRING, description='URL of the Excel file'),
+                'image_url': openapi.Schema(type=openapi.TYPE_STRING, description='Image URL (optional)'),
+            },
+            required=['text', 'fileUrl']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            422: 'Unprocessable Entity',
+            500: 'Internal Server Error'
+        }
+    )
     def post(self, request):
         try:
             print(f"API_TOKEN: {API_TOKEN}")
@@ -112,6 +137,18 @@ class SendMessage(APIView):
 
 
 class FacebookWebhook(APIView):
+    @swagger_auto_schema(
+        operation_description="Webhook for Facebook messages",
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            500: 'Internal Server Error'
+        }
+    )
     def post(self, request):
         try:
             data = request.data
@@ -166,6 +203,13 @@ class FacebookWebhook(APIView):
             return JsonResponse("EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT", safe=False,
                                 status=500)
 
+    @swagger_auto_schema(
+        operation_description="Verify the webhook",
+        responses={
+            200: openapi.Response('Challenge response'),
+            500: 'Internal Server Error'
+        }
+    )
     def get(self, request):
         try:
             data = request.GET.get("hub.verify_token")
@@ -185,6 +229,27 @@ class FacebookWebhook(APIView):
 
 
 class ImageGeneration(APIView):
+    @swagger_auto_schema(
+        operation_description="Generate an image from text",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'text': openapi.Schema(type=openapi.TYPE_STRING, description='Text prompt for image generation'),
+            },
+            required=['text']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'url': openapi.Schema(type=openapi.TYPE_STRING, description='Generated image URL'),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            422: 'Unprocessable Entity',
+            500: 'Internal Server Error'
+        }
+    )
     def post(self, request):
         try:
             request_data = request.data
@@ -223,6 +288,28 @@ class ImageGeneration(APIView):
 
 
 class TextGeneration(APIView):
+    @swagger_auto_schema(
+        operation_description="Generate text based on input",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'text': openapi.Schema(type=openapi.TYPE_STRING, description='Input text for generation'),
+                'textType': openapi.Schema(type=openapi.TYPE_INTEGER, description='Type of text transformation (optional)'),
+            },
+            required=['text']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'text': openapi.Schema(type=openapi.TYPE_STRING, description='Generated text'),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            422: 'Unprocessable Entity',
+            500: 'Internal Server Error'
+        }
+    )
     def post(self, request):
         try:
             request_data = request.data

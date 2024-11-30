@@ -5,6 +5,9 @@ from whatsapp_apis.serializer import VerifyBusinessPhoneNumberSerializer
 import sys
 import requests
 from UnderdogCrew.settings import API_KEY
+from rest_framework import status
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 
 # Function to check phone number and country code
@@ -22,6 +25,24 @@ def check_phone_number(data, phone_number, country_code):
 
 # APIView with serializer integration
 class VerifyBusinessPhoneNumber(APIView):
+    @swagger_auto_schema(
+        operation_description="Verify a business phone number",
+        request_body=VerifyBusinessPhoneNumberSerializer,
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'business_id': openapi.Schema(type=openapi.TYPE_STRING),
+                    'is_verified': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'phone_number': openapi.Schema(type=openapi.TYPE_STRING),
+                    'country_code': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            400: 'Bad Request',
+            500: 'Internal Server Error'
+        }
+    )
     def post(self, request):
         try:
             # Validate incoming data with the serializer
@@ -69,6 +90,20 @@ class VerifyBusinessPhoneNumber(APIView):
 
 
 class MessageTemplates(APIView):
+    @swagger_auto_schema(
+        operation_description="Retrieve message templates",
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
+                }
+            )),
+            400: 'Template not found',
+            500: 'Internal Server Error'
+        }
+    )
     def get(self, request):
         try:
             url = "https://graph.facebook.com/v21.0/236353759566806/message_templates"
