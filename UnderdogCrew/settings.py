@@ -52,7 +52,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'ai_apis',
-    'whatsapp_apis'
+    'whatsapp_apis',
+    'drf_yasg',
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
