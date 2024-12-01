@@ -33,13 +33,11 @@ def token_required(f):
                 token = auth_header.split(" ")[1]
             except IndexError:
                 return JsonResponse({
-                    'status': 'error',
                     'message': 'Invalid token format'
                 }, status=401)
 
         if not token:
             return JsonResponse({
-                'status': 'error',
                 'message': 'Token is missing'
             }, status=401)
 
@@ -50,15 +48,12 @@ def token_required(f):
             current_user_id = data['user_id']
         except jwt.ExpiredSignatureError:
             return JsonResponse({
-                'status': 'error',
                 'message': 'Token has expired'
             }, status=401)
         except jwt.InvalidTokenError as e:
             return JsonResponse({
-                'status': 'error',
                 'message': str(e)
             }, status=401)
-
         return f(*args, current_user_id, **kwargs)
-
+    
     return decorated

@@ -13,7 +13,7 @@ class S3Helper:
         )
         self.bucket_name = settings.AWS_STORAGE_BUCKET_NAME
 
-    def upload_file(self, file_obj, folder_name):
+    def upload_file(self, file_obj, folder_name, file_extension):
         """Upload a file to S3 bucket"""
         try:
             # Generate unique filename
@@ -25,13 +25,11 @@ class S3Helper:
                 file_obj,
                 self.bucket_name,
                 unique_filename,
-                ExtraArgs={
-                    'ContentType': file_obj.content_type
-                }
+                ExtraArgs={'ACL': 'public-read','ContentType': 'auto'}
             )
 
             # Generate URL
-            url = f"https://{self.bucket_name}.s3.amazonaws.com/{unique_filename}"
+            url = f"https://{self.bucket_name}.s3.{settings.AWS_REGION}.amazonaws.com/{unique_filename}"
             return url
 
         except ClientError as e:

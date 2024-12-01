@@ -1,15 +1,16 @@
-import re
-from django.shortcuts import render
 from rest_framework.views import APIView
-from django.http import HttpResponse, JsonResponse
+from django.http import  JsonResponse
 from rest_framework import status
 from django.contrib.auth.hashers import make_password, check_password
 from drf_yasg import openapi
+from bson import ObjectId
 from drf_yasg.utils import swagger_auto_schema
 from utils.database import MongoDB
 from utils.auth import generate_tokens, token_required
-from .serializers import SignupSerializer, LoginSerializer, FileUploadSerializer
+from .serializers import SignupSerializer, LoginSerializer, FileUploadSerializer, FileUploadResponseSerializer
 from utils.s3_helper import S3Helper
+from .utils import get_file_extension, validate_file
+from rest_framework.parsers import MultiPartParser, FormParser
 
 # Create your views here.
 
@@ -170,6 +171,8 @@ class LoginView(APIView):
 
 
 class FileUploadView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+    
     @swagger_auto_schema(
         operation_description="Upload file to S3 bucket",
         manual_parameters=[
@@ -179,48 +182,21 @@ class FileUploadView(APIView):
                 description="Bearer token",
                 type=openapi.TYPE_STRING,
                 required=True
-            )
+            ),
         ],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'file': openapi.Schema(type=openapi.TYPE_FILE, description='File to upload'),
-                'file_type': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description='Type of file',
-                    enum=['image', 'excel', 'doc', 'pdf']
-                ),
-            },
-            required=['file', 'file_type']
-        ),
+        request_body=FileUploadSerializer,
         responses={
-            200: openapi.Response('Success', openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'status': openapi.Schema(type=openapi.TYPE_STRING),
-                    'message': openapi.Schema(type=openapi.TYPE_STRING),
-                    'data': openapi.Schema(
-                        type=openapi.TYPE_OBJECT,
-                        properties={
-                            'file_url': openapi.Schema(type=openapi.TYPE_STRING),
-                            'file_type': openapi.Schema(type=openapi.TYPE_STRING),
-                            'uploaded_by': openapi.Schema(type=openapi.TYPE_STRING),
-                        }
-                    ),
-                }
-            )),
+            200: FileUploadResponseSerializer,
             400: 'Bad Request',
             401: 'Unauthorized',
+            404: 'Not Found',
             500: 'Internal Server Error'
         }
     )
     @token_required
     def post(self, request, current_user_id):
         try:
-            # Initialize MongoDB connection
             db = MongoDB()
-            
-            # Validate request data
             serializer = FileUploadSerializer(data=request.data)
             if not serializer.is_valid():
                 return JsonResponse({
@@ -228,20 +204,37 @@ class FileUploadView(APIView):
                     'errors': serializer.errors
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            validated_data = serializer.validated_data
-            file_obj = validated_data['file']
-            file_type = validated_data['file_type']
-
-            # Get user details
-            user = db.find_document('users', {'_id': current_user_id})
+            file = serializer.validated_data['file']
+            
+            print(current_user_id,"========>")
+            # Get user details and check status
+            user = db.find_document('users', {
+                '_id': ObjectId(current_user_id),
+            })
+            
             if not user:
                 return JsonResponse({
-                    'message': 'User not found'
+                    'message': 'Active user not found'
                 }, status=status.HTTP_404_NOT_FOUND)
 
-            # Initialize S3 helper and upload file
+            # Validate file
+            is_valid, file_type, mime_type = validate_file(file)
+            if not is_valid:
+                return JsonResponse({
+                    'message': f'Invalid file type: {mime_type}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get file extension and determine folder
+            file_extension = get_file_extension(mime_type)
+            folder = f"{current_user_id}/{file_type}s"
+
+            # Upload to S3
             s3_helper = S3Helper()
-            file_url = s3_helper.upload_file(file_obj, file_type)
+            file_url = s3_helper.upload_file(
+                file_obj=file,
+                folder_name=folder,
+                file_extension=file_extension
+            )
 
             if not file_url:
                 return JsonResponse({
@@ -254,7 +247,10 @@ class FileUploadView(APIView):
                 'data': {
                     'file_url': file_url,
                     'file_type': file_type,
-                    'uploaded_by': user['email'],
+                    'file_name': file.name,
+                    'file_size': file.size,
+                    'mime_type': mime_type,
+                    'uploaded_by': user['email']
                 }
             }, status=status.HTTP_200_OK)
 

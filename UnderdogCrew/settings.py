@@ -26,6 +26,11 @@ API_KEY = os.getenv("API_KEY")
 OPEN_AI_KEY=os.getenv("OPEN_AI_KEY")
 MONGODB_ATLAS_CLUSTER_URI = os.getenv("MONGODB_ATLAS_CLUSTER_URI")
 MONGODB_NAME = os.getenv("DB_NAME")
+# AWS S3 Settings
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+AWS_REGION = os.getenv("AWS_REGION")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/

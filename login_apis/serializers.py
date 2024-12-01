@@ -1,5 +1,6 @@
 from rest_framework import serializers
 import re
+from django.core.validators import FileExtensionValidator
 
 class SignupSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -29,5 +30,28 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField() 
 
 class FileUploadSerializer(serializers.Serializer):
-    file = serializers.FileField()
-    file_type = serializers.ChoiceField(choices=['image', 'excel', 'doc', 'pdf'])
+    file = serializers.FileField(
+        validators=[FileExtensionValidator(
+            allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx']
+        )]
+    )
+    file_type = serializers.ChoiceField(
+        choices=['image', 'document', 'excel'],
+        required=True
+    )
+
+
+class FileUploadResponseSerializer(serializers.Serializer):
+    status = serializers.CharField(default='success')
+    message = serializers.CharField(default='File uploaded successfully')
+    data = serializers.DictField(
+        child=serializers.CharField(),
+        default={
+            'file_url': serializers.CharField(),
+            'file_type': serializers.CharField(),
+            'file_name': serializers.CharField(),
+            'file_size': serializers.IntegerField(),
+            'mime_type': serializers.CharField(),
+            'uploaded_by': serializers.CharField()
+        }
+    )
