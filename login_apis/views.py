@@ -13,6 +13,8 @@ from .utils import get_file_extension, validate_file
 from rest_framework.parsers import MultiPartParser, FormParser
 from utils.twilio_otp import generate_otp, send_otp
 from datetime import datetime, timezone
+import twilio
+import re
 
 # Create your views here.
 
@@ -285,9 +287,10 @@ class OTPGenerate(APIView):
     def post(self, request):
         try:
             phone_number = request.data.get('phone_number')
-            if not phone_number:
+            # Validate phone number format
+            if not phone_number or not re.match(r'^\+\d{1,3}\d{10,15}$', phone_number):
                 return JsonResponse({
-                    'message': 'Phone number is required'
+                    'message': 'Phone number must include country code and be followed by the number'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             db = MongoDB()
@@ -309,7 +312,10 @@ class OTPGenerate(APIView):
                 'status': 'success',
                 'message': 'OTP sent successfully'
             }, status=status.HTTP_200_OK)
-
+        except twilio.base.exceptions.TwilioRestException as e:
+            return JsonResponse({
+                'message': str(e.msg)
+            })
         except Exception as e:
             return JsonResponse({
                 'message': str(e)
@@ -344,6 +350,12 @@ class OTPVerify(APIView):
             phone_number = request.data.get('phone_number')
             input_otp = request.data.get('otp')
 
+            # Validate phone number format
+            if not phone_number or not re.match(r'^\+\d{1,3}\d{10,15}$', phone_number):
+                return JsonResponse({
+                    'message': 'Phone number must include country code and be followed by the number'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
             if not phone_number or not input_otp:
                 return JsonResponse({
                     'message': 'Phone number and OTP are required'
@@ -352,32 +364,32 @@ class OTPVerify(APIView):
             db = MongoDB()
             
             # Find the latest OTP for this phone number
-            otp_record = db.find_document('otps', {
+            otp_record = db.find_documents('otps', {
                 'phone_number': phone_number,
                 'is_verified': False
-            }, sort=[('created_at', -1)])
+            }, sort=[('created_at', -1)],limit=1)
 
             if not otp_record:
                 return JsonResponse({
                     'message': 'No OTP found for this number'
                 }, status=status.HTTP_404_NOT_FOUND)
-
+        
             # Check if OTP is expired (2 minutes validity)
-            time_diff = datetime.now(timezone.utc) - otp_record['created_at']
+            time_diff = datetime.now(timezone.utc) - otp_record[0]['created_at'].astimezone(timezone.utc)
             if time_diff.total_seconds() > 120:  # 2 minutes
                 return JsonResponse({
                     'message': 'OTP has expired'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            if str(otp_record['otp']) != str(input_otp):
+            if str(otp_record[0]['otp']) != str(input_otp):
                 return JsonResponse({
                     'message': 'Invalid OTP'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             # Mark OTP as verified
             db.update_document('otps', 
-                {'_id': otp_record['_id']}, 
-                {'$set': {'is_verified': True}}
+                {'_id': otp_record[0]['_id']}, 
+                {'is_verified': True}
             )
 
             return JsonResponse({

@@ -26,6 +26,15 @@ class MongoDB:
         collection = self.get_collection(collection_name)
         return collection.find_one(query)
 
+    def find_documents(self, collection_name, query, sort=None,limit=None):
+        collection = self.get_collection(collection_name)
+        cursor = collection.find(query)
+        if sort:
+            cursor = cursor.sort(sort)
+        if limit:
+            cursor = cursor.limit(limit)  # Apply sorting if provided
+        return list(cursor)
+    
     def update_document(self, collection_name, query, update_data):
         collection = self.get_collection(collection_name)
         update_data['updated_at'] = datetime.utcnow()
