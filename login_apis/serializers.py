@@ -5,7 +5,8 @@ from django.core.validators import FileExtensionValidator
 class SignupSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(min_length=8, max_length=50)
-    username = serializers.CharField(min_length=3, max_length=50)
+    first_name = serializers.CharField(max_length=20)
+    last_name = serializers.CharField(max_length=20)
     business_number = serializers.CharField(max_length=20)
 
     def validate_password(self, value):
@@ -18,10 +19,10 @@ class SignupSerializer(serializers.Serializer):
         return value
 
     def validate_business_number(self, value):
-        # Custom business number validation
-        if not value.isalnum():
+        # Custom business number (phone number) validation
+        if not re.match(r'^\+\d{1,3}\d{10,15}$', value):
             raise serializers.ValidationError(
-                "Business number must contain only letters and numbers"
+                "Business number must include country code and be followed by the number"
             )
         return value
 
