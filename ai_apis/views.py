@@ -21,6 +21,43 @@ from drf_yasg import openapi
 API_TOKEN = API_KEY
 
 
+def process_components(components, msg_data, image_url):
+    result_list = []
+
+    for component in components:
+        if component['type'].upper() == "HEADER" and component.get('format') == "IMAGE":
+            # Process HEADER with type IMAGE
+            header_entry = {
+                "type": "header",
+                "parameters": [
+                    {
+                        "type": "image",
+                        "image": {
+                            "link": image_url
+                        }
+                    }
+                ]
+            }
+            result_list.append(header_entry)
+
+        elif component['type'].upper() == "BODY" and 'body_text' in component.get('example', {}):
+            # Process BODY
+            body_parameters = []
+            for i, text in enumerate(component['example']['body_text'][0]):
+                body_parameters.append({
+                    "type": "text",
+                    "text": msg_data.get('Name') if i == 0 else text
+                })
+
+            body_entry = {
+                "type": "body",
+                "parameters": body_parameters
+            }
+            result_list.append(body_entry)
+
+    return result_list
+
+
 class SendMessage(APIView):
     @swagger_auto_schema(
         operation_description="Send a message via WhatsApp",
@@ -30,8 +67,18 @@ class SendMessage(APIView):
                 'text': openapi.Schema(type=openapi.TYPE_STRING, description='Text message to send'),
                 'fileUrl': openapi.Schema(type=openapi.TYPE_STRING, description='URL of the Excel file'),
                 'image_url': openapi.Schema(type=openapi.TYPE_STRING, description='Image URL (optional)'),
+                'template_name': openapi.Schema(type=openapi.TYPE_STRING, description='Name of the template to send'),
+                'message_type': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description='Type of message to send (1 for bulk, 2 for single numbers)'
+                ),
+                'numbers': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Items(type=openapi.TYPE_STRING),
+                    description='Array of phone numbers for single messages (optional, required if message_type=2)'
+                ),
             },
-            required=['text', 'fileUrl']
+            required=['text', 'message_type', 'template_name']
         ),
         responses={
             200: openapi.Response('Success', openapi.Schema(
@@ -49,91 +96,116 @@ class SendMessage(APIView):
             print(f"API_TOKEN: {API_TOKEN}")
             url = "https://graph.facebook.com/v19.0/450885871446042/messages"
             request_data = request.data
-            if len(request_data) == 0:
-                response_data = {
-                    "message": "request body is missing",
-                }
-                return JsonResponse(response_data, safe=False, status=422)
-            elif "text" not in request_data:
-                response_data = {
-                    "message": "text is missing",
-                }
-                return JsonResponse(response_data, safe=False, status=422)
-            elif "fileUrl" not in request_data:
-                response_data = {
-                    "message": "to is missing",
-                }
-                return JsonResponse(response_data, safe=False, status=422)
-            else:
-                text = request_data['text']
-                image_url = request_data['image_url'] if "image_url" in request_data else ""
-                # Load the Excel file
-                file_path = request_data['fileUrl']
-                df = pd.read_excel(file_path)
+            template_name = request_data.get("template_name", None)
+            # Validate required fields
+            if not request_data:
+                return JsonResponse({"message": "Request body is missing"}, safe=False, status=422)
+            if "text" not in request_data:
+                return JsonResponse({"message": "Text is missing"}, safe=False, status=422)
+            if "fileUrl" not in request_data:
+                return JsonResponse({"message": "File URL is missing"}, safe=False, status=422)
+            if "message_type" not in request_data:
+                return JsonResponse({"message": "Message type is missing"}, safe=False, status=422)
+            if template_name is None:
+                return JsonResponse({"message": "Template name is missing"}, safe=False, status=422)
 
-                # Iterate over rows using `iterrows`
-                print("Iterating over rows:")
+            template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
+            headers = {
+                'Authorization': f'Bearer {API_KEY}'
+            }
+            template_response = requests.request("GET", template_url, headers=headers)
+            if template_response.status_code != 200:
+                return JsonResponse({"message": "Template is missing"}, safe=False, status=422)
+
+            template_data = template_response.json()
+            template_components = template_data['data'][0]['components']
+
+            text = request_data['text']
+            file_path = request_data['fileUrl']
+            message_type = request_data['message_type']
+
+            image_url = request_data.get('image_url', "")
+            numbers = request_data.get('numbers', [])
+
+            if message_type == 2 and not numbers:
+                return JsonResponse(
+                    {"message": "Numbers array is required for message_type 2"},
+                    safe=False,
+                    status=422
+                )
+
+            if message_type == 1 and file_path == "":
+                return JsonResponse(
+                    {"message": "file is required for message_type 1"},
+                    safe=False,
+                    status=422
+                )
+
+            if message_type == 1:
+                # Bulk messaging using the Excel file
+                msg_details = {
+                    "Name": text
+                }
+
+                components = process_components(template_components, msg_details, image_url)
+                df = pd.read_excel(file_path)
                 for index, row in df.iterrows():
-                    print(f"Row {index}: {row.to_dict()}")
                     msg_data = row.to_dict()
+
                     payload = json.dumps({
                         "messaging_product": "whatsapp",
                         "recipient_type": "individual",
                         "to": f"91{msg_data['To Number']}",
                         "type": "template",
                         "template": {
-                            "name": "hotel",
+                            "name": template_name,
                             "language": {
                                 "code": "en"
                             },
-                            "components": [
-                                {
-                                    "type": "header",
-                                    "parameters": [
-                                        {
-                                            "type": "image",
-                                            "image": {
-                                                "link": image_url
-                                            }
-                                        }
-                                    ]
-                                },
-                                {
-                                    "type": "body",
-                                    "parameters": [
-                                        {
-                                            "type": "text",
-                                            "text": msg_data['Name']
-                                        },
-                                        {
-                                            "type": "text",
-                                            "text": "Underdog Crew"
-                                        }
-                                    ]
-                                }
-                            ]
+                            "components": components
                         }
                     })
                     headers = {
-                        'Authorization': 'Bearer '+API_TOKEN,
-                        'Content-Type': 'application/json',
-                        'Cookie': 'ps_l=0; ps_n=0'
+                        'Authorization': 'Bearer ' + API_TOKEN,
+                        'Content-Type': 'application/json'
                     }
-                    print(f"payload {payload}")
-                    response = requests.request("POST", url, headers=headers, data=payload)
+                    print(f"Sending bulk message payload: {payload}")
+                    response = requests.post(url, headers=headers, data=payload)
+                    print(response.json())
+            elif message_type == 2:
+                # Sending messages to specific numbers
+                msg_details = {
+                    "Name": text
+                }
 
+                components = process_components(template_components, msg_details, image_url)
+                for number in numbers:
+                    payload = json.dumps({
+                        "messaging_product": "whatsapp",
+                        "recipient_type": "individual",
+                        "to": f"91{number}",
+                        "type": "template",
+                        "template": {
+                            "name": template_name,
+                            "language": {
+                                "code": "en"
+                            },
+                            "components": components
+                        }
+                    })
+                    headers = {
+                        'Authorization': 'Bearer ' + API_TOKEN,
+                        'Content-Type': 'application/json'
+                    }
+                    print(f"Sending single message payload: {payload}")
+                    response = requests.post(url, headers=headers, data=payload)
                     print(response.json())
 
-                response_data = {
-                    "message": "Message send successfully"
-                }
-                return JsonResponse(response_data, safe=False, status=200)
+            return JsonResponse({"message": "Messages sent successfully"}, safe=False, status=200)
+
         except Exception as ex:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
-            error = {
-                "message": "something went wrong"
-            }
-            return JsonResponse(error, safe=False, status=500)
+            return JsonResponse({"message": "Something went wrong"}, safe=False, status=500)
 
 
 class FacebookWebhook(APIView):
