@@ -11,6 +11,10 @@ from .serializers import SignupSerializer, LoginSerializer, FileUploadSerializer
 from utils.s3_helper import S3Helper
 from .utils import get_file_extension, validate_file
 from rest_framework.parsers import MultiPartParser, FormParser
+from utils.twilio_otp import generate_otp, send_otp
+from datetime import datetime, timezone
+import twilio
+import re
 
 # Create your views here.
 
@@ -205,8 +209,7 @@ class FileUploadView(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             file = serializer.validated_data['file']
-            
-            print(current_user_id,"========>")
+                        
             # Get user details and check status
             user = db.find_document('users', {
                 '_id': ObjectId(current_user_id),
@@ -252,6 +255,146 @@ class FileUploadView(APIView):
                     'mime_type': mime_type,
                     'uploaded_by': user['email']
                 }
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class OTPGenerate(APIView):
+    @swagger_auto_schema(
+        operation_description="Send OTP to phone number",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'phone_number': openapi.Schema(type=openapi.TYPE_STRING, description='Phone number with country code'),
+            },
+            required=['phone_number']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            400: 'Bad Request',
+            500: 'Internal Server Error'
+        }
+    )
+    def post(self, request):
+        try:
+            phone_number = request.data.get('phone_number')
+            # Validate phone number format
+            if not phone_number or not re.match(r'^\+\d{1,3}\d{10,15}$', phone_number):
+                return JsonResponse({
+                    'message': 'Phone number must include country code and be followed by the number'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            db = MongoDB()
+            otp = generate_otp()
+            
+            # Store OTP in MongoDB with timestamp
+            otp_data = {
+                'phone_number': phone_number,
+                'otp': otp,
+                'created_at': datetime.now(timezone.utc),
+                'is_verified': False
+            }
+            # Send OTP via Twilio
+            send_otp(phone_number, otp)
+
+            db.create_document('otps', otp_data)
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'OTP sent successfully'
+            }, status=status.HTTP_200_OK)
+        except twilio.base.exceptions.TwilioRestException as e:
+            return JsonResponse({
+                'message': str(e.msg)
+            })
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class OTPVerify(APIView):
+    @swagger_auto_schema(
+        operation_description="Verify OTP",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'phone_number': openapi.Schema(type=openapi.TYPE_STRING, description='Phone number with country code'),
+                'otp': openapi.Schema(type=openapi.TYPE_STRING, description='OTP received'),
+            },
+            required=['phone_number', 'otp']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            400: 'Bad Request',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    def post(self, request):
+        try:
+            phone_number = request.data.get('phone_number')
+            input_otp = request.data.get('otp')
+
+            # Validate phone number format
+            if not phone_number or not re.match(r'^\+\d{1,3}\d{10,15}$', phone_number):
+                return JsonResponse({
+                    'message': 'Phone number must include country code and be followed by the number'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if not phone_number or not input_otp:
+                return JsonResponse({
+                    'message': 'Phone number and OTP are required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            db = MongoDB()
+            
+            # Find the latest OTP for this phone number
+            otp_record = db.find_documents('otps', {
+                'phone_number': phone_number,
+                'is_verified': False
+            }, sort=[('created_at', -1)],limit=1)
+
+            if not otp_record:
+                return JsonResponse({
+                    'message': 'No OTP found for this number'
+                }, status=status.HTTP_404_NOT_FOUND)
+        
+            # Check if OTP is expired (2 minutes validity)
+            time_diff = datetime.now(timezone.utc) - otp_record[0]['created_at'].astimezone(timezone.utc)
+            if time_diff.total_seconds() > 120:  # 2 minutes
+                return JsonResponse({
+                    'message': 'OTP has expired'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if str(otp_record[0]['otp']) != str(input_otp):
+                return JsonResponse({
+                    'message': 'Invalid OTP'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Mark OTP as verified
+            db.update_document('otps', 
+                {'_id': otp_record[0]['_id']}, 
+                {'is_verified': True}
+            )
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'OTP verified successfully'
             }, status=status.HTTP_200_OK)
 
         except Exception as e:

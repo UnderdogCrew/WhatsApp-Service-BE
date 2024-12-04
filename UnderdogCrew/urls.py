@@ -50,5 +50,7 @@ urlpatterns = [
     path('message_templates', whatsapp_apis.MessageTemplates.as_view(), name='MessageTemplates'),
     path('sign_up',login_service.SignupView.as_view(),name='SignupView'),
     path('login',login_service.LoginView.as_view(),name='LoginView'),
-    path('upload',login_service.FileUploadView.as_view(),name='FileUploadView')
+    path('upload',login_service.FileUploadView.as_view(),name='FileUploadView'),
+    path('otp/generate/', login_service.OTPGenerate.as_view(), name='OTPGenerate'),  # Added URL for generating OTP
+    path('otp/verify/', login_service.OTPVerify.as_view(), name='OTPVerify'),      # Added URL for verifying OTP
 ]
