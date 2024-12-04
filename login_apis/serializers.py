@@ -5,7 +5,8 @@ from django.core.validators import FileExtensionValidator
 class SignupSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(min_length=8, max_length=50)
-    username = serializers.CharField(min_length=3, max_length=50)
+    first_name = serializers.CharField(max_length=20)
+    last_name = serializers.CharField(max_length=20)
     business_number = serializers.CharField(max_length=20)
 
     def validate_password(self, value):
