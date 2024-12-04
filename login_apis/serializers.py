@@ -18,10 +18,10 @@ class SignupSerializer(serializers.Serializer):
         return value
 
     def validate_business_number(self, value):
-        # Custom business number validation
-        if not value.isalnum():
+        # Custom business number (phone number) validation
+        if not re.match(r'^\+\d{1,3}\d{10,15}$', value):
             raise serializers.ValidationError(
-                "Business number must contain only letters and numbers"
+                "Business number must include country code and be followed by the number"
             )
         return value
 

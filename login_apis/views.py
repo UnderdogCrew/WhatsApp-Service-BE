@@ -26,10 +26,12 @@ class SignupView(APIView):
             properties={
                 'email': openapi.Schema(type=openapi.TYPE_STRING, description='User email'),
                 'password': openapi.Schema(type=openapi.TYPE_STRING, description='User password'),
-                'username': openapi.Schema(type=openapi.TYPE_STRING, description='Username'),
+                'first_name': openapi.Schema(type=openapi.TYPE_STRING, description='First name'),
+                'last_name': openapi.Schema(type=openapi.TYPE_STRING, description='Last name'),
                 'business_number': openapi.Schema(type=openapi.TYPE_STRING, description='Business number'),
+                'business_id': openapi.Schema(type=openapi.TYPE_STRING, description='Business ID (optional)'),
             },
-            required=['email', 'password', 'username', 'business_number']
+            required=['email', 'password', 'first_name', 'last_name', 'business_number']
         ),
         responses={
             201: openapi.Response('Created', openapi.Schema(
@@ -64,10 +66,16 @@ class SignupView(APIView):
 
             validated_data = serializer.validated_data
 
-            # Check if user already exists
+            # Check if user already exists by email
             if db.find_document('users', {'email': validated_data['email']}):
                 return JsonResponse({
                     'message': 'Email already exists'
+                }, safe=False, status=status.HTTP_409_CONFLICT)
+
+            # Check if business_number already exists
+            if db.find_document('users', {'business_number': validated_data['business_number']}):
+                return JsonResponse({
+                    'message': 'Business number already exists'
                 }, safe=False, status=status.HTTP_409_CONFLICT)
 
             # Create user
@@ -75,13 +83,15 @@ class SignupView(APIView):
                 'email': validated_data['email'],
                 'password': make_password(validated_data['password']),
                 'base_encoded_password': validated_data['password'],
-                'username': validated_data['username'],
+                'first_name': validated_data['first_name'],
+                'last_name': validated_data['last_name'],
                 'business_number': validated_data['business_number'],
-                'default_credit':1000
+                'business_id': validated_data.get('business_id', ''),
+                'default_credit': 1000
             }
 
-            user_id = db.create_document('users',user_data)
-            access_token, refresh_token = generate_tokens(user_id,validated_data['email'])
+            user_id = db.create_document('users', user_data)
+            access_token, refresh_token = generate_tokens(user_id, validated_data['email'])
 
             return JsonResponse({
                 'status': 'success',
@@ -90,18 +100,20 @@ class SignupView(APIView):
                     'user': {
                         'id': user_id,
                         'email': validated_data['email'],
-                        'username': validated_data['username']
+                        'first_name': validated_data['first_name'],
+                        'last_name': validated_data['last_name'],
+                        'business_id': user_data['business_id']
                     },
                     'tokens': {
                         'access': access_token,
                         'refresh': refresh_token
                     }
                 }
-            },safe=False, status=status.HTTP_201_CREATED)
+            }, safe=False, status=status.HTTP_201_CREATED)
         except Exception as e:
             return JsonResponse({
                 'message': str(e)
-            },safe=False, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            }, safe=False, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class LoginView(APIView):
     @swagger_auto_schema(
