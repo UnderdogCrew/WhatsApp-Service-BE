@@ -168,7 +168,8 @@ class LoginView(APIView):
                         'user': {
                             'id': str(user['_id']),
                             'email': user['email'],
-                            'username': user['username']
+                            'first_name': user['first_name'],
+                            'last_name': user['last_name']
                         },
                         'tokens': {
                             'access': access_token,
