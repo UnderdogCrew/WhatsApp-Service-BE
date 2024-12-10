@@ -7,7 +7,7 @@ from bson import ObjectId
 from drf_yasg.utils import swagger_auto_schema
 from utils.database import MongoDB
 from utils.auth import generate_tokens, token_required
-from .serializers import SignupSerializer, LoginSerializer, FileUploadSerializer, FileUploadResponseSerializer
+from .serializers import SignupSerializer, LoginSerializer, FileUploadSerializer, FileUploadResponseSerializer, BusinessDetailsSerializer
 from utils.s3_helper import S3Helper
 from .utils import get_file_extension, validate_file
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -410,6 +410,119 @@ class OTPVerify(APIView):
                 'message': 'OTP verified successfully'
             }, status=status.HTTP_200_OK)
 
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class BusinessDetails(APIView):
+    @swagger_auto_schema(
+        operation_description="Update WhatsApp business details",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        request_body=BusinessDetailsSerializer,
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            400: 'Bad Request',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required  # Assuming you want to protect this endpoint
+    def patch(self, request, current_user_id):
+        try:
+            serializer = BusinessDetailsSerializer(data=request.data)  # Validate incoming data
+            if not serializer.is_valid():
+                return JsonResponse({
+                    'message': 'Validation error',
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Extract validated data
+            business_details = serializer.validated_data
+
+            db = MongoDB()
+            # Update the user's WhatsApp business details
+            result = db.update_document('users', 
+                {'_id': ObjectId(current_user_id)}, 
+                {'whatsapp_business_details': business_details}
+            )
+
+            if result.modified_count == 0:
+                return JsonResponse({
+                    'message': 'No changes made or user not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'WhatsApp business details updated successfully'
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        operation_description="Get WhatsApp business details",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'whatsapp_business_details': openapi.Schema(type=openapi.TYPE_OBJECT),
+                        }
+                    ),
+                }
+            )),
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required  # Assuming you want to protect this endpoint
+    def get(self, request, current_user_id):
+        try:
+            db = MongoDB()
+            # Fetch the user's WhatsApp business details
+            user = db.find_document('users', {'_id': ObjectId(current_user_id)})
+
+            if not user or 'whatsapp_business_details' not in user:
+                return JsonResponse({
+                    'message': 'WhatsApp business details not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'WhatsApp business details retrieved successfully',
+                'data': {
+                    'whatsapp_business_details': user['whatsapp_business_details']
+                }
+            }, status=status.HTTP_200_OK)
         except Exception as e:
             return JsonResponse({
                 'message': str(e)
