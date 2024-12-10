@@ -35,7 +35,7 @@ schema_view = get_schema_view(
    public=True,
    permission_classes=(permissions.AllowAny,),
    url='https://whatsapp-api.theunderdogcrew.com/',
-    # url='http://127.0.0.1:8000/',
+#    url='http://127.0.0.1:8000/',
 )
 
 urlpatterns = [
@@ -51,6 +51,7 @@ urlpatterns = [
     path('sign_up',login_service.SignupView.as_view(),name='SignupView'),
     path('login',login_service.LoginView.as_view(),name='LoginView'),
     path('upload',login_service.FileUploadView.as_view(),name='FileUploadView'),
-    path('otp/generate/', login_service.OTPGenerate.as_view(), name='OTPGenerate'),  # Added URL for generating OTP
-    path('otp/verify/', login_service.OTPVerify.as_view(), name='OTPVerify'),      # Added URL for verifying OTP
+    path('otp/generate/', login_service.OTPGenerate.as_view(), name='OTPGenerate'),
+    path('otp/verify/', login_service.OTPVerify.as_view(), name='OTPVerify'),      
+    path('business-details/', login_service.BusinessDetails.as_view(), name='update_whatsapp_business_details'),
 ]

@@ -56,3 +56,9 @@ class FileUploadResponseSerializer(serializers.Serializer):
             'uploaded_by': serializers.CharField()
         }
     )
+
+class BusinessDetailsSerializer(serializers.Serializer):
+    category = serializers.CharField(required=True, max_length=255)
+    business_name = serializers.CharField(required=True, max_length=255)
+    timezone = serializers.CharField(required=True, max_length=200)
+    description = serializers.CharField(required=False, allow_blank=True, max_length=500)  # Optional field
