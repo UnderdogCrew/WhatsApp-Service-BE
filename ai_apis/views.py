@@ -247,6 +247,7 @@ class FacebookWebhook(APIView):
     )
     def post(self, request):
         try:
+            db = MongoDB()
             data = request.data
             print(f"data: {data}")
             entry = data['entry']
