@@ -54,4 +54,5 @@ urlpatterns = [
     path('otp/generate/', login_service.OTPGenerate.as_view(), name='OTPGenerate'),
     path('otp/verify/', login_service.OTPVerify.as_view(), name='OTPVerify'),      
     path('business-details/', login_service.BusinessDetails.as_view(), name='update_whatsapp_business_details'),
+     path('verify-email', login_service.EmailVerificationView.as_view(), name='verify_email')
 ]

@@ -44,6 +44,7 @@ class SignupView(APIView):
                         properties={
                             'user': openapi.Schema(type=openapi.TYPE_OBJECT),
                             'tokens': openapi.Schema(type=openapi.TYPE_OBJECT),
+                            'business_verified': openapi.Schema(type=openapi.TYPE_BOOLEAN),
                         }
                     ),
                 }
@@ -93,6 +94,9 @@ class SignupView(APIView):
             user_id = db.create_document('users', user_data)
             access_token, refresh_token = generate_tokens(user_id, validated_data['email'])
 
+            # Check if WhatsApp business details exist
+            business_verified = 'whatsapp_business_details' in user_data
+
             return JsonResponse({
                 'status': 'success',
                 'message': 'User created successfully',
@@ -107,7 +111,8 @@ class SignupView(APIView):
                     'tokens': {
                         'access': access_token,
                         'refresh': refresh_token
-                    }
+                    },
+                    'business_verified': business_verified
                 }
             }, safe=False, status=status.HTTP_201_CREATED)
         except Exception as e:
@@ -137,6 +142,7 @@ class LoginView(APIView):
                         properties={
                             'user': openapi.Schema(type=openapi.TYPE_OBJECT),
                             'tokens': openapi.Schema(type=openapi.TYPE_OBJECT),
+                            'business_verified': openapi.Schema(type=openapi.TYPE_BOOLEAN),
                         }
                     ),
                 }
@@ -160,7 +166,11 @@ class LoginView(APIView):
             user = db.find_document('users', {'email': validated_data['email']})
 
             if user and check_password(validated_data['password'], user['password']):
-                access_token, refresh_token = generate_tokens(str(user['_id']),validated_data['email'])
+                access_token, refresh_token = generate_tokens(str(user['_id']), validated_data['email'])
+                
+                # Check if WhatsApp business details exist
+                business_verified = 'whatsapp_business_details' in user
+
                 return JsonResponse({
                     'status': 'success',
                     'message': 'Login successful',
@@ -174,9 +184,10 @@ class LoginView(APIView):
                         'tokens': {
                             'access': access_token,
                             'refresh': refresh_token
-                        }
+                        },
+                        'business_verified': business_verified  # Add business_verified key
                     }
-                },safe=False, status=status.HTTP_200_OK)
+                }, safe=False, status=status.HTTP_200_OK)
             return JsonResponse({
                 'message': 'Invalid credentials'
             }, safe=False, status=status.HTTP_401_UNAUTHORIZED)
@@ -523,6 +534,53 @@ class BusinessDetails(APIView):
                     'whatsapp_business_details': user['whatsapp_business_details']
                 }
             }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class EmailVerificationView(APIView):
+    @swagger_auto_schema(
+        operation_description="Verify if an email is already registered",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='User email'),
+            },
+            required=['email']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'exists': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                }
+            )),
+            400: 'Bad Request',
+            500: 'Internal Server Error'
+        }
+    )
+    def post(self, request):
+        try:
+            email = request.data.get('email')
+
+            # Validate email format
+            if not email or not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
+                return JsonResponse({
+                    'message': 'Invalid email format'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            db = MongoDB()
+            user_exists = db.find_document('users', {'email': email})
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Email verification successful',
+                'exists': user_exists is not None  # True if user exists, False otherwise
+            }, status=status.HTTP_200_OK)
+
         except Exception as e:
             return JsonResponse({
                 'message': str(e)
