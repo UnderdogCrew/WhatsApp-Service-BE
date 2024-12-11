@@ -264,7 +264,7 @@ class FacebookWebhook(APIView):
                     {'_id': user['_id']},
                     {
                         'message_status': statuses[0]['status'],
-                        f"{statuses[0]['status']}_at": statuses[0]['timestamp']
+                        f"{statuses[0]['status']}_at": int(statuses[0]['timestamp'])
                     }
                 )
 
