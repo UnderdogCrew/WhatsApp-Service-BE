@@ -12,6 +12,7 @@ import openai
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from utils.database import MongoDB
 
 
 '''
@@ -43,6 +44,7 @@ def process_components(components, msg_data, image_url):
         elif component['type'].upper() == "BODY" and 'body_text' in component.get('example', {}):
             # Process BODY
             body_parameters = []
+            print(component['example']['body_text'][0])
             for i, text in enumerate(component['example']['body_text'][0]):
                 body_parameters.append({
                     "type": "text",
@@ -93,6 +95,7 @@ class SendMessage(APIView):
     )
     def post(self, request):
         try:
+            db = MongoDB()
             print(f"API_TOKEN: {API_TOKEN}")
             url = "https://graph.facebook.com/v19.0/450885871446042/messages"
             request_data = request.data
@@ -114,6 +117,7 @@ class SendMessage(APIView):
                 'Authorization': f'Bearer {API_KEY}'
             }
             template_response = requests.request("GET", template_url, headers=headers)
+            print(template_response.status_code)
             if template_response.status_code != 200:
                 return JsonResponse({"message": "Template is missing"}, safe=False, status=422)
 
@@ -172,6 +176,17 @@ class SendMessage(APIView):
                     print(f"Sending bulk message payload: {payload}")
                     response = requests.post(url, headers=headers, data=payload)
                     print(response.json())
+
+                    whatsapp_status_logs = {
+                        "number": f"91{msg_data['To Number']}",
+                        "message": text,
+                        "id": response.json()['messages'][0]["id"],
+                        "message_status": response.json()['messages'][0]["message_status"],
+                        "created_at": int(datetime.datetime.now().timestamp()),
+                        "template_name": template_name
+                    }
+                    db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+
             elif message_type == 2:
                 # Sending messages to specific numbers
                 msg_details = {
@@ -200,6 +215,15 @@ class SendMessage(APIView):
                     print(f"Sending single message payload: {payload}")
                     response = requests.post(url, headers=headers, data=payload)
                     print(response.json())
+                    whatsapp_status_logs = {
+                        "number": f"91{number}",
+                        "message": text,
+                        "id": response.json()['messages'][0]["id"],
+                        "message_status": response.json()['messages'][0]["message_status"],
+                        "created_at": int(datetime.datetime.now().timestamp()),
+                        "template_name": template_name
+                    }
+                    db.create_document('whatsapp_message_logs', whatsapp_status_logs)
 
             return JsonResponse({"message": "Messages sent successfully"}, safe=False, status=200)
 
@@ -229,6 +253,20 @@ class FacebookWebhook(APIView):
             changes = entry[0]['changes']
             value = changes[0]['value']
             phone_number_id = value['metadata']['phone_number_id']
+            statuses = value['statuses']
+
+            # need to add the logs in database
+            user = db.find_document('whatsapp_message_logs', {'id': statuses[0]['id']})
+            if user:
+                db.update_document(
+                    'whatsapp_message_logs',
+                    {'_id': user['_id']},
+                    {
+                        'message_status': statuses[0]['status'],
+                        f"{statuses[0]['status']}_at": statuses[0]['timestamp']
+                    }
+                )
+
             try:
                 messages = value['messages'][0]['text']['body']
                 from_number = value['messages'][0]['from']
