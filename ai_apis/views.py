@@ -105,8 +105,6 @@ class SendMessage(APIView):
                 return JsonResponse({"message": "Request body is missing"}, safe=False, status=422)
             if "text" not in request_data:
                 return JsonResponse({"message": "Text is missing"}, safe=False, status=422)
-            if "fileUrl" not in request_data:
-                return JsonResponse({"message": "File URL is missing"}, safe=False, status=422)
             if "message_type" not in request_data:
                 return JsonResponse({"message": "Message type is missing"}, safe=False, status=422)
             if template_name is None:
@@ -125,7 +123,7 @@ class SendMessage(APIView):
             template_components = template_data['data'][0]['components']
 
             text = request_data['text']
-            file_path = request_data['fileUrl']
+            file_path = request_data['fileUrl'] if "fileUrl" in request_data else ""
             message_type = request_data['message_type']
 
             image_url = request_data.get('image_url', "")
