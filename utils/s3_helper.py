@@ -13,7 +13,7 @@ class S3Helper:
         )
         self.bucket_name = settings.AWS_STORAGE_BUCKET_NAME
 
-    def upload_file(self, file_obj, folder_name, file_extension):
+    def upload_file(self, file_obj, folder_name, file_extension,content_type=None):
         """Upload a file to S3 bucket"""
         try:
             # Generate unique filename
@@ -25,7 +25,8 @@ class S3Helper:
                 file_obj,
                 self.bucket_name,
                 unique_filename,
-                ExtraArgs={'ACL': 'public-read','ContentType': 'auto'}
+                ExtraArgs={'ACL': 'public-read',
+                           'ContentType': content_type}
             )
 
             # Generate URL
