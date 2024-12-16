@@ -15,6 +15,8 @@ from utils.twilio_otp import generate_otp, send_otp
 from datetime import datetime, timezone
 import twilio
 import re
+import jwt
+from django.conf import settings
 
 # Create your views here.
 
@@ -44,7 +46,7 @@ class SignupView(APIView):
                         properties={
                             'user': openapi.Schema(type=openapi.TYPE_OBJECT),
                             'tokens': openapi.Schema(type=openapi.TYPE_OBJECT),
-                            'business_verified': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            'business_verified': openapi.Schema(type=openapi.TYPE_INTEGER),
                         }
                     ),
                 }
@@ -88,15 +90,15 @@ class SignupView(APIView):
                 'last_name': validated_data['last_name'],
                 'business_number': validated_data['business_number'],
                 'business_id': validated_data.get('business_id', ''),
-                'default_credit': 1000
+                'default_credit': 1000,
+                'is_email_verified': False  # Set default value for email verification
             }
 
             user_id = db.create_document('users', user_data)
             access_token, refresh_token = generate_tokens(user_id, validated_data['email'])
 
             # Check if WhatsApp business details exist
-            business_verified = 'whatsapp_business_details' in user_data
-
+            business_verified = 0  # Default to 0 (no business details)
             return JsonResponse({
                 'status': 'success',
                 'message': 'User created successfully',
@@ -106,13 +108,14 @@ class SignupView(APIView):
                         'email': validated_data['email'],
                         'first_name': validated_data['first_name'],
                         'last_name': validated_data['last_name'],
-                        'business_id': user_data['business_id']
+                        'business_id': user_data['business_id'],
+                        'is_email_verified': user_data['is_email_verified'] if "is_email_verified" in user_data else False  # Add is_email_verified key
                     },
                     'tokens': {
                         'access': access_token,
                         'refresh': refresh_token
                     },
-                    'business_verified': business_verified
+                    'business_verified': business_verified  # Set to 0
                 }
             }, safe=False, status=status.HTTP_201_CREATED)
         except Exception as e:
@@ -142,7 +145,7 @@ class LoginView(APIView):
                         properties={
                             'user': openapi.Schema(type=openapi.TYPE_OBJECT),
                             'tokens': openapi.Schema(type=openapi.TYPE_OBJECT),
-                            'business_verified': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            'business_verified': openapi.Schema(type=openapi.TYPE_INTEGER),
                         }
                     ),
                 }
@@ -169,7 +172,13 @@ class LoginView(APIView):
                 access_token, refresh_token = generate_tokens(str(user['_id']), validated_data['email'])
                 
                 # Check if WhatsApp business details exist
-                business_verified = 'whatsapp_business_details' in user
+                if 'whatsapp_business_details' in user:
+                    if user['whatsapp_business_details'].get('verified', False):
+                        business_verified = 2  # Verified business details
+                    else:
+                        business_verified = 1  # Business details present but not verified
+                else:
+                    business_verified = 0  # No business details
 
                 return JsonResponse({
                     'status': 'success',
@@ -179,13 +188,14 @@ class LoginView(APIView):
                             'id': str(user['_id']),
                             'email': user['email'],
                             'first_name': user['first_name'],
-                            'last_name': user['last_name']
+                            'last_name': user['last_name'],
+                            'is_email_verified': user.get('is_email_verified', False)  # Add is_email_verified key
                         },
                         'tokens': {
                             'access': access_token,
                             'refresh': refresh_token
                         },
-                        'business_verified': business_verified  # Add business_verified key
+                        'business_verified': business_verified  # Set based on business details
                     }
                 }, safe=False, status=status.HTTP_200_OK)
             return JsonResponse({
@@ -260,7 +270,8 @@ class FileUploadView(APIView):
             file_url = s3_helper.upload_file(
                 file_obj=file,
                 folder_name=folder,
-                file_extension=file_extension
+                file_extension=file_extension,
+                content_type=mime_type
             )
 
             if not file_url:
@@ -581,6 +592,82 @@ class EmailVerificationView(APIView):
                 'exists': user_exists is not None  # True if user exists, False otherwise
             }, status=status.HTTP_200_OK)
 
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class RefreshTokenView(APIView):
+    @swagger_auto_schema(
+        operation_description="Refresh access token",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'access_token': openapi.Schema(type=openapi.TYPE_STRING),
+                        }
+                    ),
+                }
+            )),
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    def get(self, request):
+        try:
+            token = None
+            if 'Authorization' in request.headers:
+                auth_header = request.headers['Authorization']
+                try:
+                    token = auth_header.split(" ")[1]  # Extract the token
+                except IndexError:
+                    return JsonResponse({
+                        'message': 'Invalid token format'
+                    }, status=401)
+
+            if not token:
+                return JsonResponse({
+                    'message': 'Token is missing'
+                }, status=401)
+
+            # Decode the refresh token
+            data = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            user_id = data['user_id']
+            user_email = data['user_email']
+
+            # Generate new access token
+            access_token, _ = generate_tokens(user_id, user_email)
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Access token refreshed successfully',
+                'data': {
+                    'access_token': access_token
+                }
+            }, status=status.HTTP_200_OK)
+
+        except jwt.ExpiredSignatureError:
+            return JsonResponse({
+                'message': 'Refresh token has expired'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        except jwt.InvalidTokenError as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
             return JsonResponse({
                 'message': str(e)
