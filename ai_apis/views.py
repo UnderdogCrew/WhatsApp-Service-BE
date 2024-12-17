@@ -13,6 +13,7 @@ from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from utils.database import MongoDB
+import pytz
 
 
 '''
@@ -575,7 +576,11 @@ class UserDashboard(APIView):
             # Validate and process date formats
             if start_date:
                 try:
-                    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+                    start_date_gmt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+
+                    # Localize to Asia/Kolkata timezone
+                    kolkata_timezone = pytz.timezone("Asia/Kolkata")
+                    start_date = kolkata_timezone.localize(start_date_gmt)
                 except ValueError:
                     return JsonResponse(
                         {"message": "Invalid start_date format. Use YYYY-MM-DD."},
@@ -583,8 +588,12 @@ class UserDashboard(APIView):
                     )
             if end_date:
                 try:
-                    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-                    end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=59)
+                    end_date_gmt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+                    end_date_gmt = end_date_gmt.replace(hour=23, minute=59, second=59, microsecond=59)
+
+                    # Localize to Asia/Kolkata timezone
+                    kolkata_timezone = pytz.timezone("Asia/Kolkata")
+                    end_date = kolkata_timezone.localize(end_date_gmt)
                 except ValueError:
                     return JsonResponse(
                         {"message": "Invalid end_date format. Use YYYY-MM-DD."},
@@ -606,15 +615,15 @@ class UserDashboard(APIView):
             query_filter = {"user_id": user_id}
             text_filter = {"user_id": user_id}
             if start_date:
-                query_filter["created_at"] = {"$gte": int(start_date.timestamp())}
-                text_filter["created_at"] = {"$gte": int(start_date.timestamp())}
+                query_filter["created_at"] = {"$gte": start_date}
+                text_filter["created_at"] = {"$gte": start_date}
             if end_date:
                 if "created_at" in query_filter:
-                    query_filter["created_at"]["$lte"] = int(end_date.timestamp())
-                    text_filter["created_at"]["$lte"] = int(end_date.timestamp())
+                    query_filter["created_at"]["$lte"] = end_date
+                    text_filter["created_at"]["$lte"] = end_date
                 else:
-                    query_filter["created_at"] = {"$lte": int(end_date.timestamp())}
-                    text_filter["created_at"] = {"$lte": int(end_date.timestamp())}
+                    query_filter["created_at"] = {"$lte": end_date}
+                    text_filter["created_at"] = {"$lte": end_date}
             print(f"text filter: {text_filter}")
             # Fetch data from database
             total_message = len(db.find_documents("whatsapp_message_logs", query_filter))
