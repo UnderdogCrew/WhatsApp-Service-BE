@@ -584,7 +584,7 @@ class UserDashboard(APIView):
             if end_date:
                 try:
                     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-                    end_date = end_date.replace(hour=23, minute=59, second=59, millisecond=59)
+                    end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=59)
                 except ValueError:
                     return JsonResponse(
                         {"message": "Invalid end_date format. Use YYYY-MM-DD."},
