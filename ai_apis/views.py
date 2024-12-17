@@ -96,6 +96,7 @@ class SendMessage(APIView):
     def post(self, request):
         try:
             db = MongoDB()
+            user_id = "1"
             print(f"API_TOKEN: {API_TOKEN}")
             url = "https://graph.facebook.com/v19.0/450885871446042/messages"
             request_data = request.data
@@ -178,6 +179,7 @@ class SendMessage(APIView):
                     whatsapp_status_logs = {
                         "number": f"91{msg_data['To Number']}",
                         "message": text,
+                        "user_id": user_id,
                         "id": response.json()['messages'][0]["id"],
                         "message_status": response.json()['messages'][0]["message_status"],
                         "created_at": int(datetime.datetime.now().timestamp()),
@@ -216,6 +218,7 @@ class SendMessage(APIView):
                     whatsapp_status_logs = {
                         "number": f"91{number}",
                         "message": text,
+                        "user_id": user_id,
                         "id": response.json()['messages'][0]["id"],
                         "message_status": response.json()['messages'][0]["message_status"],
                         "created_at": int(datetime.datetime.now().timestamp()),
@@ -361,6 +364,7 @@ class ImageGeneration(APIView):
     )
     def post(self, request):
         try:
+            user_id = "1"
             request_data = request.data
             if len(request_data) == 0:
                 response_data = {
@@ -383,6 +387,15 @@ class ImageGeneration(APIView):
                     n=1,
                 )
                 image_url = response.data[0].url
+
+                image_generation_logs = {
+                    "message": text,
+                    "user_id": user_id,
+                    "created_at": int(datetime.datetime.now().timestamp()),
+                    "image_url": image_url
+                }
+                db.create_document('image_generation_logs', image_generation_logs)
+
                 response_data = {
                     "url": image_url,
                     "message": "Data Found"
@@ -421,6 +434,7 @@ class TextGeneration(APIView):
     )
     def post(self, request):
         try:
+            user_id = "1"
             request_data = request.data
             if len(request_data) == 0:
                 response_data = {
@@ -491,6 +505,16 @@ class TextGeneration(APIView):
                 if "Hindi:" in response_text and text_type == 5:
                     response_text = response_text.split("Hindi:")[1]
 
+                text_generation_logs = {
+                    "message": text,
+                    "user_id": user_id,
+                    "created_at": int(datetime.datetime.now().timestamp()),
+                    "response": response_text,
+                    "input_token": len(text),
+                    "output_token": len(response_text),
+                }
+                db.create_document('text_generation_logs', text_generation_logs)
+
                 response_data = {
                     "text": response_text,
                     "message": "Data Found"
@@ -502,3 +526,109 @@ class TextGeneration(APIView):
                 "message": "something went wrong"
             }
             return JsonResponse(error, safe=False, status=500)
+
+
+
+class UserDashboard(APIView):
+    @swagger_auto_schema(
+        operation_description="Fetch user dashboard data",
+        manual_parameters=[
+            openapi.Parameter(
+                "start_date",
+                openapi.IN_QUERY,
+                description="Start date for filtering data (optional, format: YYYY-MM-DD)",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "end_date",
+                openapi.IN_QUERY,
+                description="End date for filtering data (optional, format: YYYY-MM-DD)",
+                type=openapi.TYPE_STRING,
+                required=False,
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                "Success",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "data": openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_OBJECT)),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                    },
+                )
+            ),
+            401: "Unauthorized",
+            500: "Internal Server Error",
+        }
+    )
+    def get(self, request):
+        try:
+            user_id = "1"
+            # Parse optional query parameters
+            start_date = request.query_params.get("start_date", None)
+            end_date = request.query_params.get("end_date", None)
+
+            # Validate and process date formats
+            if start_date:
+                try:
+                    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+                except ValueError:
+                    return JsonResponse(
+                        {"message": "Invalid start_date format. Use YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            if end_date:
+                try:
+                    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+                except ValueError:
+                    return JsonResponse(
+                        {"message": "Invalid end_date format. Use YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            # # Validate Authorization header
+            # auth_token = request.headers.get("Authorization")
+            # if not auth_token:
+            #     return Response(
+            #         {"message": "Authorization header missing"},
+            #         status=status.HTTP_401_UNAUTHORIZED,
+            #     )
+
+            # Connect to the database
+            db = MongoDB()
+
+            # Build query filter based on dates
+            query_filter = {"user_id": user_id}
+            text_filter = {"user_id": user_id}
+            if start_date:
+                query_filter["created_at"] = {"$gte": int(start_date.timestamp())}
+                text_filter["created_at"] = {"$gte": int(start_date.timestamp())}
+            if end_date:
+                if "created_at" in query_filter:
+                    query_filter["created_at"]["$lte"] = int(end_date.timestamp())
+                    text_filter["created_at"]["$lte"] = int(end_date.timestamp())
+                else:
+                    query_filter["created_at"] = {"$lte": int(end_date.timestamp())}
+                    text_filter["created_at"] = {"$lte": int(end_date.timestamp())}
+
+            # Fetch data from database
+            total_message = len(db.find_documents("whatsapp_message_logs", query_filter))
+            query_filter['status'] = "delivered"
+            total_message_received = len(db.find_documents("whatsapp_message_logs", query_filter))
+            text_generation_logs = len(db.find_documents("text_generation_logs", text_filter))
+            image_generation_logs = len(db.find_documents("image_generation_logs", text_filter))
+
+            response_data = {
+                "total_message": total_message,
+                "total_message_received": total_message_received,
+                "text_generation_logs": text_generation_logs,
+                "image_generation_logs": image_generation_logs
+            }
+
+            return JsonResponse(response_data, status=status.HTTP_200_OK)
+
+        except Exception as ex:
+            print(f"Error: {ex}")
+            return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -34,8 +34,8 @@ schema_view = get_schema_view(
    ),
    public=True,
    permission_classes=(permissions.AllowAny,),
-   url='https://whatsapp-api.theunderdogcrew.com/',
-   # url='http://127.0.0.1:8000/',
+   # url='https://whatsapp-api.theunderdogcrew.com/',
+   url='http://127.0.0.1:8000/',
 )
 
 urlpatterns = [
@@ -43,6 +43,7 @@ urlpatterns = [
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path('send/message', views.SendMessage.as_view(), name='SendMessage'),
+    path('dashboard', views.UserDashboard.as_view(), name='UserDashboard'),
     path('webhook', views.FacebookWebhook.as_view(), name='FacebookWebhook'),
     path('image-generation', views.ImageGeneration.as_view(), name='ImageGeneration'),
     path('text-generation', views.TextGeneration.as_view(), name='TextGeneration'),
@@ -54,5 +55,5 @@ urlpatterns = [
     path('otp/generate/', login_service.OTPGenerate.as_view(), name='OTPGenerate'),
     path('otp/verify/', login_service.OTPVerify.as_view(), name='OTPVerify'),      
     path('business-details/', login_service.BusinessDetails.as_view(), name='update_whatsapp_business_details'),
-     path('verify-email', login_service.EmailVerificationView.as_view(), name='verify_email')
+    path('verify-email', login_service.EmailVerificationView.as_view(), name='verify_email')
 ]
