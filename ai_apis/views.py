@@ -584,6 +584,7 @@ class UserDashboard(APIView):
             if end_date:
                 try:
                     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+                    end_date = end_date.replace(hour=23, minute=59, second=59, millisecond=59)
                 except ValueError:
                     return JsonResponse(
                         {"message": "Invalid end_date format. Use YYYY-MM-DD."},
@@ -614,7 +615,7 @@ class UserDashboard(APIView):
                 else:
                     query_filter["created_at"] = {"$lte": int(end_date.timestamp())}
                     text_filter["created_at"] = {"$lte": int(end_date.timestamp())}
-
+            print(f"text filter: {text_filter}")
             # Fetch data from database
             total_message = len(db.find_documents("whatsapp_message_logs", query_filter))
             query_filter['status'] = "delivered"
