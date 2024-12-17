@@ -364,6 +364,7 @@ class ImageGeneration(APIView):
     )
     def post(self, request):
         try:
+            db = MongoDB()
             user_id = "1"
             request_data = request.data
             if len(request_data) == 0:
@@ -434,6 +435,7 @@ class TextGeneration(APIView):
     )
     def post(self, request):
         try:
+            db = MongoDB()
             user_id = "1"
             request_data = request.data
             if len(request_data) == 0:
