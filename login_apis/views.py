@@ -14,9 +14,10 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from utils.twilio_otp import generate_otp, send_otp
 from datetime import datetime, timezone
 import twilio
+from UnderdogCrew.settings import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD ,SECRET_KEY
 import re
 import jwt
-from django.conf import settings
+from rest_framework.permissions import IsAuthenticated
 
 # Create your views here.
 
@@ -477,6 +478,8 @@ class BusinessDetails(APIView):
             business_details = serializer.validated_data
 
             db = MongoDB()
+
+            business_details["verified"] = False
             # Update the user's WhatsApp business details
             result = db.update_document('users', 
                 {'_id': ObjectId(current_user_id)}, 
@@ -645,7 +648,7 @@ class RefreshTokenView(APIView):
                 }, status=401)
 
             # Decode the refresh token
-            data = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             user_id = data['user_id']
             user_email = data['user_email']
 
@@ -668,6 +671,185 @@ class RefreshTokenView(APIView):
             return JsonResponse({
                 'message': str(e)
             }, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AdminLoginView(APIView):
+    @swagger_auto_schema(
+        operation_description="Admin login for superadmin user",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Superadmin email'),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description='Superadmin password'),
+            },
+            required=['email', 'password']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'tokens': openapi.Schema(type=openapi.TYPE_OBJECT),
+                        }
+                    ),
+                }
+            )),
+            401: 'Invalid credentials',
+            500: 'Internal Server Error'
+        }
+    )
+    def post(self, request):
+        email = request.data.get('email')
+        password = request.data.get('password')
+
+        if email == SUPERADMIN_EMAIL and check_password(password, make_password(SUPERADMIN_PASSWORD)):
+            # Generate tokens for superadmin
+            access_token, refresh_token = generate_tokens("superadmin", SUPERADMIN_EMAIL)
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Admin login successful',
+                'data': {
+                    'tokens': {
+                        'access': access_token,
+                        'refresh': refresh_token
+                    }
+                }
+            }, status=status.HTTP_200_OK)
+
+        return JsonResponse({
+            'message': 'Invalid credentials'
+        }, status=status.HTTP_401_UNAUTHORIZED)
+
+class GetAllUsersView(APIView):
+    @swagger_auto_schema(
+        operation_description="Get all users with optional search and pagination",
+        manual_parameters=[
+            openapi.Parameter('search', openapi.IN_QUERY, description="Search by first name, last name, or email", type=openapi.TYPE_STRING),
+            openapi.Parameter('business_verified', openapi.IN_QUERY, description="Filter by WhatsApp business verified status (true/false)", type=openapi.TYPE_BOOLEAN),
+            openapi.Parameter('skip', openapi.IN_QUERY, description="Number of records to skip", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('limit', openapi.IN_QUERY, description="Number of records to return", type=openapi.TYPE_INTEGER),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
+                }
+            )),
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    def get(self, request):
+        search = request.query_params.get('search', '')
+        business_verified = request.query_params.get('business_verified', None)
+        skip = int(request.query_params.get('skip', 0))
+        limit = int(request.query_params.get('limit', 10))
+
+        # Initialize MongoDB connection
+        db = MongoDB()
+        query = {}
+
+        if search:
+            query['$or'] = [
+                {'first_name': {'$regex': search, '$options': 'i'}},
+                {'last_name': {'$regex': search, '$options': 'i'}},
+                {'email': {'$regex': search, '$options': 'i'}}
+            ]
+        if business_verified is not None:
+            query['whatsapp_business_details.verified'] = business_verified.lower() == 'true'
+
+         # Specify projection to exclude the password field
+        projection = {
+            'password': 0,
+            'base_encoded_password': 0 
+        }
+
+        users = db.find_documents('users', query, skip=skip, limit=limit,projection=projection)
+        if not users:
+            return JsonResponse({
+                'message': 'User not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        for user in users:
+            user['id'] = str(user['_id'])
+            del user['_id']
+
+        print(users)
+        return JsonResponse({
+            'status': 'success',
+            'data': users
+        }, status=status.HTTP_200_OK)
+
+class VerifyBusinessDetailsView(APIView):
+    @swagger_auto_schema(
+        operation_description="Verify WhatsApp business details and set business ID",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'user_id': openapi.Schema(type=openapi.TYPE_STRING, description='User ID to update'),
+                'business_id': openapi.Schema(type=openapi.TYPE_STRING, description='Business ID to set'),
+            },
+            required=['user_id', 'business_id']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            400: 'Bad Request',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    def patch(self, request):
+        try:
+            user_id = request.data.get('user_id')
+            business_id = request.data.get('business_id')
+
+            # Validate user_id and business_id
+            if not user_id or not business_id:
+                return JsonResponse({
+                    'message': 'User ID and Business ID are required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            db = MongoDB()
+            # Find the user with the provided user_id
+            user = db.find_document('users', {'_id': ObjectId(user_id)})
+
+            if not user:
+                return JsonResponse({
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Update the user's WhatsApp business details to set verified to True and add business_id
+            result = db.update_document('users', 
+                {'_id': ObjectId(user['_id'])}, 
+                {'whatsapp_business_details.verified': True, 'business_id': business_id}
+            )
+
+            if result.modified_count == 0:
+                return JsonResponse({
+                    'message': 'No changes made or user not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Business details verified and updated successfully'
+            }, status=status.HTTP_200_OK)
+
         except Exception as e:
             return JsonResponse({
                 'message': str(e)

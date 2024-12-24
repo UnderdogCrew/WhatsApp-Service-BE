@@ -26,11 +26,13 @@ class MongoDB:
         collection = self.get_collection(collection_name)
         return collection.find_one(query)
 
-    def find_documents(self, collection_name, query, sort=None,limit=None):
+    def find_documents(self, collection_name, query, sort=None, skip=None, limit=None, projection=None):
         collection = self.get_collection(collection_name)
-        cursor = collection.find(query)
+        cursor = collection.find(query, projection)
         if sort:
             cursor = cursor.sort(sort)
+        if skip:
+            cursor = cursor.skip(skip)
         if limit:
             cursor = cursor.limit(limit)  # Apply sorting if provided
         return list(cursor)
