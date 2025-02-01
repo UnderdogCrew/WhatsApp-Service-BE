@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Subscription, Plan
+from .models import Subscription, Plans
 
 class SubscriptionCancelRequestSerializer(serializers.Serializer):
     subscription_id = serializers.CharField()
@@ -17,5 +17,5 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
 class PlanSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Plan
+        model = Plans
         fields = '__all__' 

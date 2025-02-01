@@ -46,6 +46,7 @@ def token_required(f):
             if data.get('type') != 'access':
                 raise jwt.InvalidTokenError('Invalid token type')
             current_user_id = data['user_id']
+            current_user_email = data['user_email']
         except jwt.ExpiredSignatureError:
             return JsonResponse({
                 'message': 'Token has expired'
@@ -54,6 +55,6 @@ def token_required(f):
             return JsonResponse({
                 'message': str(e)
             }, status=401)
-        return f(*args, current_user_id, **kwargs)
+        return f(*args, current_user_id, current_user_email, **kwargs)
     
     return decorated

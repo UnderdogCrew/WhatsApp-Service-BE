@@ -65,7 +65,5 @@ urlpatterns = [
     path('subscriptions/cancel', subscription_views.SubscriptionCancelView.as_view(), name='subscription_cancel'),
     path('subscriptions/create-order', subscription_views.CreateOrderView.as_view(), name='create_order'),
     path('subscriptions/plans', subscription_views.PlansView.as_view(), name='plans'),
-    path('webhook/', subscription_views.WebhookView.as_view(), name='webhook'),
-
-
+    path('subscriptions/webhook', subscription_views.WebhookView.as_view(), name='webhook'),
 ]
