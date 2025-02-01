@@ -40,6 +40,10 @@ TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER')
 SUPERADMIN_EMAIL = os.getenv('SUPERADMIN_EMAIL')
 SUPERADMIN_PASSWORD = os.getenv('SUPERADMIN_PASSWORD')
 
+RAZORPAY_API_KEY = os.getenv('RAZORPAY_API_KEY')
+RAZORPAY_API_SECRET = os.getenv('RAZORPAY_API_SECRET')
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
+
 # New configuration variable
 SEND_LIVE_OTP = os.getenv('SEND_LIVE_OTP', 'false').lower() == 'true'
 
@@ -70,6 +74,7 @@ INSTALLED_APPS = [
     'ai_apis',
     'whatsapp_apis',
     'login_apis',
+    'subscriptions',
     'drf_yasg',
 ]
 

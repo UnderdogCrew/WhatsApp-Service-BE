@@ -233,7 +233,7 @@ class FileUploadView(APIView):
         }
     )
     @token_required
-    def post(self, request, current_user_id):
+    def post(self, request, current_user_id, current_user_email):
         try:
             db = MongoDB()
             serializer = FileUploadSerializer(data=request.data)
@@ -465,7 +465,7 @@ class BusinessDetails(APIView):
         }
     )
     @token_required  # Assuming you want to protect this endpoint
-    def patch(self, request, current_user_id):
+    def patch(self, request, current_user_id, current_user_email):
         try:
             serializer = BusinessDetailsSerializer(data=request.data)  # Validate incoming data
             if not serializer.is_valid():
@@ -530,7 +530,7 @@ class BusinessDetails(APIView):
         }
     )
     @token_required  # Assuming you want to protect this endpoint
-    def get(self, request, current_user_id):
+    def get(self, request, current_user_id, current_user_email):
         try:
             db = MongoDB()
             # Fetch the user's WhatsApp business details

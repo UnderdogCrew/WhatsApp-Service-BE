@@ -19,6 +19,7 @@ from django.urls import path
 from ai_apis import views
 from whatsapp_apis import views as whatsapp_apis
 from login_apis import views as login_service
+from subscriptions import views as subscription_views
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
@@ -34,8 +35,8 @@ schema_view = get_schema_view(
    ),
    public=True,
    permission_classes=(permissions.AllowAny,),
-   url='https://whatsapp-api.theunderdogcrew.com/',
-#    url='http://127.0.0.1:8000/',
+#    url='https://whatsapp-api.theunderdogcrew.com/',
+   url='http://127.0.0.1:8000/',
 )
 
 urlpatterns = [
@@ -59,5 +60,10 @@ urlpatterns = [
     path('refresh-token', login_service.RefreshTokenView.as_view(), name='refresh_token'),
     path('login/admin',login_service.AdminLoginView.as_view(), name='admin_login'),
     path('business-details/verify', login_service.VerifyBusinessDetailsView.as_view(), name='verify_whatsapp_business_details'),
-    path('users', login_service.GetAllUsersView.as_view(), name='get_all_users')
+    path('users', login_service.GetAllUsersView.as_view(), name='get_all_users'),
+    path('subscriptions', subscription_views.SubscriptionView.as_view(), name='subscription_view'),
+    path('subscriptions/cancel', subscription_views.SubscriptionCancelView.as_view(), name='subscription_cancel'),
+    path('subscriptions/create-order', subscription_views.CreateOrderView.as_view(), name='create_order'),
+    path('subscriptions/plans', subscription_views.PlansView.as_view(), name='plans'),
+    path('subscriptions/webhook', subscription_views.WebhookView.as_view(), name='webhook'),
 ]
