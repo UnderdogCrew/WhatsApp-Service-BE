@@ -14,6 +14,8 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from utils.database import MongoDB
 import pytz
+from ai_apis.schedule_task import schedule_message
+import threading
 
 
 '''
@@ -67,6 +69,7 @@ class SendMessage(APIView):
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
+                "schedule_type": openapi.Schema(type=openapi.TYPE_INTEGER, description='Type of the message which needs to send message for instante or schedule(1 for instante and 2 for schedule)'),
                 'text': openapi.Schema(type=openapi.TYPE_STRING, description='Text message to send'),
                 'fileUrl': openapi.Schema(type=openapi.TYPE_STRING, description='URL of the Excel file'),
                 'image_url': openapi.Schema(type=openapi.TYPE_STRING, description='Image URL (optional)'),
@@ -125,6 +128,7 @@ class SendMessage(APIView):
             template_components = template_data['data'][0]['components']
 
             text = request_data['text']
+            schedule_type = request_data['schedule_type'] if "schedule_type" in request_data else 1
             file_path = request_data['fileUrl'] if "fileUrl" in request_data else ""
             message_type = request_data['message_type']
 
@@ -144,6 +148,15 @@ class SendMessage(APIView):
                     safe=False,
                     status=422
                 )
+
+            if schedule_type == 2:
+                threading.Thread(target=schedule_message, args=(file_path, user_id, ),)
+                return JsonResponse(
+                    {"message": "Message scheduled successfully"},
+                    safe=False,
+                    status=200
+                )
+            
 
             if message_type == 1:
                 # Bulk messaging using the Excel file

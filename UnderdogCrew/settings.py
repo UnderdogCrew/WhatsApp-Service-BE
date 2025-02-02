@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+import redis
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -43,6 +44,19 @@ SUPERADMIN_PASSWORD = os.getenv('SUPERADMIN_PASSWORD')
 RAZORPAY_API_KEY = os.getenv('RAZORPAY_API_KEY')
 RAZORPAY_API_SECRET = os.getenv('RAZORPAY_API_SECRET')
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
+
+
+REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_DATABASE = os.getenv("REDIS_DATABASE")
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
+REDIS_USER = os.getenv("REDIS_USER")
+
+# Connect to Redis (update with your Redis instance details)
+redis_client = redis.Redis(
+    host=REDIS_HOST,  # Change this if your Redis is hosted remotely
+    port=6379,         # Default Redis port
+    db=0               # Default DB
+)
 
 # New configuration variable
 SEND_LIVE_OTP = os.getenv('SEND_LIVE_OTP', 'false').lower() == 'true'
