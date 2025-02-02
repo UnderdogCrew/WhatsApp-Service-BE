@@ -796,12 +796,12 @@ class UserMessageLogs(APIView):
             message_list = []
             for _message in total_message:
                 # Convert ISO string to datetime object
-                dt_obj = datetime.strptime(_message['created_at'], "%Y-%m-%dT%H:%M:%S.%f")
+                dt_obj = datetime.datetime.strptime(_message['created_at'], "%Y-%m-%dT%H:%M:%S.%f")
                 # Convert to a human-readable format
                 human_readable = dt_obj.strftime("%Y-%m-%d %H:%M:%S")
                 
                 try:
-                    updated_dt_obj = datetime.strptime(_message['updated_at'], "%Y-%m-%dT%H:%M:%S.%f")
+                    updated_dt_obj = datetime.datetime.strptime(_message['updated_at'], "%Y-%m-%dT%H:%M:%S.%f")
                     # Convert to a human-readable format
                     updated_at_human_readable = updated_dt_obj.strftime("%Y-%m-%d %H:%M:%S")
                 except:
@@ -809,7 +809,7 @@ class UserMessageLogs(APIView):
 
                 try:
                     # Convert to a datetime object
-                    sent_dt_obj = datetime.utcfromtimestamp(_message['sent_at'])
+                    sent_dt_obj = datetime.datetime.utcfromtimestamp(_message['sent_at'])
 
                     # Format it into a readable format
                     sent_dt_readable = sent_dt_obj.strftime("%Y-%m-%d %H:%M:%S")
@@ -818,7 +818,7 @@ class UserMessageLogs(APIView):
                 
                 try:
                     # Convert to a datetime object
-                    delivered_at_obj = datetime.utcfromtimestamp(_message['delivered_at'])
+                    delivered_at_obj = datetime.datetime.utcfromtimestamp(_message['delivered_at'])
 
                     # Format it into a readable format
                     delivered_at_readable = delivered_at_obj.strftime("%Y-%m-%d %H:%M:%S")
@@ -828,7 +828,7 @@ class UserMessageLogs(APIView):
 
                 try:
                     # Convert to a datetime object
-                    failed_at_obj = datetime.utcfromtimestamp(_message['failed_at'])
+                    failed_at_obj = datetime.datetime.utcfromtimestamp(_message['failed_at'])
 
                     # Format it into a readable format
                     failed_at_readable = failed_at_obj.strftime("%Y-%m-%d %H:%M:%S")
