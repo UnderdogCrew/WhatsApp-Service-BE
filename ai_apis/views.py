@@ -787,7 +787,10 @@ class UserMessageLogs(APIView):
                     text_filter["created_at"] = {"$lte": end_date}
             print(f"text filter: {text_filter}")
             # Fetch data from database
-            total_message = db.find_documents("whatsapp_message_logs", query_filter).sort([("_id", -1)]).skip(skip).limit(limit)
+            sort_order = [("_id", -1)]  # Sorting in descending order
+            skip_count = skip
+            limit_count = limit
+            total_message = db.find_documents("whatsapp_message_logs", query_filter, sort=sort_order, skip=skip_count, limit=limit_count)
             total_message_count = len(db.find_documents("whatsapp_message_logs", query_filter))
 
             message_list = []
