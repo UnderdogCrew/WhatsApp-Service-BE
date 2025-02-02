@@ -274,12 +274,29 @@ class FacebookWebhook(APIView):
             # need to add the logs in database
             user = db.find_document('whatsapp_message_logs', {'id': statuses[0]['id']})
             if user:
+                code = 0
+                title = ""
+                message = ""
+                error_data = ""
+                try:
+                    errors = statuses[0]['errors'][0]
+                    code = errors['code']
+                    title = errors['title']
+                    message = errors['message']
+                    error_data = errors['error_data']['details']
+                except:
+                    pass
+
                 db.update_document(
                     'whatsapp_message_logs',
                     {'_id': user['_id']},
                     {
                         'message_status': statuses[0]['status'],
-                        f"{statuses[0]['status']}_at": int(statuses[0]['timestamp'])
+                        f"{statuses[0]['status']}_at": int(statuses[0]['timestamp']),
+                        "code": code,
+                        "title": title,
+                        "message": message,
+                        "error_data": error_data,
                     }
                 )
 
