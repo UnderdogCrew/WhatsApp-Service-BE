@@ -295,7 +295,7 @@ class FacebookWebhook(APIView):
                         f"{statuses[0]['status']}_at": int(statuses[0]['timestamp']),
                         "code": code,
                         "title": title,
-                        "message": message,
+                        "error_message": message,
                         "error_data": error_data,
                     }
                 )
