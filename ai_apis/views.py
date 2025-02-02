@@ -674,3 +674,199 @@ class UserDashboard(APIView):
         except Exception as ex:
             print(f"Error: {ex}")
             return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class UserMessageLogs(APIView):
+    @swagger_auto_schema(
+        operation_description="Fetch user message logs",
+        manual_parameters=[
+            openapi.Parameter(
+                "start_date",
+                openapi.IN_QUERY,
+                description="Start date for filtering data (optional, format: YYYY-MM-DD)",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "end_date",
+                openapi.IN_QUERY,
+                description="End date for filtering data (optional, format: YYYY-MM-DD)",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "skip",
+                openapi.IN_QUERY,
+                description="skip the data",
+                type=openapi.TYPE_INTEGER,
+                required=False,
+            ),
+            openapi.Parameter(
+                "limit",
+                openapi.IN_QUERY,
+                description="limit the data",
+                type=openapi.TYPE_INTEGER,
+                required=False,
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                "Success",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "data": openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_OBJECT)),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                    },
+                )
+            ),
+            401: "Unauthorized",
+            500: "Internal Server Error",
+        }
+    )
+    def get(self, request):
+        try:
+            user_id = "1"
+            # Parse optional query parameters
+            start_date = request.query_params.get("start_date", None)
+            end_date = request.query_params.get("end_date", None)
+            skip = int(request.query_params.get("skip", 0))
+            limit = int(request.query_params.get("limit", 20))
+
+            # Validate and process date formats
+            if start_date:
+                try:
+                    start_date_gmt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+
+                    # Localize to Asia/Kolkata timezone
+                    kolkata_timezone = pytz.timezone("Asia/Kolkata")
+                    start_date = kolkata_timezone.localize(start_date_gmt)
+                except ValueError:
+                    return JsonResponse(
+                        {"message": "Invalid start_date format. Use YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            if end_date:
+                try:
+                    end_date_gmt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+                    end_date_gmt = end_date_gmt.replace(hour=23, minute=59, second=59, microsecond=59)
+
+                    # Localize to Asia/Kolkata timezone
+                    kolkata_timezone = pytz.timezone("Asia/Kolkata")
+                    end_date = kolkata_timezone.localize(end_date_gmt)
+                except ValueError:
+                    return JsonResponse(
+                        {"message": "Invalid end_date format. Use YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            # # Validate Authorization header
+            # auth_token = request.headers.get("Authorization")
+            # if not auth_token:
+            #     return Response(
+            #         {"message": "Authorization header missing"},
+            #         status=status.HTTP_401_UNAUTHORIZED,
+            #     )
+
+            # Connect to the database
+            db = MongoDB()
+
+            # Build query filter based on dates
+            query_filter = {"user_id": user_id}
+            text_filter = {"user_id": user_id}
+            if start_date:
+                query_filter["created_at"] = {"$gte": start_date}
+                text_filter["created_at"] = {"$gte": start_date}
+            if end_date:
+                if "created_at" in query_filter:
+                    query_filter["created_at"]["$lte"] = end_date
+                    text_filter["created_at"]["$lte"] = end_date
+                else:
+                    query_filter["created_at"] = {"$lte": end_date}
+                    text_filter["created_at"] = {"$lte": end_date}
+            print(f"text filter: {text_filter}")
+            # Fetch data from database
+            total_message = db.find_documents("whatsapp_message_logs", query_filter).sort("_id", -1).skip(skip).limit(limit)
+            total_message_count = len(db.find_documents("whatsapp_message_logs", query_filter))
+
+            message_list = []
+            for _message in total_message:
+                # Convert ISO string to datetime object
+                dt_obj = datetime.strptime(_message['created_at'], "%Y-%m-%dT%H:%M:%S.%f")
+                # Convert to a human-readable format
+                human_readable = dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+                
+                try:
+                    updated_dt_obj = datetime.strptime(_message['updated_at'], "%Y-%m-%dT%H:%M:%S.%f")
+                    # Convert to a human-readable format
+                    updated_at_human_readable = updated_dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    updated_at_human_readable = ""
+
+                try:
+                    # Convert to a datetime object
+                    sent_dt_obj = datetime.utcfromtimestamp(_message['sent_at'])
+
+                    # Format it into a readable format
+                    sent_dt_readable = sent_dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    sent_dt_readable = ""
+                
+                try:
+                    # Convert to a datetime object
+                    delivered_at_obj = datetime.utcfromtimestamp(_message['delivered_at'])
+
+                    # Format it into a readable format
+                    delivered_at_readable = delivered_at_obj.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    delivered_at_readable = ""
+
+
+                try:
+                    # Convert to a datetime object
+                    failed_at_obj = datetime.utcfromtimestamp(_message['failed_at'])
+
+                    # Format it into a readable format
+                    failed_at_readable = failed_at_obj.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    failed_at_readable = ""
+                    
+
+
+                message_list.append(
+                    {
+                        "id": str(_message['_id']),
+                        "number" : _message['number'],
+                        "message" : _message['message'],
+                        "message_id" : _message['id'],
+                        "message_status" : _message['message_status'],
+                        "created_at" : human_readable,
+                        "template_name" : _message['template_name'],
+                        "updated_at": updated_at_human_readable,
+                        "sent_at": sent_dt_readable,
+                        "delivered_at": delivered_at_readable,
+                        "failed_at": failed_at_readable,
+                        "code": _message['code'] if "code" in _message else 0,
+                        "error_data": _message['error_data'] if "error_data" in _message else "",
+                        "title": _message['title'] if "title" in _message else "",
+                        "error_message": _message['error_message'] if "error_message" in _message else ""
+                    }
+                )
+
+            if len(message_list) > 0:
+                response_data = {
+                    "data": message_list,
+                    "count": total_message_count
+                }
+                return JsonResponse(response_data, status=status.HTTP_200_OK)
+            else:
+                response_data = {
+                    "data": [],
+                    "count": 0
+                }
+                return JsonResponse(response_data, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as ex:
+            print(f"Error: {ex}")
+            return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
