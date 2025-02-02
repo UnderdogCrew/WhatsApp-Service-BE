@@ -796,12 +796,12 @@ class UserMessageLogs(APIView):
             message_list = []
             for _message in total_message:
                 # Convert ISO string to datetime object
-                human_readable = datetime.datetime.strftime(_message['created_at'], "%Y-%m-%dT%H:%M:%S.%f")
+                human_readable = datetime.datetime.strftime(_message['created_at'], "%Y-%m-%d %H:%M:%S")
                 # Convert to a human-readable format
                 # human_readable = dt_obj.strftime("%Y-%m-%d %H:%M:%S")
                 
                 try:
-                    updated_at_human_readable = datetime.datetime.strftime(_message['updated_at'], "%Y-%m-%dT%H:%M:%S.%f")
+                    updated_at_human_readable = datetime.datetime.strftime(_message['updated_at'], "%Y-%m-%d %H:%M:%S")
                     # Convert to a human-readable format
                     # updated_at_human_readable = updated_dt_obj.strftime("%Y-%m-%d %H:%M:%S")
                 except:
