@@ -16,7 +16,7 @@ from utils.database import MongoDB
 import pytz
 from ai_apis.schedule_task import schedule_message
 import threading
-from whatsapp_message_data import send_message_data
+from utils.whatsapp_message_data import send_message_data
 
 
 '''
