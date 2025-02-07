@@ -1,7 +1,7 @@
 import pandas as pd
 from utils.database import MongoDB
-from whatsapp_message_data import send_message_data
-import threading
+# from whatsapp_message_data import send_message_data
+# import threading
 
 
 def schedule_message(file_path, user_id, image_url, template_name, text):
