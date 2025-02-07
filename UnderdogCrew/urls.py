@@ -54,6 +54,7 @@ urlpatterns = [
     path('sign_up',login_service.SignupView.as_view(),name='SignupView'),
     path('login',login_service.LoginView.as_view(),name='LoginView'),
     path('upload',login_service.FileUploadView.as_view(),name='FileUploadView'),
+    path('profile',login_service.ProfileView.as_view(),name='ProfileView'),
     path('otp/generate/', login_service.OTPGenerate.as_view(), name='OTPGenerate'),
     path('otp/verify/', login_service.OTPVerify.as_view(), name='OTPVerify'),      
     path('business-details/', login_service.BusinessDetails.as_view(), name='update_whatsapp_business_details'),

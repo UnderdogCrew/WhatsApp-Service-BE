@@ -855,3 +855,95 @@ class VerifyBusinessDetailsView(APIView):
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+class ProfileView(APIView):
+    @swagger_auto_schema(
+        operation_description="Get user profile and subscription details",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'user': openapi.Schema(type=openapi.TYPE_OBJECT),
+                            'subscription': openapi.Schema(type=openapi.TYPE_OBJECT),
+                            'plans': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
+                        }
+                    ),
+                }
+            )),
+            401: 'Unauthorized',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def get(self, request, current_user_id, current_user_email):
+        try:
+            db = MongoDB()
+            
+            # Get user details
+            user = db.find_document('users', {'_id': ObjectId(current_user_id)})
+            if not user:
+                return JsonResponse({
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Get user's subscription
+            subscription = db.find_document('subscriptions', {
+                'user_email': current_user_email
+            })
+
+            # Format the response
+            user_data = {
+                'id': str(user['_id']),
+                'email': user['email'],
+                'first_name': user['first_name'],
+                'last_name': user['last_name'],
+                'business_number': user.get('business_number', ''),
+                'business_id': user.get('business_id', ''),
+                'is_email_verified': user.get('is_email_verified', False),
+                'default_credit': user.get('default_credit', 0),
+            }
+
+            subscription_data = None
+            if subscription:
+                # Get plan details if subscription exists
+                plan = db.find_document('plans', {'planid': subscription['plan_id']})
+                subscription_data = {
+                    'id': str(subscription['_id']),
+                    'status': subscription.get('status', ''),
+                    'total_count': subscription.get('total_count', ''),
+                    'has_access': subscription.get('has_access', False),
+                    'plan': {
+                        'planid': str(plan['planid']),
+                        'planname': plan.get('planname', ''),
+                        'billing_amount': plan.get('billing_amount', ''),
+                    } if plan else None
+                }
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Profile retrieved successfully',
+                'data': {
+                    'user': user_data,
+                    'subscription': subscription_data
+                }
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
