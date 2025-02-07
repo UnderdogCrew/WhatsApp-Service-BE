@@ -16,6 +16,7 @@ from utils.database import MongoDB
 import pytz
 from ai_apis.schedule_task import schedule_message
 import threading
+from whatsapp_message_data import send_message_data
 
 
 '''
@@ -99,10 +100,8 @@ class SendMessage(APIView):
     )
     def post(self, request):
         try:
-            db = MongoDB()
             user_id = "1"
             print(f"API_TOKEN: {API_TOKEN}")
-            url = "https://graph.facebook.com/v19.0/450885871446042/messages"
             request_data = request.data
             template_name = request_data.get("template_name", None)
             # Validate required fields
@@ -123,9 +122,6 @@ class SendMessage(APIView):
             print(template_response.status_code)
             if template_response.status_code != 200:
                 return JsonResponse({"message": "Template is missing"}, safe=False, status=422)
-
-            template_data = template_response.json()
-            template_components = template_data['data'][0]['components']
 
             text = request_data['text']
             schedule_type = request_data['schedule_type'] if "schedule_type" in request_data else 1
@@ -150,7 +146,7 @@ class SendMessage(APIView):
                 )
 
             if schedule_type == 2:
-                threading.Thread(target=schedule_message, args=(file_path, user_id, ),)
+                threading.Thread(target=schedule_message, args=(file_path, user_id, image_url, template_name, text, ),)
                 return JsonResponse(
                     {"message": "Message scheduled successfully"},
                     safe=False,
@@ -160,85 +156,28 @@ class SendMessage(APIView):
 
             if message_type == 1:
                 # Bulk messaging using the Excel file
-                msg_details = {
-                    "Name": text
-                }
-
-                components = process_components(template_components, msg_details, image_url)
                 df = pd.read_excel(file_path)
                 for index, row in df.iterrows():
                     msg_data = row.to_dict()
 
-                    payload = json.dumps({
-                        "messaging_product": "whatsapp",
-                        "recipient_type": "individual",
-                        "to": f"91{msg_data['To Number']}",
-                        "type": "template",
-                        "template": {
-                            "name": template_name,
-                            "language": {
-                                "code": "en"
-                            },
-                            "components": components
-                        }
-                    })
-                    headers = {
-                        'Authorization': 'Bearer ' + API_TOKEN,
-                        'Content-Type': 'application/json'
-                    }
-                    print(f"Sending bulk message payload: {payload}")
-                    response = requests.post(url, headers=headers, data=payload)
-                    print(response.json())
-
-                    whatsapp_status_logs = {
-                        "number": f"91{msg_data['To Number']}",
-                        "message": text,
-                        "user_id": user_id,
-                        "id": response.json()['messages'][0]["id"],
-                        "message_status": response.json()['messages'][0]["message_status"],
-                        "created_at": int(datetime.datetime.now().timestamp()),
-                        "template_name": template_name
-                    }
-                    db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+                    send_message_data(
+                        number=msg_data['To Number'],
+                        template_name=template_name,
+                        text=text,
+                        image_url=image_url,
+                        user_id=user_id
+                    )
 
             elif message_type == 2:
-                # Sending messages to specific numbers
-                msg_details = {
-                    "Name": text
-                }
-
-                components = process_components(template_components, msg_details, image_url)
                 for number in numbers:
-                    payload = json.dumps({
-                        "messaging_product": "whatsapp",
-                        "recipient_type": "individual",
-                        "to": f"91{number}",
-                        "type": "template",
-                        "template": {
-                            "name": template_name,
-                            "language": {
-                                "code": "en"
-                            },
-                            "components": components
-                        }
-                    })
-                    headers = {
-                        'Authorization': 'Bearer ' + API_TOKEN,
-                        'Content-Type': 'application/json'
-                    }
-                    print(f"Sending single message payload: {payload}")
-                    response = requests.post(url, headers=headers, data=payload)
-                    print(response.json())
-                    whatsapp_status_logs = {
-                        "number": f"91{number}",
-                        "message": text,
-                        "user_id": user_id,
-                        "id": response.json()['messages'][0]["id"],
-                        "message_status": response.json()['messages'][0]["message_status"],
-                        "created_at": int(datetime.datetime.now().timestamp()),
-                        "template_name": template_name
-                    }
-                    db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+                    
+                    send_message_data(
+                        number=number,
+                        template_name=template_name,
+                        text=text,
+                        image_url=image_url,
+                        user_id=user_id
+                    )
 
             return JsonResponse({"message": "Messages sent successfully"}, safe=False, status=200)
 
