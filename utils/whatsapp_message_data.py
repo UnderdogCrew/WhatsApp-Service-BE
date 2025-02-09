@@ -63,6 +63,7 @@ def send_message_data(number, template_name, text, image_url, user_id):
     
     template_data = template_response.json()
     template_components = template_data['data'][0]['components']
+    category = template_data['data'][0]['category']
 
     # Sending messages to specific numbers
     msg_details = {
@@ -96,6 +97,7 @@ def send_message_data(number, template_name, text, image_url, user_id):
         "number": f"91{number}",
         "message": text,
         "user_id": user_id,
+        "price": 0.125 if category == "UTILITY" else 0.875,
         "id": response.json()['messages'][0]["id"],
         "message_status": response.json()['messages'][0]["message_status"],
         "created_at": int(datetime.datetime.now().timestamp()),
