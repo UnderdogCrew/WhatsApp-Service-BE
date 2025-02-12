@@ -64,6 +64,7 @@ def send_message_data(number, template_name, text, image_url, user_id):
     template_data = template_response.json()
     template_components = template_data['data'][0]['components']
     category = template_data['data'][0]['category']
+    language = template_data['data'][0]['language']
 
     # Sending messages to specific numbers
     msg_details = {
@@ -79,7 +80,7 @@ def send_message_data(number, template_name, text, image_url, user_id):
         "template": {
                 "name": template_name,
                 "language": {
-                    "code": "en"
+                    "code": language
                 },
                 "components": components
             }
@@ -92,16 +93,33 @@ def send_message_data(number, template_name, text, image_url, user_id):
     print(f"Sending bulk message payload: {payload}")
     response = requests.post(url, headers=headers, data=payload)
     print(response.json())
+    if response.status_code == 200:
+        whatsapp_status_logs = {
+            "number": f"91{number}",
+            "message": text,
+            "user_id": user_id,
+            "price": 0.125 if category == "UTILITY" else 0.875,
+            "id": response.json()['messages'][0]["id"],
+            "message_status": response.json()['messages'][0]["message_status"],
+            "created_at": int(datetime.datetime.now().timestamp()),
+            "template_name": template_name
+        }
+        db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+    else:
+        whatsapp_status_logs = {
+            "number": f"91{number}",
+            "message": text,
+            "user_id": user_id,
+            "price": 0,
+            "id": "",
+            "message_status": "error",
+            "created_at": int(datetime.datetime.now().timestamp()),
+            "template_name": template_name,
+            "code": response.json()['error']['code'],
+            "title": response.json()['error']['type'],
+            "error_message": response.json()['error']['message'],
+            "error_data": response.json()['error']['message'],
+        }
+        db.create_document('whatsapp_message_logs', whatsapp_status_logs)
 
-    whatsapp_status_logs = {
-        "number": f"91{number}",
-        "message": text,
-        "user_id": user_id,
-        "price": 0.125 if category == "UTILITY" else 0.875,
-        "id": response.json()['messages'][0]["id"],
-        "message_status": response.json()['messages'][0]["message_status"],
-        "created_at": int(datetime.datetime.now().timestamp()),
-        "template_name": template_name
-    }
-    db.create_document('whatsapp_message_logs', whatsapp_status_logs)
     return True
