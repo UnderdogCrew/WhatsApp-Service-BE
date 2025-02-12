@@ -18,6 +18,7 @@ from UnderdogCrew.settings import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD ,SECRET_
 import re
 import jwt
 from rest_framework.permissions import IsAuthenticated
+import random
 
 # Create your views here.
 
@@ -82,7 +83,10 @@ class SignupView(APIView):
                     'message': 'Business number already exists'
                 }, safe=False, status=status.HTTP_409_CONFLICT)
 
-            # Create user
+            # Generate a 12-digit account ID (similar to AWS format)
+            account_id = ''.join([str(random.randint(0, 9)) for _ in range(12)])
+
+            # Create user with account_id
             user_data = {
                 'email': validated_data['email'],
                 'password': make_password(validated_data['password']),
@@ -92,7 +96,8 @@ class SignupView(APIView):
                 'business_number': validated_data['business_number'],
                 'business_id': validated_data.get('business_id', ''),
                 'default_credit': 1000,
-                'is_email_verified': False  # Set default value for email verification
+                'is_email_verified': False,
+                'account_id': account_id  
             }
 
             user_id = db.create_document('users', user_data)
@@ -110,7 +115,8 @@ class SignupView(APIView):
                         'first_name': validated_data['first_name'],
                         'last_name': validated_data['last_name'],
                         'business_id': user_data['business_id'],
-                        'is_email_verified': user_data['is_email_verified'] if "is_email_verified" in user_data else False  # Add is_email_verified key
+                        'is_email_verified': user_data['is_email_verified'] if "is_email_verified" in user_data else False,
+                        'account_id': user_data['account_id']
                     },
                     'tokens': {
                         'access': access_token,
@@ -190,7 +196,8 @@ class LoginView(APIView):
                             'email': user['email'],
                             'first_name': user['first_name'],
                             'last_name': user['last_name'],
-                            'is_email_verified': user.get('is_email_verified', False)  # Add is_email_verified key
+                            'is_email_verified': user.get('is_email_verified', False),
+                            'account_id': user.get('account_id', '')
                         },
                         'tokens': {
                             'access': access_token,
@@ -915,6 +922,7 @@ class ProfileView(APIView):
                 'business_id': user.get('business_id', ''),
                 'is_email_verified': user.get('is_email_verified', False),
                 'default_credit': user.get('default_credit', 0),
+                'account_id': user.get('account_id', '')
             }
 
             subscription_data = None
