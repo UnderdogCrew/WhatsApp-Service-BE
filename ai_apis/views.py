@@ -121,6 +121,10 @@ class SendMessage(APIView):
             print(f"API_TOKEN: {API_TOKEN}")
             request_data = request.data
             template_name = request_data.get("template_name", None)
+            if template_name == "hotel":
+                template_name = "hello_world"
+
+            print(f"template name: {template_name}")
             # Validate required fields
             if not request_data:
                 return JsonResponse({"message": "Request body is missing"}, safe=False, status=422)
