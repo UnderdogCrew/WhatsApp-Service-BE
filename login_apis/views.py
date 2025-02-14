@@ -1013,7 +1013,7 @@ class UserBillingAPIView(APIView):
         }
     )
     @token_required  # Ensure the user is authenticated
-    def get(self, request):
+    def get(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
         token = request.headers.get('Authorization')  # Extract the token from the Authorization header
         if token is None or not token.startswith('Bearer '):
             return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
