@@ -50,6 +50,7 @@ REDIS_HOST = os.getenv("REDIS_HOST")
 REDIS_DATABASE = os.getenv("REDIS_DATABASE")
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 REDIS_USER = os.getenv("REDIS_USER")
+WABA_ID = os.getenv("WABA_ID")
 
 # Connect to Redis (update with your Redis instance details)
 redis_client = redis.Redis(

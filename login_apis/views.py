@@ -17,7 +17,6 @@ import twilio
 from UnderdogCrew.settings import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD ,SECRET_KEY
 import re
 import jwt
-from rest_framework.permissions import IsAuthenticated
 import random
 
 # Create your views here.
