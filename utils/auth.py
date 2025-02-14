@@ -58,3 +58,12 @@ def token_required(f):
         return f(*args, current_user_id, current_user_email, **kwargs)
     
     return decorated
+
+def decode_token(token):
+    try:
+        data = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        return data
+    except jwt.ExpiredSignatureError:
+        return {'message': 'Token has expired'}
+    except jwt.InvalidTokenError as e:
+        return {'message': str(e)}

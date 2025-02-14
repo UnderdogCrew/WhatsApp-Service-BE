@@ -17,6 +17,7 @@ import pytz
 from ai_apis.schedule_task import schedule_message
 import threading
 from utils.whatsapp_message_data import send_message_data
+from utils.auth import token_required, decode_token
 
 
 '''
@@ -380,6 +381,7 @@ class ImageGeneration(APIView):
             return JsonResponse(error, safe=False, status=500)
 
 
+
 class TextGeneration(APIView):
     @swagger_auto_schema(
         operation_description="Generate text based on input",
@@ -403,10 +405,12 @@ class TextGeneration(APIView):
             500: 'Internal Server Error'
         }
     )
+    @token_required  # Ensure the user is authenticated
     def post(self, request):
+        user_id = decode_token(request.auth)  # Decode the token to get user information
+        print(f"user id: {user_id}")
         try:
             db = MongoDB()
-            user_id = "1"
             request_data = request.data
             if len(request_data) == 0:
                 response_data = {
