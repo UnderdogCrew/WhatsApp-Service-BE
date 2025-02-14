@@ -3,6 +3,7 @@ from utils.database import MongoDB
 import requests
 import datetime
 from UnderdogCrew.settings import API_KEY, OPEN_AI_KEY
+import traceback
 db = MongoDB()
 
 '''
@@ -51,75 +52,82 @@ def process_components(components, msg_data, image_url):
 
 
 def send_message_data(number, template_name, text, image_url, user_id):
-    url = "https://graph.facebook.com/v19.0/450885871446042/messages"
-    template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
-    headers = {
-        'Authorization': f'Bearer {API_KEY}'
-    }
-    template_response = requests.request("GET", template_url, headers=headers)
-    print(template_response.status_code)
-    if template_response.status_code != 200:
-        return False
-    
-    template_data = template_response.json()
-    template_components = template_data['data'][0]['components']
-    category = template_data['data'][0]['category']
-    language = template_data['data'][0]['language']
+    try:
+        url = "https://graph.facebook.com/v19.0/450885871446042/messages"
+        template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
+        headers = {
+            'Authorization': f'Bearer {API_KEY}'
+        }
+        template_response = requests.request("GET", template_url, headers=headers)
+        print(template_response.status_code)
+        if template_response.status_code != 200:
+            return False
+        
+        template_data = template_response.json()
+        template_components = template_data['data'][0]['components']
+        category = template_data['data'][0]['category']
+        language = template_data['data'][0]['language']
 
-    # Sending messages to specific numbers
-    msg_details = {
-        "Name": text
-    }
+        # Sending messages to specific numbers
+        msg_details = {
+            "Name": text
+        }
 
-    components = process_components(template_components, msg_details, image_url)
-    payload = json.dumps({
-        "messaging_product": "whatsapp",
-        "recipient_type": "individual",
-        "to": f"91{number}",
-        "type": "template",
-        "template": {
-                "name": template_name,
-                "language": {
-                    "code": language
-                },
-                "components": components
+        components = process_components(template_components, msg_details, image_url)
+        payload = json.dumps({
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": f"91{number}",
+            "type": "template",
+            "template": {
+                    "name": template_name,
+                    "language": {
+                        "code": language
+                    },
+                    "components": components
+                }
             }
+        )
+        headers = {
+            'Authorization': 'Bearer ' + API_TOKEN,
+            'Content-Type': 'application/json'
         }
-    )
-    headers = {
-        'Authorization': 'Bearer ' + API_TOKEN,
-        'Content-Type': 'application/json'
-    }
-    print(f"Sending bulk message payload: {payload}")
-    response = requests.post(url, headers=headers, data=payload)
-    print(response.json())
-    if response.status_code == 200:
-        whatsapp_status_logs = {
-            "number": f"91{number}",
-            "message": text,
-            "user_id": user_id,
-            "price": 0.125 if category == "UTILITY" else 0.875,
-            "id": response.json()['messages'][0]["id"],
-            "message_status": response.json()['messages'][0]["message_status"],
-            "created_at": int(datetime.datetime.now().timestamp()),
-            "template_name": template_name
-        }
-        db.create_document('whatsapp_message_logs', whatsapp_status_logs)
-    else:
-        whatsapp_status_logs = {
-            "number": f"91{number}",
-            "message": text,
-            "user_id": user_id,
-            "price": 0,
-            "id": "",
-            "message_status": "error",
-            "created_at": int(datetime.datetime.now().timestamp()),
-            "template_name": template_name,
-            "code": response.json()['error']['code'],
-            "title": response.json()['error']['type'],
-            "error_message": response.json()['error']['message'],
-            "error_data": response.json()['error']['message'],
-        }
-        db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+        print(f"Sending bulk message payload: {payload}")
+        response = requests.post(url, headers=headers, data=payload)
+        print(response.json())
+        if response.status_code == 200:
+            whatsapp_status_logs = {
+                "number": f"91{number}",
+                "message": text,
+                "user_id": user_id,
+                "price": 0.125 if category == "UTILITY" else 0.875,
+                "id": response.json()['messages'][0]["id"],
+                "message_status": response.json()['messages'][0]["message_status"],
+                "created_at": int(datetime.datetime.now().timestamp()),
+                "template_name": template_name
+            }
+            db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+        else:
+            whatsapp_status_logs = {
+                "number": f"91{number}",
+                "message": text,
+                "user_id": user_id,
+                "price": 0,
+                "id": "",
+                "message_status": "error",
+                "created_at": int(datetime.datetime.now().timestamp()),
+                "template_name": template_name,
+                "code": response.json()['error']['code'],
+                "title": response.json()['error']['type'],
+                "error_message": response.json()['error']['message'],
+                "error_data": response.json()['error']['message'],
+            }
+            db.create_document('whatsapp_message_logs', whatsapp_status_logs)
 
-    return True
+        return True
+    except Exception as e:
+            # Print the error with line number and human-readable format
+            error_message = f"Error occurred: {str(e)}\n"
+            error_message += traceback.format_exc()
+            print(error_message)  # Log the error for debugging
+            return True
