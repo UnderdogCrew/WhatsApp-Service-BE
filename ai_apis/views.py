@@ -19,6 +19,9 @@ import threading
 from utils.whatsapp_message_data import send_message_data
 from utils.auth import token_required, decode_token
 
+price_per_million_tokens = 0.15  # Price for 1M tokens
+tokens_per_million = 1_000_000  # 1M tokens
+
 
 '''
     API for login the user in portal
@@ -412,8 +415,8 @@ class TextGeneration(APIView):
             return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
 
         token = token.split(' ')[1]  # Get the actual token part
-        user_id = decode_token(token)  # Decode the token to get user information
-        print(f"user id: {user_id}")
+        user_id = decode_token(token)['user_id']  # Decode the token to get user information
+        print(f"user id: {user_id['user_id']}")
         try:
             db = MongoDB()
             request_data = request.data
@@ -466,33 +469,29 @@ class TextGeneration(APIView):
                 }
 
                 response = requests.post("https://api.openai.com/v1/chat/completions", json=data, headers=headers)
-                print(response.json())
+                uses = response.json()['usage']
+                total_tokens = uses['total_tokens']
+                prompt_tokens = uses['prompt_tokens']
+                completion_tokens = uses['completion_tokens']
                 response_text = response.json()['choices'][0]['message']['content']
-                if text_type == 1:
-                    if ":\n" in response_text:
-                        response_text = response_text.split(":\n")[1]
-                    if '\" \'' in response_text:
-                        response_text = response_text.split('\" \'')[0]
-                    if '\n\n' in response_text:
-                        response_text = response_text.split('\n\n')[0]
-                    if " (" in response_text:
-                        response_text = response_text.split(" (")[0]
-                    if ": " in response_text:
-                        response_text = response_text.split(": ")[1]
 
-                    response_text = response_text.replace("\"", "")
-                    response_text.replace("\n", "")
 
                 if "Hindi:" in response_text and text_type == 5:
                     response_text = response_text.split("Hindi:")[1]
+
+                # Calculate the price and ensure it's stored as a float
+                price = float((total_tokens / tokens_per_million) * price_per_million_tokens)
+                # Print the result
+                print(f"Price for {total_tokens} tokens: ${price}")
 
                 text_generation_logs = {
                     "message": text,
                     "user_id": user_id,
                     "created_at": int(datetime.datetime.now().timestamp()),
                     "response": response_text,
-                    "input_token": len(text),
-                    "output_token": len(response_text),
+                    "input_token": prompt_tokens,
+                    "price": price,
+                    "output_token": completion_tokens,
                 }
                 db.create_document('text_generation_logs', text_generation_logs)
 
