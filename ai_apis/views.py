@@ -415,8 +415,15 @@ class TextGeneration(APIView):
             return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
 
         token = token.split(' ')[1]  # Get the actual token part
-        user_id = decode_token(token)['user_id']  # Decode the token to get user information
-        print(f"user id: {user_id['user_id']}")
+        user_info = decode_token(token)  # Decode the token to get user information
+        
+        # Check if user_info is a dictionary
+        if isinstance(user_info, dict) and 'user_id' in user_info:
+            user_id = user_info['user_id']  # Access user_id from the decoded token
+            print(f"user id: {user_id}")
+        else:
+            return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+
         try:
             db = MongoDB()
             request_data = request.data
