@@ -6,7 +6,7 @@ from drf_yasg import openapi
 from bson import ObjectId
 from drf_yasg.utils import swagger_auto_schema
 from utils.database import MongoDB
-from utils.auth import generate_tokens, token_required
+from utils.auth import generate_tokens, token_required, decode_token
 from .serializers import SignupSerializer, LoginSerializer, FileUploadSerializer, FileUploadResponseSerializer, BusinessDetailsSerializer
 from utils.s3_helper import S3Helper
 from .utils import get_file_extension, validate_file
@@ -955,3 +955,116 @@ class ProfileView(APIView):
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+
+class UserBillingAPIView(APIView):
+    """
+    API to get user billing details from WhatsApp, Image Generation, and Text Generation logs.
+    """
+
+    @swagger_auto_schema(
+        operation_description="Get total billing for a user within a date range",
+        manual_parameters=[
+            openapi.Parameter(
+                name="start_date",
+                in_=openapi.IN_QUERY,
+                description="Filter records starting from this date (YYYY-MM-DD)",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                name="end_date",
+                in_=openapi.IN_QUERY,
+                description="Filter records up to this date (YYYY-MM-DD)",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Total billing details",
+                examples={
+                    "application/json": {
+                        "user_id": "677fff42d9fba430631d4478",
+                        "start_date": "2025-02-14",
+                        "end_date": "2025-02-15",
+                        "whatsapp_total": 0.125,
+                        "image_total": 0.08,
+                        "text_total": 0.00001335,
+                        "total_price": 0.20501335
+                    }
+                }
+            ),
+            400: openapi.Response(
+                description="Invalid date format",
+                examples={
+                    "application/json": {
+                        "error": "Invalid date format. Use YYYY-MM-DD."
+                    }
+                }
+            )
+        }
+    )
+    @token_required  # Ensure the user is authenticated
+    def get(self, request):
+        token = request.headers.get('Authorization')  # Extract the token from the Authorization header
+        if token is None or not token.startswith('Bearer '):
+            return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+        token = token.split(' ')[1]  # Get the actual token part
+        user_info = decode_token(token)  # Decode the token to get user information
+        
+        # Check if user_info is a dictionary
+        if isinstance(user_info, dict) and 'user_id' in user_info:
+            user_id = user_info['user_id']  # Access user_id from the decoded token
+            print(f"user id: {user_id}")
+        else:
+            return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+        db = MongoDB()
+
+        # Get query parameters for start and end date
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+
+        # Convert dates to ISO format
+        try:
+            if start_date:
+                start_date = datetime.strptime(start_date, "%Y-%m-%d")
+            if end_date:
+                end_date = datetime.strptime(end_date, "%Y-%m-%d")
+        except ValueError:
+            return JsonResponse({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Build filter conditions
+        filters = {"user_id": user_id}
+        if start_date and end_date:
+            filters["created_at"] = {"$gte": start_date, "$lte": end_date}
+        elif start_date:
+            filters["created_at"] = {"$gte": start_date}
+        elif end_date:
+            filters["created_at"] = {"$lte": end_date}
+
+        # Get total billing from WhatsApp logs
+        whatsapp_logs = db.find_documents('whatsapp_message_logs', filters)
+        whatsapp_total = sum(log.get('price', 0) for log in whatsapp_logs)
+
+        # Get total billing from Image Generation logs
+        image_logs = db.find_documents('image_generation_logs', filters)
+        image_total = sum(log.get('price', 0) for log in image_logs)
+
+        # Get total billing from Text Generation logs
+        text_logs = db.find_documents('text_generation_logs', filters)
+        text_total = sum(log.get('price', 0) for log in text_logs)
+
+        # Calculate final total
+        total_price = whatsapp_total + image_total + text_total
+
+        return JsonResponse({
+            "user_id": user_id,
+            "start_date": start_date.strftime("%Y-%m-%d") if start_date else None,
+            "end_date": end_date.strftime("%Y-%m-%d") if end_date else None,
+            "whatsapp_total": whatsapp_total,
+            "image_total": image_total,
+            "text_total": text_total,
+            "total_price": total_price
+        }, status=status.HTTP_200_OK)
