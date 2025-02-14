@@ -407,7 +407,12 @@ class TextGeneration(APIView):
     )
     @token_required  # Ensure the user is authenticated
     def post(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
-        user_id = decode_token(request.auth)  # Decode the token to get user information
+        token = request.headers.get('Authorization')  # Extract the token from the Authorization header
+        if token is None or not token.startswith('Bearer '):
+            return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+        token = token.split(' ')[1]  # Get the actual token part
+        user_id = decode_token(token)  # Decode the token to get user information
         print(f"user id: {user_id}")
         try:
             db = MongoDB()
