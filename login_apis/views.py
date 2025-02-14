@@ -6,7 +6,7 @@ from drf_yasg import openapi
 from bson import ObjectId
 from drf_yasg.utils import swagger_auto_schema
 from utils.database import MongoDB
-from utils.auth import generate_tokens, token_required, decode_token
+from utils.auth import generate_tokens, token_required, decode_token, current_dollar_price
 from .serializers import SignupSerializer, LoginSerializer, FileUploadSerializer, FileUploadResponseSerializer, BusinessDetailsSerializer
 from utils.s3_helper import S3Helper
 from .utils import get_file_extension, validate_file
@@ -1020,6 +1020,7 @@ class UserBillingAPIView(APIView):
 
         token = token.split(' ')[1]  # Get the actual token part
         user_info = decode_token(token)  # Decode the token to get user information
+        dollar_price = current_dollar_price
         
         # Check if user_info is a dictionary
         if isinstance(user_info, dict) and 'user_id' in user_info:
@@ -1058,10 +1059,12 @@ class UserBillingAPIView(APIView):
         # Get total billing from Image Generation logs
         image_logs = db.find_documents('image_generation_logs', filters)
         image_total = sum(log.get('price', 0) for log in image_logs)
+        image_total = dollar_price * image_total
 
         # Get total billing from Text Generation logs
         text_logs = db.find_documents('text_generation_logs', filters)
         text_total = sum(log.get('price', 0) for log in text_logs)
+        text_total = dollar_price * text_total
 
         # Calculate final total
         total_price = whatsapp_total + image_total + text_total

@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 from functools import wraps
 from django.conf import settings
 from django.http import JsonResponse
+from forex_python.converter import CurrencyRates
+
 
 def generate_tokens(user_id,user_email):
     access_token = jwt.encode({
@@ -67,3 +69,14 @@ def decode_token(token):
         return {'message': 'Token has expired'}
     except jwt.InvalidTokenError as e:
         return {'message': str(e)}
+
+
+def current_dollar_price():
+    # Create an instance of CurrencyRates
+    c = CurrencyRates()
+
+    # Get the current USD to INR rate
+    usd_to_inr_rate = c.get_rate('USD', 'INR')
+
+    print(f"The current USD to INR exchange rate is: {usd_to_inr_rate}")
+    return usd_to_inr_rate
