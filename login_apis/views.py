@@ -966,6 +966,13 @@ class UserBillingAPIView(APIView):
         operation_description="Get total billing for a user within a date range",
         manual_parameters=[
             openapi.Parameter(
+                name="Authorization",
+                in_=openapi.IN_HEADER,
+                description="Bearer <your_token>",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
                 name="start_date",
                 in_=openapi.IN_QUERY,
                 description="Filter records starting from this date (YYYY-MM-DD)",
