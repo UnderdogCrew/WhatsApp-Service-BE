@@ -336,10 +336,24 @@ class ImageGeneration(APIView):
             500: 'Internal Server Error'
         }
     )
-    def post(self, request):
+    @token_required  # Ensure the user is authenticated
+    def post(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
         try:
+            token = request.headers.get('Authorization')  # Extract the token from the Authorization header
+            if token is None or not token.startswith('Bearer '):
+                return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+            token = token.split(' ')[1]  # Get the actual token part
+            user_info = decode_token(token)  # Decode the token to get user information
+            
+            # Check if user_info is a dictionary
+            if isinstance(user_info, dict) and 'user_id' in user_info:
+                user_id = user_info['user_id']  # Access user_id from the decoded token
+                print(f"user id: {user_id}")
+            else:
+                return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+        
             db = MongoDB()
-            user_id = "1"
             request_data = request.data
             if len(request_data) == 0:
                 response_data = {
@@ -366,6 +380,7 @@ class ImageGeneration(APIView):
                 image_generation_logs = {
                     "message": text,
                     "user_id": user_id,
+                    "price": 0.08,
                     "created_at": int(datetime.datetime.now().timestamp()),
                     "image_url": image_url
                 }
