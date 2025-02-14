@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from django.conf import settings
 from django.http import JsonResponse
-from forex_python.converter import CurrencyRates
+import requests
 
 
 def generate_tokens(user_id,user_email):
@@ -72,11 +72,11 @@ def decode_token(token):
 
 
 def current_dollar_price():
-    # Create an instance of CurrencyRates
-    c = CurrencyRates()
-
-    # Get the current USD to INR rate
-    usd_to_inr_rate = c.get_rate('USD', 'INR')
-
-    print(f"The current USD to INR exchange rate is: {usd_to_inr_rate}")
-    return usd_to_inr_rate
+    url = "https://api.exchangerate-api.com/v4/latest/USD"
+    try:
+        response = requests.get(url)
+        data = response.json()
+        return data.get("rates", {}).get("INR")
+    except Exception as e:
+        print(f"Error fetching exchange rate: {e}")
+        return None
