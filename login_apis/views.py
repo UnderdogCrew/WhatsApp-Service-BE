@@ -1020,7 +1020,7 @@ class UserBillingAPIView(APIView):
 
         token = token.split(' ')[1]  # Get the actual token part
         user_info = decode_token(token)  # Decode the token to get user information
-        dollar_price = current_dollar_price
+        dollar_price = current_dollar_price()
         
         # Check if user_info is a dictionary
         if isinstance(user_info, dict) and 'user_id' in user_info:
