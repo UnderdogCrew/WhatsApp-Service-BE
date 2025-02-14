@@ -406,7 +406,7 @@ class TextGeneration(APIView):
         }
     )
     @token_required  # Ensure the user is authenticated
-    def post(self, request):
+    def post(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
         user_id = decode_token(request.auth)  # Decode the token to get user information
         print(f"user id: {user_id}")
         try:
