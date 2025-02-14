@@ -1073,8 +1073,8 @@ class UserBillingAPIView(APIView):
             "user_id": user_id,
             "start_date": start_date.strftime("%Y-%m-%d") if start_date else None,
             "end_date": end_date.strftime("%Y-%m-%d") if end_date else None,
-            "whatsapp_total": whatsapp_total,
-            "image_total": image_total,
-            "text_total": text_total,
-            "total_price": total_price
+            "whatsapp_total": round(whatsapp_total, 2),
+            "image_total": round(image_total, 2),
+            "text_total": round(text_total, 2),
+            "total_price": round(total_price, 2)
         }, status=status.HTTP_200_OK)
