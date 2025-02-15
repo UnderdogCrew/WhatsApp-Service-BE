@@ -582,9 +582,22 @@ class UserDashboard(APIView):
             500: "Internal Server Error",
         }
     )
-    def get(self, request):
+    @token_required  # Ensure the user is authenticated
+    def get(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
         try:
-            user_id = "1"
+            token = request.headers.get('Authorization')  # Extract the token from the Authorization header
+            if token is None or not token.startswith('Bearer '):
+                return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+            token = token.split(' ')[1]  # Get the actual token part
+            user_info = decode_token(token)  # Decode the token to get user information
+            
+            # Check if user_info is a dictionary
+            if isinstance(user_info, dict) and 'user_id' in user_info:
+                user_id = user_info['user_id']  # Access user_id from the decoded token
+                print(f"user id: {user_id}")
+            else:
+                return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
             # Parse optional query parameters
             start_date = request.query_params.get("start_date", None)
             end_date = request.query_params.get("end_date", None)
