@@ -1033,23 +1033,19 @@ class UserBillingAPIView(APIView):
         start_date = request.GET.get('start_date')
         end_date = request.GET.get('end_date')
 
+        # Check if start_date and end_date are provided
+        if not start_date or not end_date:
+            return JsonResponse({"error": "Both start_date and end_date are required."}, status=status.HTTP_400_BAD_REQUEST)
+
         # Convert dates to ISO format
         try:
-            if start_date:
-                start_date = datetime.strptime(start_date, "%Y-%m-%d")
-            if end_date:
-                end_date = datetime.strptime(end_date, "%Y-%m-%d")
+            start_date = datetime.strptime(start_date, "%Y-%m-%d")
+            end_date = datetime.strptime(end_date, "%Y-%m-%d")
         except ValueError:
             return JsonResponse({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Build filter conditions
-        filters = {"user_id": user_id}
-        if start_date and end_date:
-            filters["created_at"] = {"$gte": start_date, "$lte": end_date}
-        elif start_date:
-            filters["created_at"] = {"$gte": start_date}
-        elif end_date:
-            filters["created_at"] = {"$lte": end_date}
+        filters = {"user_id": user_id, "created_at": {"$gte": start_date, "$lte": end_date}}
 
         # Get total billing from WhatsApp logs
         whatsapp_logs = db.find_documents('whatsapp_message_logs', filters)
@@ -1071,7 +1067,7 @@ class UserBillingAPIView(APIView):
         # Check for invoices in the given date range
         invoice_filters = {
             "user_id": user_id,
-            "created_at": {"$gte": start_date, "$lte": end_date} if start_date and end_date else {}
+            "created_at": {"$gte": start_date, "$lte": end_date}
         }
         invoices = db.find_documents('invoices', invoice_filters)
         invoice_status = "Issued" if invoices else "Pending"  # Set status based on invoice presence
@@ -1080,10 +1076,12 @@ class UserBillingAPIView(APIView):
         user = db.find_document('users', {'_id': ObjectId(user_id)})
         account_id = user.get('account_id', '') if user else ''  # Get account_id if user exists, else empty string
 
+        # Format billing period
+        billing_period = f"{start_date.strftime('%B %d')} - {end_date.strftime('%B %d, %Y')}"
+
         return JsonResponse({
             "user_id": user_id,
-            "start_date": start_date.strftime("%Y-%m-%d") if start_date else None,
-            "end_date": end_date.strftime("%Y-%m-%d") if end_date else None,
+            "billing_period": billing_period,  # Include billing period in the response
             "whatsapp_total": f"₹{round(whatsapp_total, 2)}",
             "image_total": f"₹{round(image_total, 2)}",
             "text_total": f"₹{round(text_total, 2)}",
