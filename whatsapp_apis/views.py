@@ -1,13 +1,20 @@
 # Create your views here.
 from rest_framework.views import APIView
 from django.http import HttpResponse, JsonResponse
-from whatsapp_apis.serializer import VerifyBusinessPhoneNumberSerializer
+from whatsapp_apis.serializers import VerifyBusinessPhoneNumberSerializer, WhatsAppTemplateSerializer
 import sys
 import requests
+from utils.database import MongoDB
+from utils.auth import token_required
 from UnderdogCrew.settings import API_KEY
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from datetime import datetime, timezone
+from UnderdogCrew.settings import WABA_ID
+from bson.objectid import ObjectId
+from django.conf import settings
+
 
 
 # Function to check phone number and country code
@@ -130,3 +137,182 @@ class MessageTemplates(APIView):
                 "message": "Something went wrong"
             }
             return JsonResponse(error, safe=False, status=500)
+        
+
+class WhatsAppTemplateView(APIView):
+    @swagger_auto_schema(
+        operation_description="Create WhatsApp message template",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        request_body=WhatsAppTemplateSerializer,
+        responses={
+            201: openapi.Response('Created', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'template_id': openapi.Schema(type=openapi.TYPE_STRING),
+                            'fb_template_id': openapi.Schema(type=openapi.TYPE_STRING),
+                            'name': openapi.Schema(type=openapi.TYPE_STRING),
+                            'status': openapi.Schema(type=openapi.TYPE_STRING)
+                        }
+                    )
+                }
+            )),
+            400: 'Bad Request',
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def post(self, request, current_user_id, current_user_email):
+        try:
+            db = MongoDB()
+            
+            # Validate data using serializer
+            serializer = WhatsAppTemplateSerializer(data=request.data)
+            if not serializer.is_valid():
+                return JsonResponse({
+                    'message': 'Validation error',
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            validated_data = serializer.validated_data
+
+            # Check if template name already exists for this user
+            existing_template = db.find_document('whatsapp_templates', {
+                'user_id': current_user_id,
+                'name': validated_data['name']
+            })
+
+            if existing_template:
+                return JsonResponse({
+                    'message': 'Template name already exists'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get user's WABA ID
+            user = db.find_document('users', {'_id': ObjectId(current_user_id)})
+            waba_id = user.get('waba_id', WABA_ID)
+
+            # Call Facebook Graph API
+            url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates"
+            headers = {
+                'Content-Type': 'application/json'
+            }
+
+            fb_response = requests.post(
+                url,
+                headers=headers,
+                json=validated_data
+            )
+
+            if fb_response.status_code != 200:
+                return JsonResponse({
+                    'message': 'Facebook API error',
+                    'error': fb_response.json()
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            fb_data = fb_response.json()
+
+            # Create template document
+            template_data = {
+                'user_id': current_user_id,
+                'waba_id': waba_id,
+                'fb_template_id': fb_data.get('id'),
+                'name': validated_data['name'],
+                'language': validated_data['language'],
+                'category': validated_data['category'],
+                'components': validated_data['components'],
+                'status': fb_data.get('status', 'PENDING'),
+                'created_at': datetime.now(timezone.utc),
+                'updated_at': datetime.now(timezone.utc)
+            }
+
+            template_id = db.create_document('whatsapp_templates', template_data)
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Template created successfully',
+                'data': {
+                    'template_id': str(template_id),
+                    'fb_template_id': fb_data.get('id'),
+                    'name': template_data['name'],
+                    'status': template_data['status']
+                }
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        operation_description="Get all WhatsApp message templates",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(
+                        type=openapi.TYPE_ARRAY,
+                        items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                    ),
+                }
+            )),
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def get(self, current_user_id, current_user_email):
+        try:
+            db = MongoDB()
+            
+            # Get all templates for the user
+            templates = db.find_documents('whatsapp_templates', {
+                'user_id': current_user_id
+            })
+
+            templates_data = []
+            for template in templates:
+                templates_data.append({
+                    'id': str(template['_id']),
+                    'name': template['name'],
+                    'language': template['language'],
+                    'category': template['category'],
+                    'components': template['components'],
+                    'status': template['status'],
+                    'created_at': template['created_at'].isoformat(),
+                    'updated_at': template['updated_at'].isoformat()
+                })
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Templates retrieved successfully',
+                'data': templates_data
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

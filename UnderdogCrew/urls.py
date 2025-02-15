@@ -69,4 +69,5 @@ urlpatterns = [
     path('subscriptions/create-order', subscription_views.CreateOrderView.as_view(), name='create_order'),
     path('subscriptions/plans', subscription_views.PlansView.as_view(), name='plans'),
     path('subscriptions/webhook', subscription_views.WebhookView.as_view(), name='webhook'),
+    path('whatsapp-templates/', whatsapp_apis.WhatsAppTemplateView.as_view(), name='whatsapp-templates'),
 ]
