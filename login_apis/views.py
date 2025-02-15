@@ -1069,6 +1069,18 @@ class UserBillingAPIView(APIView):
         # Calculate final total
         total_price = whatsapp_total + image_total + text_total
 
+        # Check for invoices in the given date range
+        invoice_filters = {
+            "user_id": user_id,
+            "created_at": {"$gte": start_date, "$lte": end_date} if start_date and end_date else {}
+        }
+        invoices = db.find_documents('invoices', invoice_filters)
+        invoice_status = "Issued" if invoices else "Pending"  # Set status based on invoice presence
+
+        # Fetch user details from the database
+        user = db.find_document('users', {'_id': ObjectId(user_id)})
+        account_id = user.get('account_id', '') if user else ''  # Get account_id if user exists, else empty string
+
         return JsonResponse({
             "user_id": user_id,
             "start_date": start_date.strftime("%Y-%m-%d") if start_date else None,
@@ -1076,5 +1088,7 @@ class UserBillingAPIView(APIView):
             "whatsapp_total": round(whatsapp_total, 2),
             "image_total": round(image_total, 2),
             "text_total": round(text_total, 2),
-            "total_price": round(total_price, 2)
+            "total_price": round(total_price, 2),
+            "invoice_status": invoice_status,  # Include invoice status in the response
+            "account_id": account_id  # Include account_id in the response
         }, status=status.HTTP_200_OK)
