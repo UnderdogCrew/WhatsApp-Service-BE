@@ -166,6 +166,13 @@ class SendMessage(APIView):
                     status=422
                 )
 
+            if schedule_type == 1 and file_path == "":
+                return JsonResponse(
+                    {"message": "file is required for message_type 1"},
+                    safe=False,
+                    status=422
+                )
+
             if schedule_type == 2:
                 threading.Thread(target=schedule_message, args=(file_path, user_id, image_url, template_name, text, ),)
                 return JsonResponse(
