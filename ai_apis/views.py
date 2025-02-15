@@ -166,7 +166,7 @@ class SendMessage(APIView):
                     status=422
                 )
 
-            if schedule_type == 1 and file_path == "":
+            if schedule_type == 2 and file_path == "":
                 return JsonResponse(
                     {"message": "file is required for message_type 1"},
                     safe=False,
