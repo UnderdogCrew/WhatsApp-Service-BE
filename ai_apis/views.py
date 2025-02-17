@@ -174,7 +174,9 @@ class SendMessage(APIView):
                 )
 
             if schedule_type == 2:
-                threading.Thread(target=schedule_message, args=(file_path, user_id, image_url, template_name, text, ),)
+                # Create a thread for the schedule_message function
+                message_thread = threading.Thread(target=schedule_message, args=(file_path, user_id, image_url, template_name, text))
+                message_thread.start()  # Start the thread
                 return JsonResponse(
                     {"message": "Message scheduled successfully"},
                     safe=False,

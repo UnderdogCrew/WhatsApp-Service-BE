@@ -4,6 +4,8 @@ import requests
 import datetime
 from UnderdogCrew.settings import API_KEY, OPEN_AI_KEY
 import traceback
+import pandas as pd
+
 db = MongoDB()
 
 '''
@@ -32,26 +34,52 @@ def process_components(components, msg_data, image_url):
             }
             result_list.append(header_entry)
 
-        elif component['type'].upper() == "BODY" and 'body_text' in component.get('example', {}):
-            # Process BODY
-            body_parameters = []
-            print(component['example']['body_text'][0])
-            for i, text in enumerate(component['example']['body_text'][0]):
-                body_parameters.append({
-                    "type": "text",
-                    "text": msg_data.get('Name') if i == 0 else text
-                })
+        elif component['type'].upper() == "BODY":
+            # Check for body_text_named_params
+            if 'body_text_named_params' in component.get('example', {}):
+                # Process BODY with named parameters
+                body_parameters = []
+                for param in component['example']['body_text_named_params']:
+                    value = msg_data.get(param['param_name'], param['example'])
+                    # Convert Timestamp to string if necessary
+                    if isinstance(value, pd.Timestamp):  # Assuming you are using pandas
+                        value = value.strftime('%Y-%m-%d')  # Format as needed
+                    body_parameters.append({
+                        "type": "text",
+                        "parameter_name": param['param_name'],
+                        "text": value
+                    })
 
-            body_entry = {
-                "type": "body",
-                "parameters": body_parameters
-            }
-            result_list.append(body_entry)
+                body_entry = {
+                    "type": "body",
+                    "parameters": body_parameters
+                }
+                result_list.append(body_entry)
+
+            # Existing condition for body_text
+            elif 'body_text' in component.get('example', {}):
+                # Process BODY
+                body_parameters = []
+                print(component['example']['body_text'][0])
+                for i, text in enumerate(component['example']['body_text'][0]):
+                    # Convert Timestamp to string if necessary
+                    if isinstance(text, pd.Timestamp):  # Assuming you are using pandas
+                        text = text.strftime('%Y-%m-%d')  # Format as needed
+                    body_parameters.append({
+                        "type": "text",
+                        "text": msg_data.get('Name') if i == 0 else text
+                    })
+
+                body_entry = {
+                    "type": "body",
+                    "parameters": body_parameters
+                }
+                result_list.append(body_entry)
 
     return result_list
 
 
-def send_message_data(number, template_name, text, image_url, user_id):
+def send_message_data(number, template_name, text, image_url, user_id, entry=None):
     try:
         url = "https://graph.facebook.com/v19.0/450885871446042/messages"
         template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
@@ -59,7 +87,7 @@ def send_message_data(number, template_name, text, image_url, user_id):
             'Authorization': f'Bearer {API_KEY}'
         }
         template_response = requests.request("GET", template_url, headers=headers)
-        print(template_response.status_code)
+        print(f"template response: {template_response.status_code}")
         if template_response.status_code != 200:
             return False
         
@@ -68,12 +96,49 @@ def send_message_data(number, template_name, text, image_url, user_id):
         category = template_data['data'][0]['category']
         language = template_data['data'][0]['language']
 
+        if entry is not None:
+            if "name" in entry:
+                text = entry['name']
+        
+        company_name = ""
+        if entry is not None:
+            if "company_name" in entry:
+                company_name = entry['company_name']
+        
+        reg_number = ""
+        model = ""
+        policy = ""
+        if entry is not None:
+            if "reg_number" in entry:
+                reg_number = entry['reg_number']
+            
+            if "model" in entry:
+                model = entry['model']
+
+        if reg_number != "" and model != "":
+            policy = f"{reg_number} ({model})"
+
+        date = ""
+        if entry is not None:
+            if "date" in entry:
+                date = entry['date']
+        
+
         # Sending messages to specific numbers
-        msg_details = {
-            "Name": text
-        }
+        if text != "" and company_name != "" and policy != "" and date != "":
+            msg_details = {
+                "name": text,
+                "company_name": company_name,
+                "policy": policy,
+                "date": date
+            }   
+        else: 
+            msg_details = {
+                "Name": text
+            }
 
         components = process_components(template_components, msg_details, image_url)
+        print(f"components: {components}")
         payload = json.dumps({
             "messaging_product": "whatsapp",
             "recipient_type": "individual",

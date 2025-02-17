@@ -1,7 +1,7 @@
 import pandas as pd
 from utils.database import MongoDB
-# from whatsapp_message_data import send_message_data
-# import threading
+from utils.whatsapp_message_data import send_message_data
+import threading
 
 
 def schedule_message(file_path, user_id, image_url, template_name, text):
@@ -16,7 +16,7 @@ def schedule_message(file_path, user_id, image_url, template_name, text):
             row_data = row.to_dict()
             row_data['user_id'] = user_id
             row_data['image_url'] = image_url
-            row_data['template_name'] = template_name
+            row_data['template_name'] = template_name if row_data['template_name'] is None else row_data['template_name']
             row_data['text'] = text
 
             entry = row_data
@@ -24,7 +24,9 @@ def schedule_message(file_path, user_id, image_url, template_name, text):
             # Insert the current entry into MongoDB
             db.create_document('whatsapp_schedule_message', entry)
 
-            # threading.Thread(target=send_message_data, args=(row_data['number'], template_name, text, image_url, user_id, ),)
+            send_message_thread = threading.Thread(target=send_message_data, args=(row_data['number'], template_name, text, image_url, user_id, entry,  ),)
+            send_message_thread.start()
+
 
         print("All data entries inserted successfully.")
 
