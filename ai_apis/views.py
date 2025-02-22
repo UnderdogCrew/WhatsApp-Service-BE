@@ -88,6 +88,11 @@ class SendMessage(APIView):
                     items=openapi.Items(type=openapi.TYPE_STRING),
                     description='Array of phone numbers for single messages (optional, required if message_type=2)'
                 ),
+                'metadata': openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    description='Additional metadata for the message',
+                    additional_properties=openapi.Schema(type=openapi.TYPE_STRING)  # Dynamic fields
+                ),
             },
             required=['text', 'message_type', 'template_name']
         ),
@@ -121,6 +126,7 @@ class SendMessage(APIView):
             print(f"API_TOKEN: {API_TOKEN}")
             request_data = request.data
             template_name = request_data.get("template_name", None)
+            metadata = request_data.get("metadata", None)
             if template_name == "hotel":
                 template_name = "hello_world"
 
@@ -195,7 +201,8 @@ class SendMessage(APIView):
                         template_name=template_name,
                         text=text,
                         image_url=image_url,
-                        user_id=user_id
+                        user_id=user_id,
+                        metadata=metadata
                     )
 
             elif message_type == 2:
@@ -206,7 +213,8 @@ class SendMessage(APIView):
                         template_name=template_name,
                         text=text,
                         image_url=image_url,
-                        user_id=user_id
+                        user_id=user_id,
+                        metadata=metadata
                     )
 
             return JsonResponse({"message": "Messages sent successfully"}, safe=False, status=200)

@@ -79,7 +79,7 @@ def process_components(components, msg_data, image_url):
     return result_list
 
 
-def send_message_data(number, template_name, text, image_url, user_id, entry=None):
+def send_message_data(number, template_name, text, image_url, user_id, entry=None, metadata=None):
     try:
         url = "https://graph.facebook.com/v19.0/450885871446042/messages"
         template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
@@ -131,7 +131,9 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
                 "company_name": company_name,
                 "policy": policy,
                 "date": date
-            }   
+            }
+        elif metadata is not None:
+            msg_details = metadata   
         else: 
             msg_details = {
                 "Name": text
