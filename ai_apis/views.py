@@ -191,7 +191,7 @@ class SendMessage(APIView):
                     msg_data = row.to_dict()
 
                     send_message_data(
-                        number=msg_data['To Number'],
+                        number=msg_data['number'],
                         template_name=template_name,
                         text=text,
                         image_url=image_url,
