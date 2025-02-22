@@ -173,7 +173,7 @@ class SendMessage(APIView):
                     status=422
                 )
 
-            if schedule_type == 2:
+            if schedule_type == 2 and template_name == "insurance_policy":
                 # Create a thread for the schedule_message function
                 message_thread = threading.Thread(target=schedule_message, args=(file_path, user_id, image_url, template_name, text))
                 message_thread.start()  # Start the thread
