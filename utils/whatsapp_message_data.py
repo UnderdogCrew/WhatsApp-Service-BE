@@ -141,6 +141,8 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             }
 
         if template_text != "":
+            template_text = template_text.replace("{{", "{")
+            template_text = template_text.replace("}}", "}")
             template_text = template_text.format(**msg_details)
 
         components = process_components(template_components, msg_details, image_url)
