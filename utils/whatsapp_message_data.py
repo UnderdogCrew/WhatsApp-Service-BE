@@ -93,6 +93,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         
         template_data = template_response.json()
         template_components = template_data['data'][0]['components']
+        template_text = template_components[0]['text'] if "text" in template_components[0] else ""
         category = template_data['data'][0]['category']
         language = template_data['data'][0]['language']
 
@@ -139,8 +140,11 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
                 "Name": text
             }
 
+        if template_text != "":
+            template_text = template_text.format(**msg_details)
+
         components = process_components(template_components, msg_details, image_url)
-        print(f"components: {components}")
+        print(f"components: {template_text}")
         payload = json.dumps({
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
@@ -165,7 +169,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         if response.status_code == 200:
             whatsapp_status_logs = {
                 "number": f"91{number}",
-                "message": text,
+                "message": template_text,
                 "user_id": user_id,
                 "price": 0.125 if category == "UTILITY" else 0.875,
                 "id": response.json()['messages'][0]["id"],
@@ -177,7 +181,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         else:
             whatsapp_status_logs = {
                 "number": f"91{number}",
-                "message": text,
+                "message": template_text,
                 "user_id": user_id,
                 "price": 0,
                 "id": "",
