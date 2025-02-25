@@ -1063,6 +1063,13 @@ class UserBillingAPIView(APIView):
 
         # Calculate final total
         total_price = whatsapp_total + image_total + text_total
+        
+        # Calculate CGST and SGST
+        cgst = total_price * 0.09  # 9% of total_price
+        sgst = total_price * 0.09  # 9% of total_price
+        
+        # Add CGST and SGST to total_price
+        total_price_with_tax = total_price + cgst + sgst
 
         # Check for invoices in the given date range
         invoice_filters = {
@@ -1086,6 +1093,9 @@ class UserBillingAPIView(APIView):
             "image_total": f"₹{round(image_total, 2)}",
             "text_total": f"₹{round(text_total, 2)}",
             "total_price": f"₹{round(total_price, 2)}",
+            "final_price": f"₹{round(total_price_with_tax, 2)}",
+            "cgst": f"₹{round(cgst, 2)}",
+            "sgst": f"₹{round(sgst, 2)}",
             "invoice_status": invoice_status,
             "account_id": account_id
         }, status=status.HTTP_200_OK)
