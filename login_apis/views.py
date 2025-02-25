@@ -1013,20 +1013,6 @@ class UserBillingAPIView(APIView):
     )
     @token_required  # Ensure the user is authenticated
     def get(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
-        token = request.headers.get('Authorization')  # Extract the token from the Authorization header
-        if token is None or not token.startswith('Bearer '):
-            return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
-
-        token = token.split(' ')[1]  # Get the actual token part
-        user_info = decode_token(token)  # Decode the token to get user information
-        dollar_price = current_dollar_price()
-        
-        # Check if user_info is a dictionary
-        if isinstance(user_info, dict) and 'user_id' in user_info:
-            user_id = user_info['user_id']  # Access user_id from the decoded token
-            print(f"user id: {user_id}")
-        else:
-            return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
         db = MongoDB()
 
         # Get query parameters for start and end date
@@ -1045,7 +1031,7 @@ class UserBillingAPIView(APIView):
             return JsonResponse({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Build filter conditions
-        filters = {"user_id": user_id, "created_at": {"$gte": start_date, "$lte": end_date}}
+        filters = {"user_id": current_user_id, "created_at": {"$gte": start_date, "$lte": end_date}}
 
         # Get total billing from WhatsApp logs
         whatsapp_logs = db.find_documents('whatsapp_message_logs', filters)
@@ -1073,21 +1059,21 @@ class UserBillingAPIView(APIView):
 
         # Check for invoices in the given date range
         invoice_filters = {
-            "user_id": user_id,
+            "user_id": current_user_id,
             "created_at": {"$gte": start_date, "$lte": end_date}
         }
         invoices = db.find_documents('invoices', invoice_filters)
         invoice_status = "Issued" if invoices else "Pending"  # Set status based on invoice presence
 
         # Fetch user details from the database
-        user = db.find_document('users', {'_id': ObjectId(user_id)})
+        user = db.find_document('users', {'_id': ObjectId(current_user_id)})
         account_id = user.get('account_id', '') if user else ''  # Get account_id if user exists, else empty string
 
         # Format billing period
         billing_period = f"{start_date.strftime('%B %d')} - {end_date.strftime('%B %d, %Y')}"
 
         return JsonResponse({
-            "user_id": user_id,
+            "user_id": current_user_id,
             "billing_period": billing_period,  # Include billing period in the response
             "whatsapp_total": f"₹{round(whatsapp_total, 2)}",
             "image_total": f"₹{round(image_total, 2)}",
