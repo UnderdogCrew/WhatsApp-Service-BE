@@ -20,10 +20,10 @@ def generate_monthly_invoices():
         
         # Calculate date range for the previous month
         today = datetime.now()
-         # first_day = (today.replace(day=1) - timedelta(days=1)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        # last_day = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
-        first_day = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)  # First day of current month
-        last_day = datetime.now()  # Current time
+        first_day = (today.replace(day=1) - timedelta(days=1)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_day = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
+        # first_day = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)  # First day of current month
+        # last_day = datetime.now()  # Current time
         
         print(f"Checking invoices for period: {first_day} - {last_day}")
         
