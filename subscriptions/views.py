@@ -321,6 +321,8 @@ class WebhookView(APIView):
             db = MongoDB()
             payload = request.data
             event = payload.get("event")
+            has_access = False
+            status_update = ""
             print(event)
             subscription_id = payload.get("payload", {}).get("subscription", {}).get("entity", {}).get("id")
 
@@ -330,16 +332,22 @@ class WebhookView(APIView):
                     subscription = convert_object_id(subscription)
                     if event == "subscription.activated":
                         status_update = "active"
+                        has_access = True
                     elif event == "subscription.deactivated":
                         status_update = "inactive"
+                        has_access = False
                     elif event == "subscription.pending":
                         status_update = "pending"
+                        has_access = False
                     elif event == "subscription.charged":
                         status_update = "active"
+                        has_access = True
                     elif event == "subscription.cancelled":
                         status_update = "cancelled"
+                        has_access = False
                     elif event == "subscription.completed":
                         status_update = "completed"
+                        has_access = True
                     elif event == "subscription.expired":
                         db.delete_document('subscriptions', {'subscription_id': subscription_id})
                         return Response({"status": "success"})
@@ -349,9 +357,10 @@ class WebhookView(APIView):
                         {
                             'status': status_update,
                             'updated_at': datetime.now(timezone.utc),
-                            'has_access': status_update == "active"
+                            'has_access': has_access
                         }
                     )
+                    print(subscription)
 
             elif event == "payment.captured":
                 email = payload.get("payload", {}).get("payment", {}).get("entity", {}).get("notes", {}).get("email")
