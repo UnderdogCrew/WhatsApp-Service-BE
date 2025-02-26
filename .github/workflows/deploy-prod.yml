@@ -1,0 +1,37 @@
+name: Whatsapp Service Production Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.PROD_SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        run: |
+          ssh ubuntu@${{ secrets.PROD_SERVER_IP }} '
+            sudo su - <<EOF
+            cd ${{ secrets.PROD_PROJECT_PATH }} &&
+            source .enve/bin/activate &&
+            cd WhatsApp-Service-BE &&
+            git config --global --add safe.directory $PWD &&
+            git pull origin main &&
+            pip install -r req.txt &&
+            pm2 restart whatsapp-service-prod
+          '
