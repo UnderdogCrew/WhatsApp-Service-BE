@@ -323,6 +323,7 @@ class WebhookView(APIView):
             event = payload.get("event")
             has_access = False
             status_update = ""
+            print(payload)
             print(event)
             subscription_id = payload.get("payload", {}).get("subscription", {}).get("entity", {}).get("id")
 
@@ -368,7 +369,7 @@ class WebhookView(APIView):
                 if email:
                     db.update_document('invoices',
                         {'invoice_number': invoice_id},
-                        {'$set': {'payment_status': 'Paid', 'updated_at': datetime.now(timezone.utc)}}
+                        {'payment_status': 'Paid', 'updated_at': datetime.now(timezone.utc)}
                     )
 
             return Response({"status": "success"})
