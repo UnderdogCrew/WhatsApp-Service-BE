@@ -3,7 +3,7 @@ name: Whatsapp service Deploy
 on:
   push:
     branches:
-      - main  # or master, depending on your default branch name
+      - develop  # or master, depending on your default branch name
 
 jobs:
   deploy:
@@ -31,7 +31,7 @@ jobs:
             source enve/bin/activate &&
             cd WhatsApp-Service-BE &&
             git config --global --add safe.directory $PWD &&
-            git pull origin main &&
+            git pull origin develop &&
             pip install -r req.txt &&
             pm2 restart whatsapp-service
           ' 
