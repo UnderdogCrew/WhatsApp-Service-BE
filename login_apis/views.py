@@ -1018,6 +1018,7 @@ class UserBillingAPIView(APIView):
         # Get query parameters for start and end date
         start_date = request.GET.get('start_date')
         end_date = request.GET.get('end_date')
+        dollar_price = current_dollar_price()
 
         # Check if start_date and end_date are provided
         if not start_date or not end_date:
@@ -1064,7 +1065,6 @@ class UserBillingAPIView(APIView):
         }
         invoices = db.find_documents('invoices', invoice_filters)
         invoice_status = "Issued" if invoices else "Pending"  # Set status based on invoice presence
-
         # Fetch user details from the database
         user = db.find_document('users', {'_id': ObjectId(current_user_id)})
         account_id = user.get('account_id', '') if user else ''  # Get account_id if user exists, else empty string
@@ -1083,5 +1083,7 @@ class UserBillingAPIView(APIView):
             "cgst": f"₹{round(cgst, 2)}",
             "sgst": f"₹{round(sgst, 2)}",
             "invoice_status": invoice_status,
+            "payment_status": invoices[0].get('payment_status'),
+            "invoice_number": invoices[0].get('invoice_number'),
             "account_id": account_id
         }, status=status.HTTP_200_OK)

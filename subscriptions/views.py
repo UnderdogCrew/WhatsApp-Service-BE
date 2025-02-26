@@ -139,7 +139,7 @@ class CreateOrderView(APIView):
                 amount=serializer.validated_data['amount'],
                 currency=serializer.validated_data['currency'],
                 receipt=serializer.validated_data['receipt'],
-                notes={"email": current_user_email, "credit": serializer.validated_data['amount']/100}
+                notes={"email": current_user_email, "user_id": current_user_id, "invoice_id": serializer.validated_data['receipt']}
             )
 
             if error:
@@ -312,7 +312,6 @@ class WebhookView(APIView):
                 webhook_body.encode(),
                 hashlib.sha256
             ).hexdigest()
-            print(expected_signature)
             if not hmac.compare_digest(webhook_signature, expected_signature):
                 return Response(
                     {"error": "Invalid webhook signature"},
@@ -349,18 +348,18 @@ class WebhookView(APIView):
                         {'subscription_id': subscription_id},
                         {
                             'status': status_update,
-                            'updated_at': datetime.now(timezone.utc)
+                            'updated_at': datetime.now(timezone.utc),
+                            'has_access': status_update == "active"
                         }
                     )
 
             elif event == "payment.captured":
                 email = payload.get("payload", {}).get("payment", {}).get("entity", {}).get("notes", {}).get("email")
-                credit_to_add = float(payload.get("payload", {}).get("payment", {}).get("entity", {}).get("notes", {}).get("credit", 0))
-                
+                invoice_id = payload.get("payload", {}).get("payment", {}).get("entity", {}).get("notes", {}).get("invoice_id")
                 if email:
-                    db.update_document('users',
-                        {'email': email},
-                        {'$inc': {'default_credit': credit_to_add}}
+                    db.update_document('invoices',
+                        {'invoice_number': invoice_id},
+                        {'$set': {'payment_status': 'Paid', 'updated_at': datetime.now(timezone.utc)}}
                     )
 
             return Response({"status": "success"})
