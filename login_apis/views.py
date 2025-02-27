@@ -1064,7 +1064,12 @@ class UserBillingAPIView(APIView):
             "created_at": {"$gte": start_date, "$lte": end_date}
         }
         invoices = db.find_documents('invoices', invoice_filters)
-        invoice_status = "Issued" if invoices else "Pending"  # Set status based on invoice presence
+        invoice_status = "Issued"
+        if invoices:
+            if invoices[0].get('payment_status') == "Paid":
+                invoice_status = "Paid"
+        else:
+            invoice_status = "Pending"
         # Fetch user details from the database
         user = db.find_document('users', {'_id': ObjectId(current_user_id)})
         account_id = user.get('account_id', '') if user else ''  # Get account_id if user exists, else empty string
@@ -1083,7 +1088,7 @@ class UserBillingAPIView(APIView):
             "cgst": f"₹{round(cgst, 2)}",
             "sgst": f"₹{round(sgst, 2)}",
             "invoice_status": invoice_status,
-            "payment_status": invoices[0].get('payment_status'),
-            "invoice_number": invoices[0].get('invoice_number'),
+            "payment_status": invoices[0].get('payment_status') if invoices else "Pending",
+            "invoice_number": invoices[0].get('invoice_number') if invoices else "",
             "account_id": account_id
         }, status=status.HTTP_200_OK)

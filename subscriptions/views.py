@@ -294,7 +294,7 @@ class PlansView(APIView):
 
 class WebhookView(APIView):
     def post(self, request):
-        try:
+        # try:
             # Get the webhook signature from headers
             webhook_signature = request.headers.get('X-Razorpay-Signature')
             if not webhook_signature:
@@ -321,6 +321,9 @@ class WebhookView(APIView):
             db = MongoDB()
             payload = request.data
             event = payload.get("event")
+            has_access = False
+            status_update = ""
+            print(payload)
             print(event)
             subscription_id = payload.get("payload", {}).get("subscription", {}).get("entity", {}).get("id")
 
@@ -330,16 +333,22 @@ class WebhookView(APIView):
                     subscription = convert_object_id(subscription)
                     if event == "subscription.activated":
                         status_update = "active"
+                        has_access = True
                     elif event == "subscription.deactivated":
                         status_update = "inactive"
+                        has_access = False
                     elif event == "subscription.pending":
                         status_update = "pending"
+                        has_access = False
                     elif event == "subscription.charged":
                         status_update = "active"
+                        has_access = True
                     elif event == "subscription.cancelled":
                         status_update = "cancelled"
+                        has_access = False
                     elif event == "subscription.completed":
                         status_update = "completed"
+                        has_access = True
                     elif event == "subscription.expired":
                         db.delete_document('subscriptions', {'subscription_id': subscription_id})
                         return Response({"status": "success"})
@@ -349,9 +358,10 @@ class WebhookView(APIView):
                         {
                             'status': status_update,
                             'updated_at': datetime.now(timezone.utc),
-                            'has_access': status_update == "active"
+                            'has_access': has_access
                         }
                     )
+                    print(subscription)
 
             elif event == "payment.captured":
                 email = payload.get("payload", {}).get("payment", {}).get("entity", {}).get("notes", {}).get("email")
@@ -359,13 +369,13 @@ class WebhookView(APIView):
                 if email:
                     db.update_document('invoices',
                         {'invoice_number': invoice_id},
-                        {'$set': {'payment_status': 'Paid', 'updated_at': datetime.now(timezone.utc)}}
+                        {'payment_status': 'Paid', 'updated_at': datetime.now(timezone.utc)}
                     )
 
             return Response({"status": "success"})
             
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to process webhook: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        # except Exception as e:
+        #     return Response(
+        #         {"error": f"Failed to process webhook: {str(e)}"},
+        #         status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        #     )
