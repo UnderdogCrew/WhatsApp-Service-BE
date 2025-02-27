@@ -7,7 +7,7 @@ current_path = os.path.abspath(os.getcwd())
 print(f"current_path: {current_path}")
 
 # Set up Django environment
-sys.path.append(current_path)  # Adjust this path accordingly
+sys.path.append(f"../{current_path}")  # Adjust this path accordingly
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'UnderdogCrew.settings')
 django.setup()
 
