@@ -4,7 +4,7 @@ import django
 from datetime import datetime, timedelta
 import os
 current_path = os.path.abspath(os.getcwd())
-print(f"current_path: {current_path}")
+print(f"current_path: {f"../{current_path}"}")
 
 # Set up Django environment
 sys.path.append(f"../{current_path}")  # Adjust this path accordingly
