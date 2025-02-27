@@ -21,51 +21,63 @@ target_days = {1, 2, 5, 10, 30}
 
 def fetch_scheduled_messages():
     try:
-        print(f"Starting invoice generation at {datetime.now()}")
-        db = MongoDB()
-        
-        # Calculate date range for the previous month
-        today = datetime.now()
-        target_dates = [today + timedelta(days=day) for day in target_days]
-        target_dates = [d.replace(hour=0, minute=0, second=0, microsecond=0) for d in target_dates]
-        
-        # Fetch all documents
-        records = list(
-            db.find_documents('whatsapp_schedule_message', {})
-        )
-        
-        filtered_records = [record for record in records if 'date' in record and record['date'] in target_dates]
+        # Set the desired hour and minute for execution
+        scheduled_hour = 2  # Example: 10 AM
+        scheduled_minute = 30  # Example: 0 minutes
 
-        for user in filtered_records:
-            reg_number = ""
-            model = ""
-            policy = ""
-            if "reg_number" in user:
-                reg_number = user['reg_number']
-                
-            if "model" in user:
-                model = user['model']
-
-            if reg_number != "" and model != "":
-                policy = f"{reg_number} ({model})"
+        # Get the current time
+        now = datetime.now()
+        
+        # Check if the current time matches the scheduled time
+        if now.hour == scheduled_hour and now.minute == scheduled_minute:
+            print(f"Starting invoice generation at {now}")
+            db = MongoDB()
             
-            metadata = {
-                "name" : user['name'],
-                "company_name" : user['company_name'],
-                "policy": policy,
-                "date": user['date']
-            }
-            send_message_data(
-                number=user['number'],
-                template_name="insurance_policy",
-                text=user['text'],
-                image_url="",
-                user_id=user['user_id'],
-                metadata=metadata
+            # Calculate date range for the previous month
+            today = datetime.now()
+            target_dates = [today + timedelta(days=day) for day in target_days]
+            target_dates = [d.replace(hour=0, minute=0, second=0, microsecond=0) for d in target_dates]
+            
+            # Fetch all documents
+            records = list(
+                db.find_documents('whatsapp_schedule_message', {})
             )
+            
+            filtered_records = [record for record in records if 'date' in record and record['date'] in target_dates]
 
-        print("Message send successfully......!!!!!!!")
-        return True
+            for user in filtered_records:
+                reg_number = ""
+                model = ""
+                policy = ""
+                if "reg_number" in user:
+                    reg_number = user['reg_number']
+                    
+                if "model" in user:
+                    model = user['model']
+
+                if reg_number != "" and model != "":
+                    policy = f"{reg_number} ({model})"
+                
+                metadata = {
+                    "name" : user['name'],
+                    "company_name" : user['company_name'],
+                    "policy": policy,
+                    "date": user['date']
+                }
+                send_message_data(
+                    number=user['number'],
+                    template_name="insurance_policy",
+                    text=user['text'],
+                    image_url="",
+                    user_id=user['user_id'],
+                    metadata=metadata
+                )
+
+            print("Message send successfully......!!!!!!!")
+            return True
+        else:
+            print(f"Current time {now.strftime('%H:%M')} does not match scheduled time {scheduled_hour}:{scheduled_minute}. Skipping execution.")
+            return False
 
     except Exception as e:
         print(f"Error generating monthly invoices: {str(e)}")
