@@ -91,10 +91,12 @@ def generate_monthly_invoices():
                 "invoice_number": f"INV-{user.get('account_id', '')}-{today.strftime('%Y%m')}"
             }
 
-            if total_price > 0:
-                db.create_document('invoices', invoice_data)
-                print(f"Generated invoice for user {user_id} for period {billing_period}")
-                print(f"Subtotal: {total_price}, CGST: {cgst}, SGST: {sgst}, Total with tax: {total_price_with_tax}")
+            if total_price == 0:
+                invoice_data["payment_status"] = "Paid"    
+            
+            db.create_document('invoices', invoice_data)
+            print(f"Generated invoice for user {user_id} for period {billing_period}")
+            print(f"Subtotal: {total_price}, CGST: {cgst}, SGST: {sgst}, Total with tax: {total_price_with_tax}")
 
         print("Monthly invoice generation completed successfully")
         return True
