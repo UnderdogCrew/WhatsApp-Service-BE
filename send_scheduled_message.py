@@ -53,7 +53,7 @@ def fetch_scheduled_messages():
                 "name" : user['name'],
                 "company_name" : user['company_name'],
                 "policy": policy,
-                "date": user['date']
+                "date": user['date'].strftime("%Y-%m-%d")
             }
             send_message_data(
                 number=user['number'],
