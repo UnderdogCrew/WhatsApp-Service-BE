@@ -85,3 +85,4 @@ def fetch_scheduled_messages():
 
 if __name__ == "__main__":
     fetch_scheduled_messages() 
+    sys.exit(0)
