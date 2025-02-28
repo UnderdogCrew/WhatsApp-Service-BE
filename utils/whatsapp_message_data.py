@@ -96,6 +96,8 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         
         user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
 
+        print(f"user_info: {user_info}")
+
         if user_info is not None:
             business_id = user_info['business_id']
         else:
