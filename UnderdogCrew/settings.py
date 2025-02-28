@@ -52,6 +52,7 @@ REDIS_DATABASE = os.getenv("REDIS_DATABASE")
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 REDIS_USER = os.getenv("REDIS_USER")
 WABA_ID = os.getenv("WABA_ID")
+SWAGGER_URL = os.getenv("SWAGGER_URL")
 
 # Connect to Redis (update with your Redis instance details)
 redis_client = redis.Redis(

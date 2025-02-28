@@ -23,6 +23,7 @@ from subscriptions import views as subscription_views
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+from .settings import SWAGGER_URL
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -35,8 +36,7 @@ schema_view = get_schema_view(
    ),
    public=True,
    permission_classes=(permissions.AllowAny,),
-   url='https://whatsapp-api.theunderdogcrew.com/',
-#    url='http://127.0.0.1:8000/',
+   url=SWAGGER_URL,
 )
 
 urlpatterns = [
