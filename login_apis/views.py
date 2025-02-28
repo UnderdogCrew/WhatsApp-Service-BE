@@ -1028,6 +1028,12 @@ class UserBillingAPIView(APIView):
         try:
             start_date = datetime.strptime(start_date, "%Y-%m-%d")
             end_date = datetime.strptime(end_date, "%Y-%m-%d")
+
+            # Set time for start_date to 00:00:00
+            start_date = start_date.replace(hour=0, minute=0, second=0)
+
+            # Set time for end_date to 23:59:59
+            end_date = end_date.replace(hour=23, minute=59, second=59)
         except ValueError:
             return JsonResponse({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
 
