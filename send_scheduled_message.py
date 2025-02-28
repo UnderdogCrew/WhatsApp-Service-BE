@@ -16,7 +16,7 @@ from utils.database import MongoDB
 from utils.whatsapp_message_data import send_message_data
 
 # Define the target date ranges
-target_days = {1, 2, 5, 10, 30}
+target_days = {0, 1, 2, 5, 10, 30}
 
 
 def fetch_scheduled_messages():
