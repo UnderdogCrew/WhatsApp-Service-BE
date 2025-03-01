@@ -22,6 +22,12 @@ from utils.auth import token_required, decode_token
 price_per_million_tokens = 0.15  # Price for 1M tokens
 tokens_per_million = 1_000_000  # 1M tokens
 
+whatsapp_status = {
+    0: "sent",
+    1: "delivered",
+    2: "read",
+    3: "received"
+}
 
 '''
     API for login the user in portal
@@ -246,7 +252,37 @@ class FacebookWebhook(APIView):
             changes = entry[0]['changes']
             value = changes[0]['value']
             phone_number_id = value['metadata']['phone_number_id']
-            statuses = value['statuses']
+            statuses = value['statuses'] if "statuses" in value else []
+            hub_challenge = "EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT"
+
+            if len(statuses) == 0:
+                try:
+                    user_info = db.find_document("users", query={"business_id": phone_number_id})
+                    if user_info:
+                        display_phone_number =value['metadata']['display_phone_number']
+                        messages = value['messages'][0]['text']['body']
+                        messages_type = value['messages'][0]['text']['type']
+
+                        if messages_type == "text":
+                            whatsapp_status_logs = {
+                                "number": display_phone_number,
+                                "message": messages,
+                                "user_id": str(user_info['_id']),
+                                "price": 0,
+                                "id": value['messages'][0]['id'],
+                                "message_status": "received",
+                                "created_at": int(datetime.datetime.now().timestamp()),
+                                "template_name": "template_name",
+                                "code": 0,
+                                "title": "",
+                                "error_message": "",
+                                "error_data": "",
+                            }
+                            db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+                except:
+                    pass
+                
+                return HttpResponse(hub_challenge)
 
             # need to add the logs in database
             user = db.find_document('whatsapp_message_logs', {'id': statuses[0]['id']})
@@ -285,7 +321,7 @@ class FacebookWebhook(APIView):
                 messages = ""
                 from_number = ""
                 msg_type = ""
-            hub_challenge = "EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT"
+            
             if msg_type == "text":
                 ## need to send message back
                 payload = json.dumps(
@@ -760,6 +796,7 @@ class UserMessageLogs(APIView):
             # Parse optional query parameters
             start_date = request.query_params.get("start_date", None)
             end_date = request.query_params.get("end_date", None)
+            status = request.query_params.get("status", None)
             skip = int(request.query_params.get("skip", 0))
             limit = int(request.query_params.get("limit", 20))
 
@@ -814,6 +851,10 @@ class UserMessageLogs(APIView):
                 else:
                     query_filter["created_at"] = {"$lte": end_date}
                     text_filter["created_at"] = {"$lte": end_date}
+            if status:
+                query_filter['message_status'] = whatsapp_status[status]
+                text_filter['message_status'] = whatsapp_status[status]
+            
             print(f"text filter: {text_filter}")
             # Fetch data from database
             sort_order = [("_id", -1)]  # Sorting in descending order
