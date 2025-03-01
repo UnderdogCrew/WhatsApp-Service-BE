@@ -46,8 +46,10 @@ def fetch_scheduled_messages():
             if "model" in user:
                 model = user['model']
 
-            if reg_number != "" and model != "":
+            if reg_number != "" and model != "" and reg_number is not None:
                 policy = f"{reg_number} ({model})"
+            else:
+                policy = f"{model}"
             
             metadata = {
                 "name" : user['name'],
