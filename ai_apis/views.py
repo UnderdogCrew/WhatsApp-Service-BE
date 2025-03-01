@@ -851,7 +851,7 @@ class UserMessageLogs(APIView):
                 else:
                     query_filter["created_at"] = {"$lte": end_date}
                     text_filter["created_at"] = {"$lte": end_date}
-            if status:
+            if whatsapp_status_text:
                 query_filter['message_status'] = whatsapp_status[whatsapp_status_text]
                 text_filter['message_status'] = whatsapp_status[whatsapp_status_text]
             
