@@ -23,10 +23,10 @@ price_per_million_tokens = 0.15  # Price for 1M tokens
 tokens_per_million = 1_000_000  # 1M tokens
 
 whatsapp_status = {
-    0: "sent",
-    1: "delivered",
-    2: "read",
-    3: "received"
+    "0": "sent",
+    "1": "delivered",
+    "2": "read",
+    "3": "received",
 }
 
 '''
@@ -852,8 +852,9 @@ class UserMessageLogs(APIView):
                     query_filter["created_at"] = {"$lte": end_date}
                     text_filter["created_at"] = {"$lte": end_date}
             if whatsapp_status_text:
-                query_filter['message_status'] = whatsapp_status[whatsapp_status_text]
-                text_filter['message_status'] = whatsapp_status[whatsapp_status_text]
+                if whatsapp_status_text in whatsapp_status:
+                    query_filter['message_status'] = whatsapp_status[whatsapp_status_text]
+                    text_filter['message_status'] = whatsapp_status[whatsapp_status_text]
             
             print(f"text filter: {text_filter}")
             # Fetch data from database
