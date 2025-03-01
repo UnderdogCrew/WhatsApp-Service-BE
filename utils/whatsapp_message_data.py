@@ -142,7 +142,11 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         date = ""
         if entry is not None:
             if "date" in entry:
-                date = entry['date']
+                # Convert date to string format if it's a datetime object
+                if isinstance(entry['date'], datetime.datetime):
+                    date = entry['date'].strftime("%Y-%m-%d %H:%M:%S")  # Convert to string
+                else:
+                    date = entry['date']  # Assume it's already a string
         
 
         # Sending messages to specific numbers
