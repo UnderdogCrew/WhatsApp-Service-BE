@@ -136,8 +136,10 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             if "model" in entry:
                 model = entry['model']
 
-        if reg_number != "" and model != "":
+        if reg_number != "" and model != "" and reg_number is not None:
             policy = f"{reg_number} ({model})"
+        else:
+            policy = f"{model}"
 
         date = ""
         if entry is not None:
