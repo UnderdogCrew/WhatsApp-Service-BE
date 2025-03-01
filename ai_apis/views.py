@@ -889,6 +889,16 @@ class UserMessageLogs(APIView):
                 
                 try:
                     # Convert to a datetime object
+                    read_at_obj = datetime.datetime.utcfromtimestamp(_message['read_at'])
+
+                    # Format it into a readable format
+                    read_at_readable = read_at_obj.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    read_at_readable = ""
+                
+
+                try:
+                    # Convert to a datetime object
                     delivered_at_obj = datetime.datetime.utcfromtimestamp(_message['delivered_at'])
 
                     # Format it into a readable format
@@ -920,6 +930,7 @@ class UserMessageLogs(APIView):
                         "updated_at": updated_at_human_readable,
                         "sent_at": sent_dt_readable,
                         "delivered_at": delivered_at_readable,
+                        "read_at": read_at_readable,
                         "failed_at": failed_at_readable,
                         "code": _message['code'] if "code" in _message else 0,
                         "error_data": _message['error_data'] if "error_data" in _message else "",
