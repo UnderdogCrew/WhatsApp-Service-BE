@@ -22,6 +22,11 @@ from utils.auth import token_required, decode_token
 price_per_million_tokens = 0.15  # Price for 1M tokens
 tokens_per_million = 1_000_000  # 1M tokens
 
+whatsapp_status = {
+    0: "sent",
+    1: "delivered",
+    2: "read"
+}
 
 '''
     API for login the user in portal
@@ -760,6 +765,7 @@ class UserMessageLogs(APIView):
             # Parse optional query parameters
             start_date = request.query_params.get("start_date", None)
             end_date = request.query_params.get("end_date", None)
+            status = request.query_params.get("status", None)
             skip = int(request.query_params.get("skip", 0))
             limit = int(request.query_params.get("limit", 20))
 
@@ -814,6 +820,10 @@ class UserMessageLogs(APIView):
                 else:
                     query_filter["created_at"] = {"$lte": end_date}
                     text_filter["created_at"] = {"$lte": end_date}
+            if status:
+                query_filter['message_status'] = whatsapp_status[status]
+                text_filter['message_status'] = whatsapp_status[status]
+            
             print(f"text filter: {text_filter}")
             # Fetch data from database
             sort_order = [("_id", -1)]  # Sorting in descending order
