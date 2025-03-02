@@ -30,8 +30,10 @@ class MongoDB:
 
     def create_document(self, collection_name, document):
         collection = self.get_collection(collection_name)
-        document['created_at'] = datetime.utcnow()
-        document['updated_at'] = datetime.utcnow()
+        if 'created_at' not in document:
+            document['created_at'] = datetime.utcnow()
+        if 'updated_at' not in document:
+            document['updated_at'] = datetime.utcnow()
         result = collection.insert_one(document)
         return str(result.inserted_id)
 
