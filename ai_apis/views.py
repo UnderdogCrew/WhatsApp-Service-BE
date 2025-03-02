@@ -215,11 +215,13 @@ class SendMessage(APIView):
                         "company_name": msg_data['company_name'] if "company_name" in msg_data else "",
                         "date": msg_data['date'] if "date" in msg_data else "",
                         "status": 1,
+                        "user_id": user_id,
                         "created_at": datetime.datetime.now()
                     }
                     customer_query = {
                         "number": msg_data['number'],
-                        "status": 1
+                        "status": 1,
+                        "user_id": user_id,
                     }
                     customer_data = db.find_document(collection_name='customers', query=customer_query)
                     if customer_data is not None:

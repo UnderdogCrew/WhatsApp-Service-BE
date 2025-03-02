@@ -25,6 +25,7 @@ def schedule_message(file_path, user_id, image_url, template_name, text):
             customer_details = {
                 "number": row_data['number'],
                 "name": row_data['name'],
+                "user_id": user_id,
                 "insurance_type": row_data['insurance_type'] if "insurance_type" in row_data else "",
                 "model": row_data['model'] if "model" in row_data else "",
                 "reg_number": row_data['reg_number'] if "reg_number" in row_data else "",
@@ -36,7 +37,8 @@ def schedule_message(file_path, user_id, image_url, template_name, text):
             }
             customer_query = {
                 "number": row_data['number'],
-                "status": 1
+                "status": 1,
+                "user_id": user_id
             }
             customer_data = db.find_document(collection_name='customers', query=customer_query)
             if customer_data is not None:
