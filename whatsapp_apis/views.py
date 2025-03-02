@@ -551,7 +551,7 @@ class CustomersChatLogs(APIView):
                 customer_chat_details.append(
                     {
                         "number": _customer['number'],
-                        "message": _customer['number'],
+                        "message": _customer['message'],
                         "created_at": _customer['created_at'],
                         "updated_at": _customer['updated_at'] if "updated_at" in _customer else None,
                         "sent_at": _customer['sent_at'] if "sent_at" in _customer else None,
