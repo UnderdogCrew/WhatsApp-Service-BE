@@ -18,6 +18,7 @@ from ai_apis.schedule_task import schedule_message
 import threading
 from utils.whatsapp_message_data import send_message_data
 from utils.auth import token_required, decode_token
+from bson import ObjectId
 
 price_per_million_tokens = 0.15  # Price for 1M tokens
 tokens_per_million = 1_000_000  # 1M tokens
@@ -116,6 +117,7 @@ class SendMessage(APIView):
     @token_required  # Ensure the user is authenticated
     def post(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
         try:
+            db = MongoDB()
             token = request.headers.get('Authorization')  # Extract the token from the Authorization header
             if token is None or not token.startswith('Bearer '):
                 return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
@@ -201,6 +203,38 @@ class SendMessage(APIView):
                 df = pd.read_excel(file_path)
                 for index, row in df.iterrows():
                     msg_data = row.to_dict()
+
+                    ## we need to add the numbers and name as a customer
+                    customer_details = {
+                        "number": msg_data['number'],
+                        "name": msg_data['name'],
+                        "insurance_type": msg_data['insurance_type'] if "insurance_type" in msg_data else "",
+                        "model": msg_data['model'] if "model" in msg_data else "",
+                        "reg_number": msg_data['reg_number'] if "reg_number" in msg_data else "",
+                        "policy_type": msg_data['policy_type'] if "policy_type" in msg_data else "",
+                        "company_name": msg_data['company_name'] if "company_name" in msg_data else "",
+                        "date": msg_data['date'] if "date" in msg_data else "",
+                        "status": 1,
+                        "created_at": datetime.datetime.now()
+                    }
+                    customer_query = {
+                        "number": msg_data['number'],
+                        "status": 1
+                    }
+                    customer_data = db.find_document(collection_name='customers', query=customer_query)
+                    if customer_data is not None:
+                        update_data = {
+                            "name": msg_data['name'],
+                            "insurance_type": msg_data['insurance_type'] if "insurance_type" in msg_data else "",
+                            "model": msg_data['model'] if "model" in msg_data else "",
+                            "reg_number": msg_data['reg_number'] if "reg_number" in msg_data else "",
+                            "policy_type": msg_data['policy_type'] if "policy_type" in msg_data else "",
+                            "company_name": msg_data['company_name'] if "company_name" in msg_data else "",
+                            "date": msg_data['date'] if "date" in msg_data else "",
+                        }
+                        db.update_document(collection_name="customers", query={"_id": ObjectId(customer_data['_id'])}, update_data=update_data)
+                    else:
+                        db.create_document('customers', customer_details)
 
                     send_message_data(
                         number=msg_data['number'],
