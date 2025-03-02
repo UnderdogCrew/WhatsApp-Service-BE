@@ -498,6 +498,13 @@ class CustomersChatLogs(APIView):
                 description="Bearer token",
                 type=openapi.TYPE_STRING,
                 required=True
+            ),
+            openapi.Parameter(
+                "number",
+                openapi.IN_QUERY,
+                description="number of the user for whom need to fetch the history",
+                type=openapi.TYPE_STRING,
+                required=False,
             )
         ],
         responses={
@@ -536,7 +543,11 @@ class CustomersChatLogs(APIView):
                 return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
             
             # Build query filter based on dates and name
-            query_filter = {"user_id": user_id}
+            number = request.query_params.get("number", None)
+            if number is None:
+                return JsonResponse({"message": "Number is invalid"}, status=422)
+            
+            query_filter = {"user_id": user_id, "number": f"91{number}"}
             print(f"query filter: {query_filter}")
             # Fetch data from database
             sort_order = [("_id", 1)]  # Sorting in descending order
