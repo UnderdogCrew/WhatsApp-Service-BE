@@ -484,3 +484,97 @@ class CustomersView(APIView):
             return JsonResponse({
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+
+class CustomersChatLogs(APIView):
+
+    @swagger_auto_schema(
+        operation_description="Get all the customers list",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(
+                        type=openapi.TYPE_ARRAY,
+                        items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                    ),
+                }
+            )),
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def get(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
+        try:
+            customer_chat_details = []
+            db = MongoDB()
+            token = request.headers.get('Authorization')  # Extract the token from the Authorization header
+            if token is None or not token.startswith('Bearer '):
+                return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+            token = token.split(' ')[1]  # Get the actual token part
+            user_info = decode_token(token)  # Decode the token to get user information
+            
+            # Check if user_info is a dictionary
+            if isinstance(user_info, dict) and 'user_id' in user_info:
+                user_id = user_info['user_id']  # Access user_id from the decoded token
+                print(f"user id: {user_id}")
+            else:
+                return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+            
+            # Build query filter based on dates and name
+            query_filter = {"user_id": user_id}
+            print(f"query filter: {query_filter}")
+            # Fetch data from database
+            sort_order = [("_id", 1)]  # Sorting in descending order
+
+            customer_chat_data = db.find_documents(collection_name="whatsapp_message_logs", query=query_filter, sort=sort_order)
+            for _customer in customer_chat_data:
+                if _customer['message_status'] in ['read', 'delivered', 'sent', 'received', 'error']:
+                    msg_type = 1
+                else:
+                    msg_type = 2
+
+                customer_chat_details.append(
+                    {
+                        "number": _customer['number'],
+                        "message": _customer['number'],
+                        "created_at": _customer['created_at'],
+                        "updated_at": _customer['updated_at'] if "updated_at" in _customer else None,
+                        "sent_at": _customer['sent_at'] if "sent_at" in _customer else None,
+                        "read_at": _customer['read_at'] if "read_at" in _customer else None,
+                        "status": _customer['message_status'],
+                        "msg_type": msg_type
+                    }
+                )
+
+            if len(customer_chat_details) > 0:
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'Customer retrieved successfully',
+                    'data': customer_chat_details
+                }, status=status.HTTP_200_OK)
+            else:
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'Customer not Found',
+                    'data': customer_chat_details
+                }, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
