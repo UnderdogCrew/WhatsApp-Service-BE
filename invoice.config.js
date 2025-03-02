@@ -7,14 +7,14 @@ module.exports = {
       autorestart: false,
       watch: false,
       max_memory_restart: '1G',
-      cron_restart: '0 8 1 * *',  // Runs at 8:00 AM on the 1st day of every month
+      cron_restart: '30 2 1 * *',  // 2:30 AM UTC = 8:00 AM IST
       env: {
         NODE_ENV: 'development',
-        DJANGO_SETTINGS_MODULE: 'UnderdogCrew.settings',
+        DJANGO_SETTINGS_MODULE: 'UnderdogCrew.settings'
       },
       env_production: {
         NODE_ENV: 'production',
-        DJANGO_SETTINGS_MODULE: 'UnderdogCrew.settings',
+        DJANGO_SETTINGS_MODULE: 'UnderdogCrew.settings'
       }
     }
   ]

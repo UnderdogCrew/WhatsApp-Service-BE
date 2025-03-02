@@ -30,8 +30,10 @@ class MongoDB:
 
     def create_document(self, collection_name, document):
         collection = self.get_collection(collection_name)
-        document['created_at'] = datetime.utcnow()
-        document['updated_at'] = datetime.utcnow()
+        if 'created_at' not in document:
+            document['created_at'] = datetime.utcnow()
+        if 'updated_at' not in document:
+            document['updated_at'] = datetime.utcnow()
         result = collection.insert_one(document)
         return str(result.inserted_id)
 
@@ -49,6 +51,11 @@ class MongoDB:
         if limit:
             cursor = cursor.limit(limit)  # Apply sorting if provided
         return list(cursor)
+
+    def find_documents_count(self, collection_name, query):
+        collection = self.get_collection(collection_name)
+        return collection.count_documents(query)  # Return the count of documents matching the query
+
     
     def update_document(self, collection_name, query, update_data):
         collection = self.get_collection(collection_name)

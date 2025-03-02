@@ -2,6 +2,8 @@ import pandas as pd
 from utils.database import MongoDB
 from utils.whatsapp_message_data import send_message_data
 import threading
+import datetime
+from bson import ObjectId
 
 
 def schedule_message(file_path, user_id, image_url, template_name, text):
@@ -18,6 +20,40 @@ def schedule_message(file_path, user_id, image_url, template_name, text):
             row_data['image_url'] = image_url
             row_data['template_name'] = template_name if row_data['template_name'] is None else row_data['template_name']
             row_data['text'] = text
+
+            ## we need to add the numbers and name as a customer
+            customer_details = {
+                "number": row_data['number'],
+                "name": row_data['name'],
+                "user_id": user_id,
+                "insurance_type": row_data['insurance_type'] if "insurance_type" in row_data else "",
+                "model": row_data['model'] if "model" in row_data else "",
+                "reg_number": row_data['reg_number'] if "reg_number" in row_data else "",
+                "policy_type": row_data['policy_type'] if "policy_type" in row_data else "",
+                "company_name": row_data['company_name'] if "company_name" in row_data else "",
+                "date": row_data['date'] if "date" in row_data else "",
+                "status": 1,
+                "created_at": datetime.datetime.now()
+            }
+            customer_query = {
+                "number": row_data['number'],
+                "status": 1,
+                "user_id": user_id
+            }
+            customer_data = db.find_document(collection_name='customers', query=customer_query)
+            if customer_data is not None:
+                update_data = {
+                    "name": row_data['name'],
+                    "insurance_type": row_data['insurance_type'] if "insurance_type" in row_data else "",
+                    "model": row_data['model'] if "model" in row_data else "",
+                    "reg_number": row_data['reg_number'] if "reg_number" in row_data else "",
+                    "policy_type": row_data['policy_type'] if "policy_type" in row_data else "",
+                    "company_name": row_data['company_name'] if "company_name" in row_data else "",
+                    "date": row_data['date'] if "date" in row_data else "",
+                }
+                db.update_document(collection_name="customers", query={"_id": ObjectId(customer_data['_id'])}, update_data=update_data)
+            else:
+                db.create_document('customers', customer_details)
 
             entry = row_data
 

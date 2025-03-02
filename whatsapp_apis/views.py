@@ -5,7 +5,7 @@ from whatsapp_apis.serializers import VerifyBusinessPhoneNumberSerializer, Whats
 import sys
 import requests
 from utils.database import MongoDB
-from utils.auth import token_required
+from utils.auth import token_required, decode_token
 from UnderdogCrew.settings import API_KEY
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from UnderdogCrew.settings import WABA_ID
 from bson.objectid import ObjectId
 from django.conf import settings
+import pytz
 
 
 
@@ -311,6 +312,173 @@ class WhatsAppTemplateView(APIView):
                 'message': 'Templates retrieved successfully',
                 'data': templates_data
             }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+
+class CustomersView(APIView):
+
+    @swagger_auto_schema(
+        operation_description="Get all the customers list",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                "start_date",
+                openapi.IN_QUERY,
+                description="Start date for filtering data (optional, format: YYYY-MM-DD)",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "end_date",
+                openapi.IN_QUERY,
+                description="End date for filtering data (optional, format: YYYY-MM-DD)",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "skip",
+                openapi.IN_QUERY,
+                description="skip the data",
+                type=openapi.TYPE_INTEGER,
+                required=False,
+            ),
+            openapi.Parameter(
+                "limit",
+                openapi.IN_QUERY,
+                description="limit the data",
+                type=openapi.TYPE_INTEGER,
+                required=False,
+            ),
+            openapi.Parameter(
+                "name",
+                openapi.IN_QUERY,
+                description="name for filtering data",
+                type=openapi.TYPE_STRING,
+                required=False,
+            )
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(
+                        type=openapi.TYPE_ARRAY,
+                        items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                    ),
+                }
+            )),
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def get(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
+        try:
+            customer_details = []
+            db = MongoDB()
+            token = request.headers.get('Authorization')  # Extract the token from the Authorization header
+            if token is None or not token.startswith('Bearer '):
+                return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+            token = token.split(' ')[1]  # Get the actual token part
+            user_info = decode_token(token)  # Decode the token to get user information
+            
+            # Check if user_info is a dictionary
+            if isinstance(user_info, dict) and 'user_id' in user_info:
+                user_id = user_info['user_id']  # Access user_id from the decoded token
+                print(f"user id: {user_id}")
+            else:
+                return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+            # Parse optional query parameters
+            start_date = request.query_params.get("start_date", None)
+            end_date = request.query_params.get("end_date", None)
+            skip = int(request.query_params.get("skip", 0))
+            limit = int(request.query_params.get("limit", 20))
+            name_search = request.query_params.get("name", None)  # New parameter for name search
+
+            # Validate and process date formats
+            if start_date:
+                try:
+                    start_date_gmt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+
+                    # Localize to Asia/Kolkata timezone
+                    kolkata_timezone = pytz.timezone("Asia/Kolkata")
+                    start_date = kolkata_timezone.localize(start_date_gmt)
+                except ValueError:
+                    return JsonResponse(
+                        {"message": "Invalid start_date format. Use YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            if end_date:
+                try:
+                    end_date_gmt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+                    end_date_gmt = end_date_gmt.replace(hour=23, minute=59, second=59, microsecond=59)
+
+                    # Localize to Asia/Kolkata timezone
+                    kolkata_timezone = pytz.timezone("Asia/Kolkata")
+                    end_date = kolkata_timezone.localize(end_date_gmt)
+                except ValueError:
+                    return JsonResponse(
+                        {"message": "Invalid end_date format. Use YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            
+            # Build query filter based on dates and name
+            query_filter = {"user_id": user_id, "status": 1}
+            if start_date:
+                query_filter["created_at"] = {"$gte": start_date}
+            if end_date:
+                if "created_at" in query_filter:
+                    query_filter["created_at"]["$lte"] = end_date
+                else:
+                    query_filter["created_at"] = {"$lte": end_date}
+            if name_search:  # Add name search to the query filter
+                query_filter["name"] = {"$regex": name_search, "$options": "i"}  # Case-insensitive search
+            
+            print(f"query filter: {query_filter}")
+            # Fetch data from database
+            sort_order = [("_id", -1)]  # Sorting in descending order
+            skip_count = skip
+            limit_count = limit
+
+            customer_data = db.find_documents(collection_name="customers", query=query_filter, skip=skip_count, limit=limit_count, sort=sort_order)
+            customer_count = db.find_documents_count(collection_name="customers", query=query_filter)
+            for _customer in customer_data:
+                customer_details.append(
+                    {
+                        "name": _customer['name'],
+                        "number": _customer['number'],
+                        "id": str(_customer['_id']),
+                    }
+                )
+
+            if len(customer_details) > 0:
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'Customer retrieved successfully',
+                    'data': customer_details,
+                    "count": customer_count
+                }, status=status.HTTP_200_OK)
+            else:
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'Customer not Found',
+                    'data': customer_details,
+                    "count": customer_count
+                }, status=status.HTTP_404_NOT_FOUND)
 
         except Exception as e:
             return JsonResponse({

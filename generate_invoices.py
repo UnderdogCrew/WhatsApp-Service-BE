@@ -1,6 +1,9 @@
 import os
 import django
 from datetime import datetime, timedelta
+from django.utils import timezone
+import pytz
+import calendar
 
 # Set up Django environment
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'UnderdogCrew.settings')
@@ -14,16 +17,18 @@ def generate_monthly_invoices():
     Generate monthly invoices for all users
     """
     try:
-        print(f"Starting invoice generation at {datetime.now()}")
+        ist = pytz.timezone('Asia/Kolkata')
+        print(f"Starting invoice generation at {timezone.now().astimezone(ist)}")
         db = MongoDB()
         dollar_price = current_dollar_price()
         
         # Calculate date range for the previous month
-        today = datetime.now()
+        today = timezone.now().astimezone(ist)
+        # Get first day of previous month
         first_day = (today.replace(day=1) - timedelta(days=1)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        last_day = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(microseconds=1)
-        # first_day = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)  # First day of current month
-        # last_day = datetime.now()  # Current time
+        # Get last day of previous month using calendar
+        _, last_day_of_month = calendar.monthrange(first_day.year, first_day.month)
+        last_day = first_day.replace(day=last_day_of_month, hour=23, minute=59, second=59, microsecond=999999)
         
         print(f"Checking invoices for period: {first_day} - {last_day}")
         
@@ -75,7 +80,7 @@ def generate_monthly_invoices():
                 "user_id": user_id,
                 "account_id": user.get('account_id', ''),
                 "billing_period": billing_period,
-                "created_at": datetime.now(),
+                "created_at": last_day.astimezone(ist),
                 "billing_details": {
                     "whatsapp_total": round(whatsapp_total, 2),
                     "image_total": round(image_total, 2),
@@ -87,7 +92,7 @@ def generate_monthly_invoices():
                 },
                 "status": "Generated",
                 "payment_status": "Pending",
-                "due_date": last_day + timedelta(days=7),
+                "due_date": last_day.astimezone(ist) + timedelta(days=7),
                 "invoice_number": f"INV-{user.get('account_id', '')}-{today.strftime('%Y%m')}"
             }
 
