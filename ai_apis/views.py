@@ -682,13 +682,6 @@ class UserDashboard(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-            # # Validate Authorization header
-            # auth_token = request.headers.get("Authorization")
-            # if not auth_token:
-            #     return Response(
-            #         {"message": "Authorization header missing"},
-            #         status=status.HTTP_401_UNAUTHORIZED,
-            #     )
 
             # Connect to the database
             db = MongoDB()
@@ -706,6 +699,7 @@ class UserDashboard(APIView):
                 else:
                     query_filter["created_at"] = {"$lte": end_date}
                     text_filter["created_at"] = {"$lte": end_date}
+            
             print(f"text filter: {text_filter}")
             # Fetch data from database
             total_message = len(db.find_documents("whatsapp_message_logs", query_filter))
