@@ -18,10 +18,17 @@ from ai_apis.schedule_task import schedule_message
 import threading
 from utils.whatsapp_message_data import send_message_data
 from utils.auth import token_required, decode_token
+from bson import ObjectId
 
 price_per_million_tokens = 0.15  # Price for 1M tokens
 tokens_per_million = 1_000_000  # 1M tokens
 
+whatsapp_status = {
+    "0": "sent",
+    "1": "delivered",
+    "2": "read",
+    "3": "received",
+}
 
 '''
     API for login the user in portal
@@ -110,6 +117,7 @@ class SendMessage(APIView):
     @token_required  # Ensure the user is authenticated
     def post(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
         try:
+            db = MongoDB()
             token = request.headers.get('Authorization')  # Extract the token from the Authorization header
             if token is None or not token.startswith('Bearer '):
                 return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
@@ -179,7 +187,7 @@ class SendMessage(APIView):
                     status=422
                 )
 
-            if template_name == "insurance_policy":
+            if template_name == "insurance_policy" and str(user_id) == "67c1cf4c2763ce36e17d145e":
                 # Create a thread for the schedule_message function
                 message_thread = threading.Thread(target=schedule_message, args=(file_path, user_id, image_url, template_name, text))
                 message_thread.start()  # Start the thread
@@ -195,6 +203,40 @@ class SendMessage(APIView):
                 df = pd.read_excel(file_path)
                 for index, row in df.iterrows():
                     msg_data = row.to_dict()
+
+                    ## we need to add the numbers and name as a customer
+                    customer_details = {
+                        "number": msg_data['number'],
+                        "name": msg_data['name'],
+                        "insurance_type": msg_data['insurance_type'] if "insurance_type" in msg_data else "",
+                        "model": msg_data['model'] if "model" in msg_data else "",
+                        "reg_number": msg_data['reg_number'] if "reg_number" in msg_data else "",
+                        "policy_type": msg_data['policy_type'] if "policy_type" in msg_data else "",
+                        "company_name": msg_data['company_name'] if "company_name" in msg_data else "",
+                        "date": msg_data['date'] if "date" in msg_data else "",
+                        "status": 1,
+                        "user_id": user_id,
+                        "created_at": datetime.datetime.now()
+                    }
+                    customer_query = {
+                        "number": msg_data['number'],
+                        "status": 1,
+                        "user_id": user_id,
+                    }
+                    customer_data = db.find_document(collection_name='customers', query=customer_query)
+                    if customer_data is not None:
+                        update_data = {
+                            "name": msg_data['name'],
+                            "insurance_type": msg_data['insurance_type'] if "insurance_type" in msg_data else "",
+                            "model": msg_data['model'] if "model" in msg_data else "",
+                            "reg_number": msg_data['reg_number'] if "reg_number" in msg_data else "",
+                            "policy_type": msg_data['policy_type'] if "policy_type" in msg_data else "",
+                            "company_name": msg_data['company_name'] if "company_name" in msg_data else "",
+                            "date": msg_data['date'] if "date" in msg_data else "",
+                        }
+                        db.update_document(collection_name="customers", query={"_id": ObjectId(customer_data['_id'])}, update_data=update_data)
+                    else:
+                        db.create_document('customers', customer_details)
 
                     send_message_data(
                         number=msg_data['number'],
@@ -246,7 +288,37 @@ class FacebookWebhook(APIView):
             changes = entry[0]['changes']
             value = changes[0]['value']
             phone_number_id = value['metadata']['phone_number_id']
-            statuses = value['statuses']
+            statuses = value['statuses'] if "statuses" in value else []
+            hub_challenge = "EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT"
+
+            if len(statuses) == 0:
+                try:
+                    user_info = db.find_document("users", query={"business_id": phone_number_id})
+                    if user_info:
+                        display_phone_number =value['metadata']['display_phone_number']
+                        messages = value['messages'][0]['text']['body']
+                        messages_type = value['messages'][0]['text']['type']
+
+                        if messages_type == "text":
+                            whatsapp_status_logs = {
+                                "number": display_phone_number,
+                                "message": messages,
+                                "user_id": str(user_info['_id']),
+                                "price": 0,
+                                "id": value['messages'][0]['id'],
+                                "message_status": "received",
+                                "created_at": int(datetime.datetime.now().timestamp()),
+                                "template_name": "template_name",
+                                "code": 0,
+                                "title": "",
+                                "error_message": "",
+                                "error_data": "",
+                            }
+                            db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+                except:
+                    pass
+                
+                return HttpResponse(hub_challenge)
 
             # need to add the logs in database
             user = db.find_document('whatsapp_message_logs', {'id': statuses[0]['id']})
@@ -285,7 +357,7 @@ class FacebookWebhook(APIView):
                 messages = ""
                 from_number = ""
                 msg_type = ""
-            hub_challenge = "EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT"
+            
             if msg_type == "text":
                 ## need to send message back
                 payload = json.dumps(
@@ -646,13 +718,6 @@ class UserDashboard(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-            # # Validate Authorization header
-            # auth_token = request.headers.get("Authorization")
-            # if not auth_token:
-            #     return Response(
-            #         {"message": "Authorization header missing"},
-            #         status=status.HTTP_401_UNAUTHORIZED,
-            #     )
 
             # Connect to the database
             db = MongoDB()
@@ -670,6 +735,7 @@ class UserDashboard(APIView):
                 else:
                     query_filter["created_at"] = {"$lte": end_date}
                     text_filter["created_at"] = {"$lte": end_date}
+            
             print(f"text filter: {text_filter}")
             # Fetch data from database
             total_message = len(db.find_documents("whatsapp_message_logs", query_filter))
@@ -760,6 +826,7 @@ class UserMessageLogs(APIView):
             # Parse optional query parameters
             start_date = request.query_params.get("start_date", None)
             end_date = request.query_params.get("end_date", None)
+            whatsapp_status_text = request.query_params.get("status", None)
             skip = int(request.query_params.get("skip", 0))
             limit = int(request.query_params.get("limit", 20))
 
@@ -814,6 +881,11 @@ class UserMessageLogs(APIView):
                 else:
                     query_filter["created_at"] = {"$lte": end_date}
                     text_filter["created_at"] = {"$lte": end_date}
+            if whatsapp_status_text:
+                if whatsapp_status_text in whatsapp_status:
+                    query_filter['message_status'] = whatsapp_status[whatsapp_status_text]
+                    text_filter['message_status'] = whatsapp_status[whatsapp_status_text]
+            
             print(f"text filter: {text_filter}")
             # Fetch data from database
             sort_order = [("_id", -1)]  # Sorting in descending order
@@ -847,6 +919,16 @@ class UserMessageLogs(APIView):
                 
                 try:
                     # Convert to a datetime object
+                    read_at_obj = datetime.datetime.utcfromtimestamp(_message['read_at'])
+
+                    # Format it into a readable format
+                    read_at_readable = read_at_obj.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    read_at_readable = ""
+                
+
+                try:
+                    # Convert to a datetime object
                     delivered_at_obj = datetime.datetime.utcfromtimestamp(_message['delivered_at'])
 
                     # Format it into a readable format
@@ -878,6 +960,7 @@ class UserMessageLogs(APIView):
                         "updated_at": updated_at_human_readable,
                         "sent_at": sent_dt_readable,
                         "delivered_at": delivered_at_readable,
+                        "read_at": read_at_readable,
                         "failed_at": failed_at_readable,
                         "code": _message['code'] if "code" in _message else 0,
                         "error_data": _message['error_data'] if "error_data" in _message else "",

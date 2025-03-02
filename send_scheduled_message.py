@@ -31,7 +31,7 @@ def fetch_scheduled_messages():
         
         # Fetch all documents
         records = list(
-            db.find_documents('whatsapp_schedule_message', {})
+            db.find_documents('whatsapp_schedule_message', query={"user_id": "67c1cf4c2763ce36e17d145e"})
         )
         
         filtered_records = [record for record in records if 'date' in record and record['date'] in target_dates]
@@ -46,8 +46,10 @@ def fetch_scheduled_messages():
             if "model" in user:
                 model = user['model']
 
-            if reg_number != "" and model != "":
+            if reg_number != "" and model != "" and reg_number is not None:
                 policy = f"{reg_number} ({model})"
+            else:
+                policy = f"{model}"
             
             metadata = {
                 "name" : user['name'],

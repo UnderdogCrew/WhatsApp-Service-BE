@@ -8,6 +8,7 @@ import pandas as pd
 import os
 import sys
 import django
+from bson import ObjectId
 current_path = os.path.abspath(os.getcwd())
 base_path = os.path.dirname(current_path)  # This will give you /opt/whatsapp_service/WhatsApp-Service-BE
 print(f"base_path: {base_path}")
@@ -92,7 +93,15 @@ def process_components(components, msg_data, image_url):
 
 def send_message_data(number, template_name, text, image_url, user_id, entry=None, metadata=None):
     try:
-        url = "https://graph.facebook.com/v19.0/450885871446042/messages"
+        
+        user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
+
+        if user_info is not None:
+            business_id = user_info['business_id']
+        else:
+            business_id = "450885871446042"
+
+        url = f"https://graph.facebook.com/v19.0/{business_id}/messages"
         template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
         headers = {
             'Authorization': f'Bearer {API_KEY}'
@@ -127,13 +136,19 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             if "model" in entry:
                 model = entry['model']
 
-        if reg_number != "" and model != "":
+        if reg_number != "" and model != "" and reg_number is not None:
             policy = f"{reg_number} ({model})"
+        else:
+            policy = f"{model}"
 
         date = ""
         if entry is not None:
             if "date" in entry:
-                date = entry['date']
+                # Convert date to string format if it's a datetime object
+                if isinstance(entry['date'], datetime.datetime):
+                    date = entry['date'].strftime("%Y-%m-%d %H:%M:%S")  # Convert to string
+                else:
+                    date = entry['date']  # Assume it's already a string
         
 
         # Sending messages to specific numbers

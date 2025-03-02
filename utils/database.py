@@ -51,6 +51,11 @@ class MongoDB:
         if limit:
             cursor = cursor.limit(limit)  # Apply sorting if provided
         return list(cursor)
+
+    def find_documents_count(self, collection_name, query):
+        collection = self.get_collection(collection_name)
+        return collection.count_documents(query)  # Return the count of documents matching the query
+
     
     def update_document(self, collection_name, query, update_data):
         collection = self.get_collection(collection_name)
