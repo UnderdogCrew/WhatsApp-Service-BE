@@ -412,7 +412,7 @@ class CustomersView(APIView):
             # Validate and process date formats
             if start_date:
                 try:
-                    start_date_gmt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+                    start_date_gmt = datetime.strptime(start_date, "%Y-%m-%d")
 
                     # Localize to Asia/Kolkata timezone
                     kolkata_timezone = pytz.timezone("Asia/Kolkata")
@@ -424,7 +424,7 @@ class CustomersView(APIView):
                     )
             if end_date:
                 try:
-                    end_date_gmt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+                    end_date_gmt = datetime.strptime(end_date, "%Y-%m-%d")
                     end_date_gmt = end_date_gmt.replace(hour=23, minute=59, second=59, microsecond=59)
 
                     # Localize to Asia/Kolkata timezone
