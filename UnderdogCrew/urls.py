@@ -71,4 +71,5 @@ urlpatterns = [
     path('subscriptions/webhook', subscription_views.WebhookView.as_view(), name='webhook'),
     path('whatsapp-templates/', whatsapp_apis.WhatsAppTemplateView.as_view(), name='whatsapp-templates'),
     path('customers', whatsapp_apis.CustomersView.as_view(), name='customers'),
+    path('chat/history', whatsapp_apis.CustomersChatLogs.as_view(), name='customerchatlogs'),
 ]
