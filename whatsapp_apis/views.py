@@ -504,7 +504,7 @@ class CustomersChatLogs(APIView):
                 openapi.IN_QUERY,
                 description="number of the user for whom need to fetch the history",
                 type=openapi.TYPE_STRING,
-                required=False,
+                required=True,
             )
         ],
         responses={
