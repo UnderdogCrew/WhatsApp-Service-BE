@@ -723,8 +723,12 @@ class UserDashboard(APIView):
             db = MongoDB()
 
             # Build query filter based on dates
-            query_filter = {"user_id": user_id}
-            text_filter = {"user_id": user_id}
+            if user_id == "superadmin":
+                query_filter = {}
+                text_filter = {}
+            else:    
+                query_filter = {"user_id": user_id}
+                text_filter = {"user_id": user_id}
             if start_date:
                 query_filter["created_at"] = {"$gte": start_date}
                 text_filter["created_at"] = {"$gte": start_date}
