@@ -202,7 +202,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
                 "price": 0.125 if category == "UTILITY" else 0.875,
                 "id": response.json()['messages'][0]["id"],
                 "message_status": response.json()['messages'][0]["message_status"],
-                "created_at": datetime.datetime.now().timestamp(),
+                "created_at": datetime.datetime.now(),
                 "template_name": template_name
             }
             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
@@ -214,7 +214,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
                 "price": 0,
                 "id": "",
                 "message_status": "error",
-                "created_at": datetime.datetime.now().timestamp(),
+                "created_at": datetime.datetime.now(),
                 "template_name": template_name,
                 "code": response.json()['error']['code'],
                 "title": response.json()['error']['type'],
