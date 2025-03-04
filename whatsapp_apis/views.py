@@ -550,7 +550,15 @@ class CustomersChatLogs(APIView):
             query_filter = {"user_id": user_id, "number": f"91{number}"}
             print(f"query filter: {query_filter}")
             # Fetch data from database
+            customer_query = {
+                "number": int(number)
+            }
             sort_order = [("_id", 1)]  # Sorting in descending order
+
+            customer_details = db.find_document(collection_name="customers", query=customer_query)
+
+            if customer_details is None:
+                return JsonResponse({"message": "Number is invalid"}, status=422)
 
             customer_chat_data = db.find_documents(collection_name="whatsapp_message_logs", query=query_filter, sort=sort_order)
             for _customer in customer_chat_data:
@@ -572,11 +580,17 @@ class CustomersChatLogs(APIView):
                     }
                 )
 
+            customers = {
+                "name": customer_details['name'],
+                "number": str(customer_details['number'])
+            }
+
             if len(customer_chat_details) > 0:
                 return JsonResponse({
                     'status': 'success',
                     'message': 'Customer retrieved successfully',
-                    'data': customer_chat_details
+                    'data': customer_chat_details,
+                    "customer": customers
                 }, status=status.HTTP_200_OK)
             else:
                 return JsonResponse({

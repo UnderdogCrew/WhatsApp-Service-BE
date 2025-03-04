@@ -19,6 +19,7 @@ import threading
 from utils.whatsapp_message_data import send_message_data
 from utils.auth import token_required, decode_token
 from bson import ObjectId
+from utils.auth import current_dollar_price
 
 price_per_million_tokens = 0.15  # Price for 1M tokens
 tokens_per_million = 1_000_000  # 1M tokens
@@ -642,6 +643,13 @@ class UserDashboard(APIView):
         operation_description="Fetch user dashboard data",
         manual_parameters=[
             openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
                 "start_date",
                 openapi.IN_QUERY,
                 description="Start date for filtering data (optional, format: YYYY-MM-DD)",
@@ -723,6 +731,7 @@ class UserDashboard(APIView):
             db = MongoDB()
 
             # Build query filter based on dates
+            filters = {}
             if user_id == "superadmin":
                 query_filter = {}
                 text_filter = {}
@@ -732,15 +741,44 @@ class UserDashboard(APIView):
             if start_date:
                 query_filter["created_at"] = {"$gte": start_date}
                 text_filter["created_at"] = {"$gte": start_date}
+                filters["created_at"] = {"$gte": start_date}
             if end_date:
                 if "created_at" in query_filter:
                     query_filter["created_at"]["$lte"] = end_date
                     text_filter["created_at"]["$lte"] = end_date
+                    filters["created_at"]["$lte"] = end_date
                 else:
                     query_filter["created_at"] = {"$lte": end_date}
                     text_filter["created_at"] = {"$lte": end_date}
+                    filters["created_at"] = {"$lte": end_date}
             
-            print(f"text filter: {text_filter}")
+            dollar_price = current_dollar_price()
+            # Build filter conditions
+            # Get total billing from WhatsApp logs
+            whatsapp_logs = db.find_documents('whatsapp_message_logs', filters)
+            whatsapp_total = sum(log.get('price', 0) for log in whatsapp_logs)
+
+            # Get total billing from Image Generation logs
+            image_logs = db.find_documents('image_generation_logs', filters)
+            image_total = sum(log.get('price', 0) for log in image_logs)
+            image_total = dollar_price * image_total
+
+            # Get total billing from Text Generation logs
+            text_logs = db.find_documents('text_generation_logs', filters)
+            text_total = sum(log.get('price', 0) for log in text_logs)
+            text_total = dollar_price * text_total
+
+            # Calculate final total
+            total_price = whatsapp_total + image_total + text_total
+            
+            # Calculate CGST and SGST
+            cgst = total_price * 0.09  # 9% of total_price
+            sgst = total_price * 0.09  # 9% of total_price
+            
+            # Add CGST and SGST to total_price
+            total_price_with_tax = total_price + cgst + sgst
+
+
             # Fetch data from database
             total_message = len(db.find_documents("whatsapp_message_logs", query_filter))
             query_filter['status'] = "delivered"
@@ -752,7 +790,14 @@ class UserDashboard(APIView):
                 "total_message": total_message,
                 "total_message_received": total_message_received,
                 "text_generation_logs": text_generation_logs,
-                "image_generation_logs": image_generation_logs
+                "image_generation_logs": image_generation_logs,
+                "whatsapp_total": f"₹{round(whatsapp_total, 2)}",
+                "image_total": f"₹{round(image_total, 2)}",
+                "text_total": f"₹{round(text_total, 2)}",
+                "total_price": f"₹{round(total_price, 2)}",
+                "final_price": f"₹{round(total_price_with_tax, 2)}",
+                "cgst": f"₹{round(cgst, 2)}",
+                "sgst": f"₹{round(sgst, 2)}",
             }
 
             return JsonResponse(response_data, status=status.HTTP_200_OK)
