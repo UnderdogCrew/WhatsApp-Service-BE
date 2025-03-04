@@ -643,6 +643,13 @@ class UserDashboard(APIView):
         operation_description="Fetch user dashboard data",
         manual_parameters=[
             openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
                 "start_date",
                 openapi.IN_QUERY,
                 description="Start date for filtering data (optional, format: YYYY-MM-DD)",
