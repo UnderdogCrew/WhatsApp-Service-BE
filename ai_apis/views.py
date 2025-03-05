@@ -1156,7 +1156,7 @@ class WhatsAppMessage(APIView):
                     "user_id": user_id,
                     "price": 0.1,
                     "id": response.json()['messages'][0]["id"],
-                    "message_status": response.json()['messages'][0]["message_status"],
+                    "message_status": "sent",
                     "created_at": datetime.datetime.now(),
                     "template_name": "manual"
                 }
