@@ -292,9 +292,12 @@ class FacebookWebhook(APIView):
             statuses = value['statuses'] if "statuses" in value else []
             hub_challenge = "EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT"
 
+            print(f"statuses: {len(statuses)}")
+
             if len(statuses) == 0:
                 try:
                     user_info = db.find_document("users", query={"business_id": phone_number_id})
+                    print(user_info)
                     if user_info:
                         display_phone_number =value['metadata']['display_phone_number']
                         messages = value['messages'][0]['text']['body']
