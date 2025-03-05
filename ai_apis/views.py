@@ -1145,6 +1145,8 @@ class WhatsAppMessage(APIView):
                     "body": text
                 }
             })
+            print(payload)
+            print(f"url: {url}")
             response = requests.request("POST", url, headers=headers, data=payload)
             print(response.json())
             if response.status_code == 200:
