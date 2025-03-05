@@ -736,6 +736,7 @@ class UserDashboard(APIView):
 
             # Build query filter based on dates
             filters = {}
+            user_query = {}
             if user_id == "superadmin":
                 query_filter = {}
                 text_filter = {}
@@ -746,15 +747,18 @@ class UserDashboard(APIView):
                 query_filter["created_at"] = {"$gte": start_date}
                 text_filter["created_at"] = {"$gte": start_date}
                 filters["created_at"] = {"$gte": start_date}
+                user_query['created_at'] = {"$gte": start_date}
             if end_date:
                 if "created_at" in query_filter:
                     query_filter["created_at"]["$lte"] = end_date
                     text_filter["created_at"]["$lte"] = end_date
                     filters["created_at"]["$lte"] = end_date
+                    user_query['created_at']["$lte"] = end_date
                 else:
                     query_filter["created_at"] = {"$lte": end_date}
                     text_filter["created_at"] = {"$lte": end_date}
                     filters["created_at"] = {"$lte": end_date}
+                    user_query['created_at'] = {"$lte": end_date}
             
             dollar_price = current_dollar_price()
             # Build filter conditions
@@ -789,6 +793,7 @@ class UserDashboard(APIView):
             total_message_received = len(db.find_documents("whatsapp_message_logs", query_filter))
             text_generation_logs = len(db.find_documents("text_generation_logs", text_filter))
             image_generation_logs = len(db.find_documents("image_generation_logs", text_filter))
+            active_user_count = len(db.find_documents("users", user_query))
 
             response_data = {
                 "total_message": total_message,
@@ -799,6 +804,7 @@ class UserDashboard(APIView):
                 "image_total": f"₹{round(image_total, 2)}",
                 "text_total": f"₹{round(text_total, 2)}",
                 "total_price": f"₹{round(total_price, 2)}",
+                "active_user_count": active_user_count,
                 "final_price": f"₹{round(total_price_with_tax, 2)}",
                 "cgst": f"₹{round(cgst, 2)}",
                 "sgst": f"₹{round(sgst, 2)}",
