@@ -301,11 +301,12 @@ class FacebookWebhook(APIView):
                     if user_info:
                         display_phone_number =value['metadata']['display_phone_number']
                         messages = value['messages'][0]['text']['body']
+                        from_number = value['messages'][0]['from']
                         messages_type = value['messages'][0]['type']
 
                         if messages_type == "text":
                             whatsapp_status_logs = {
-                                "number": display_phone_number,
+                                "number": from_number,
                                 "message": messages,
                                 "user_id": str(user_info['_id']),
                                 "price": 0,
