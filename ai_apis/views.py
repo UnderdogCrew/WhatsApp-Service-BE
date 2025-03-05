@@ -312,7 +312,7 @@ class FacebookWebhook(APIView):
                                 "price": 0,
                                 "id": value['messages'][0]['id'],
                                 "message_status": "received",
-                                "created_at": int(datetime.datetime.now().timestamp()),
+                                "created_at": datetime.datetime.now(),
                                 "template_name": "template_name",
                                 "code": 0,
                                 "title": "",
