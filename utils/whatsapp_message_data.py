@@ -91,12 +91,10 @@ def process_components(components, msg_data, image_url):
             for _button in component['buttons']:
                 result_list.append(
                     {
-                        "action": {
-                        "name": "cta_url",
+                        "type": "button",
                         "parameters": {
-                                "display_text": _button['text'],
-                                "url": "https://app.wapnexus.com/"
-                            }
+                            "display_text": _button['text'],
+                            "url": "https://app.wapnexus.com/"
                         }
                     }
                 )
