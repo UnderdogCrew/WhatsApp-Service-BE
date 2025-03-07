@@ -227,7 +227,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
                 "user_id": user_id,
                 "price": 0.125 if category == "UTILITY" else 0.875,
                 "id": response.json()['messages'][0]["id"],
-                "message_status": response.json()['messages'][0]["message_status"],
+                "message_status": response.json()['messages'][0]["message_status"] if "message_status" in response.json()['messages'][0] else "sent",
                 "created_at": datetime.datetime.now(),
                 "template_name": template_name
             }
