@@ -185,20 +185,14 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
                     "type": "interactive",
                     "interactive": {
                         "type": "cta_url",
-                        "header": {
-                            "text": "Available Dates"
-                        },
                         "body": {
-                            "text": "Tap the button below to see available dates."
-                        },
-                        "footer": {
-                            "text": "Dates subject to change."
+                            "text": template_text
                         },
                         "action": {
                             "name": "cta_url",
                             "parameters": {
-                                "display_text": "See Dates",
-                                "url": "https://www.luckyshrub.com?clickID=kqDGWd24Q5TRwoEQTICY7W1JKoXvaZOXWAS7h1P76s0R7Paec4"
+                                "display_text": "Review and Pay",
+                                "url": "https://wapnexus.netlify.app/"
                             }
                         }
                     }
