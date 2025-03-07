@@ -87,7 +87,19 @@ def process_components(components, msg_data, image_url):
                     "parameters": body_parameters
                 }
                 result_list.append(body_entry)
-
+        elif component['type'].upper() == "BUTTONS":
+            for _button in component['buttons']:
+                result_list.append(
+                    {
+                        "action": {
+                        "name": "cta_url",
+                        "parameters": {
+                                "display_text": _button['text'],
+                                "url": "https://app.wapnexus.com/"
+                            }
+                        }
+                    }
+                )
     return result_list
 
 
