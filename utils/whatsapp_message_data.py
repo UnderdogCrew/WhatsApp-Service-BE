@@ -87,19 +87,6 @@ def process_components(components, msg_data, image_url):
                     "parameters": body_parameters
                 }
                 result_list.append(body_entry)
-        elif component['type'].upper() == "BUTTONS":
-            for _button in component['buttons']:
-                result_list.append(
-                    {
-                        "action": {
-                        "name": "cta_url",
-                        "parameters": {
-                                "display_text": _button['text'],
-                                "url": "https://app.wapnexus.com/"
-                            }
-                        }
-                    }
-                )
     return result_list
 
 
@@ -125,6 +112,10 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         
         template_data = template_response.json()
         template_components = template_data['data'][0]['components']
+
+        # Check if there are any BUTTONS in the components
+        has_buttons = any(component['type'].upper() == "BUTTONS" for component in template_components)
+
         template_text = template_components[0]['text'] if "text" in template_components[0] else ""
         category = template_data['data'][0]['category']
         language = template_data['data'][0]['language']
@@ -185,20 +176,49 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
 
         components = process_components(template_components, msg_details, image_url)
         print(f"components: {template_text}")
-        payload = json.dumps({
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": f"91{number}",
-            "type": "template",
-            "template": {
-                    "name": template_name,
-                    "language": {
-                        "code": language
-                    },
-                    "components": components
+        if has_buttons:
+            payload = json.dumps(
+                {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "to": f"91{number}",
+                    "type": "interactive",
+                    "interactive": {
+                        "type": "cta_url",
+                        "header": {
+                            "text": "Available Dates"
+                        },
+                        "body": {
+                            "text": "Tap the button below to see available dates."
+                        },
+                        "footer": {
+                            "text": "Dates subject to change."
+                        },
+                        "action": {
+                            "name": "cta_url",
+                            "parameters": {
+                                "display_text": "See Dates",
+                                "url": "https://www.luckyshrub.com?clickID=kqDGWd24Q5TRwoEQTICY7W1JKoXvaZOXWAS7h1P76s0R7Paec4"
+                            }
+                        }
+                    }
                 }
-            }
-        )
+            )
+        else:
+            payload = json.dumps({
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": f"91{number}",
+                "type": "template",
+                "template": {
+                        "name": template_name,
+                        "language": {
+                            "code": language
+                        },
+                        "components": components
+                    }
+                }
+            )
         headers = {
             'Authorization': 'Bearer ' + API_TOKEN,
             'Content-Type': 'application/json'
