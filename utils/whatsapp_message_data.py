@@ -96,8 +96,7 @@ def process_components(components, msg_data, image_url):
                     value = buttons.get("text", "")
                     body_parameters.append({
                         "type": "ACTION",
-                        "text": value,
-                        "url": "https://app.wapnexus.com/"
+                        "text": value
                     })
 
                 body_entry = {
