@@ -101,6 +101,8 @@ def process_components(components, msg_data, image_url):
 
                 body_entry = {
                     "type": "BUTTON",
+                    "sub_type": "url",
+                    "index": 0,
                     "parameters": body_parameters
                 }
                 result_list.append(body_entry)
