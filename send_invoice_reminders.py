@@ -59,11 +59,8 @@ def send_invoice_reminders():
             # Prepare message metadata
             metadata = {
                 "name": user.get('name', ''),
-                "company_name": user.get('company_name', ''),
-                "invoice_number": invoice['invoice_number'],
                 "amount": str(invoice['billing_details']['total_price']),
                 "due_date": due_date.strftime("%Y-%m-%d"),
-                "billing_period": invoice['billing_period']
             }
 
             # Select appropriate message template based on days until due
@@ -75,8 +72,8 @@ def send_invoice_reminders():
             user["phone_number"] = "7567828780"
             send_message_data(
                 number=user.get('phone_number'),
-                template_name="invoice_due_today",
-                text="Your invoice payment is due",  # This will be overridden by template
+                template_name="invoice_template",
+                text="",
                 image_url="",
                 user_id=str(user['_id']),
                 metadata=metadata
