@@ -96,7 +96,7 @@ def process_components(components, msg_data, image_url):
                     value = buttons.get("text", "")
                     body_parameters.append({
                         "type": "text",
-                        "text": value
+                        "text": "/billing"
                     })
 
                 body_entry = {
