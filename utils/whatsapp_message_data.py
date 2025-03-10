@@ -95,7 +95,7 @@ def process_components(components, msg_data, image_url):
                 if buttons['type'] == "URL":
                     value = buttons.get("text", "")
                     body_parameters.append({
-                        "type": "ACTION",
+                        "type": "text",
                         "text": value
                     })
 
