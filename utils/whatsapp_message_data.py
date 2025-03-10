@@ -176,43 +176,43 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
 
         components = process_components(template_components, msg_details, image_url)
         print(f"components: {template_text}")
-        if has_buttons:
-            payload = json.dumps(
-                {
-                    "messaging_product": "whatsapp",
-                    "recipient_type": "individual",
-                    "to": f"91{number}",
-                    "type": "interactive",
-                    "interactive": {
-                        "type": "cta_url",
-                        "body": {
-                            "text": template_text
-                        },
-                        "action": {
-                            "name": "cta_url",
-                            "parameters": {
-                                "display_text": "Review and Pay",
-                                "url": "https://wapnexus.netlify.app/"
-                            }
-                        }
-                    }
-                }
-            )
-        else:
-            payload = json.dumps({
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": f"91{number}",
-                "type": "template",
-                "template": {
-                        "name": template_name,
+        # if has_buttons:
+        #     payload = json.dumps(
+        #         {
+        #             "messaging_product": "whatsapp",
+        #             "recipient_type": "individual",
+        #             "to": f"91{number}",
+        #             "type": "interactive",
+        #             "interactive": {
+        #                 "type": "cta_url",
+        #                 "body": {
+        #                     "text": template_text
+        #                 },
+        #                 "action": {
+        #                     "name": "cta_url",
+        #                     "parameters": {
+        #                         "display_text": "Review and Pay",
+        #                         "url": "https://wapnexus.netlify.app/"
+        #                     }
+        #                 }
+        #             }
+        #         }
+        #     )
+        # else:
+        payload = json.dumps({
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": f"91{number}",
+            "type": "template",
+            "template": {
+                    "name": template_name,
                         "language": {
                             "code": language
                         },
                         "components": components
                     }
                 }
-            )
+        )
         headers = {
             'Authorization': 'Bearer ' + API_TOKEN,
             'Content-Type': 'application/json'
