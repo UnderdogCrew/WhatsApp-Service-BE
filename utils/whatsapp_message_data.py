@@ -87,6 +87,25 @@ def process_components(components, msg_data, image_url):
                     "parameters": body_parameters
                 }
                 result_list.append(body_entry)
+        elif component['type'].upper() == "BUTTONS":
+            # Check for body_text_named_params
+            for buttons in component['buttons']:
+                # Process BODY with named parameters
+                body_parameters = []
+                if buttons['type'] == "URL":
+                    value = buttons.get("text", "")
+                    body_parameters.append({
+                        "type": "URL",
+                        "parameter_name": buttons['url'],
+                        "text": value
+                    })
+
+                body_entry = {
+                    "type": "buttons",
+                    "parameters": body_parameters
+                }
+                result_list.append(body_entry)
+
     return result_list
 
 
