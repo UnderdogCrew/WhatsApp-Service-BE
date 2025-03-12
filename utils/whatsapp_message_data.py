@@ -99,13 +99,14 @@ def process_components(components, msg_data, image_url):
                         "text": "/billing"
                     })
 
-                body_entry = {
-                    "type": "BUTTON",
-                    "sub_type": "url",
-                    "index": 0,
-                    "parameters": body_parameters
-                }
-                result_list.append(body_entry)
+                if "example" in buttons:
+                    body_entry = {
+                        "type": "BUTTON",
+                        "sub_type": "url",
+                        "index": 0,
+                        "parameters": body_parameters
+                    }
+                    result_list.append(body_entry)
 
     return result_list
 
