@@ -87,6 +87,25 @@ def process_components(components, msg_data, image_url):
                     "parameters": body_parameters
                 }
                 result_list.append(body_entry)
+        elif component['type'].upper() == "BUTTONS":
+            # Check for body_text_named_params
+            for buttons in component['buttons']:
+                # Process BODY with named parameters
+                body_parameters = []
+                if buttons['type'] == "URL":
+                    value = buttons.get("text", "")
+                    body_parameters.append({
+                        "type": "text",
+                        "text": "/billing"
+                    })
+
+                body_entry = {
+                    "type": "BUTTON",
+                    "sub_type": "url",
+                    "index": 0,
+                    "parameters": body_parameters
+                }
+                result_list.append(body_entry)
 
     return result_list
 
@@ -113,6 +132,10 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         
         template_data = template_response.json()
         template_components = template_data['data'][0]['components']
+
+        # Check if there are any BUTTONS in the components
+        has_buttons = any(component['type'].upper() == "BUTTONS" for component in template_components)
+
         template_text = template_components[0]['text'] if "text" in template_components[0] else ""
         category = template_data['data'][0]['category']
         language = template_data['data'][0]['language']
@@ -173,6 +196,29 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
 
         components = process_components(template_components, msg_details, image_url)
         print(f"components: {template_text}")
+        # if has_buttons:
+        #     payload = json.dumps(
+        #         {
+        #             "messaging_product": "whatsapp",
+        #             "recipient_type": "individual",
+        #             "to": f"91{number}",
+        #             "type": "interactive",
+        #             "interactive": {
+        #                 "type": "cta_url",
+        #                 "body": {
+        #                     "text": template_text
+        #                 },
+        #                 "action": {
+        #                     "name": "cta_url",
+        #                     "parameters": {
+        #                         "display_text": "Review and Pay",
+        #                         "url": "https://wapnexus.netlify.app/"
+        #                     }
+        #                 }
+        #             }
+        #         }
+        #     )
+        # else:
         payload = json.dumps({
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
@@ -180,12 +226,12 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             "type": "template",
             "template": {
                     "name": template_name,
-                    "language": {
-                        "code": language
-                    },
-                    "components": components
+                        "language": {
+                            "code": language
+                        },
+                        "components": components
+                    }
                 }
-            }
         )
         headers = {
             'Authorization': 'Bearer ' + API_TOKEN,
@@ -201,7 +247,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
                 "user_id": user_id,
                 "price": 0.125 if category == "UTILITY" else 0.875,
                 "id": response.json()['messages'][0]["id"],
-                "message_status": response.json()['messages'][0]["message_status"],
+                "message_status": response.json()['messages'][0]["message_status"] if "message_status" in response.json()['messages'][0] else "sent",
                 "created_at": datetime.datetime.now(),
                 "template_name": template_name
             }

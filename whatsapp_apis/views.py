@@ -603,3 +603,143 @@ class CustomersChatLogs(APIView):
             return JsonResponse({
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class UniqueChatList(APIView):
+
+    @swagger_auto_schema(
+        operation_description="Get the latest message for each unique user number, including customer names",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'chat_list': openapi.Schema(
+                        type=openapi.TYPE_ARRAY,
+                        items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                    )
+                }
+            )),
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def get(self, request, current_user_id=None, current_user_email=None):
+        try:
+            db = MongoDB()
+            token = request.headers.get('Authorization')
+
+            if not token or not token.startswith('Bearer '):
+                return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+            token = token.split(' ')[1]
+            user_info = decode_token(token)
+
+            if not isinstance(user_info, dict) or 'user_id' not in user_info:
+                return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+
+            user_id = user_info['user_id']
+            print(f"user_id: {user_id}")
+
+            # Aggregation Query to Get Unique Numbers with Latest Messages and Join with Customers
+            pipeline = [
+                {"$match": {"user_id": user_id}},  # Filter messages by user_id
+                {"$sort": {"created_at": -1}},  # Sort messages by latest timestamp
+                {"$group": {  # Group by number, keep only the latest message per number
+                    "_id": "$number",
+                    "last_message": {"$first": "$message"},
+                    "last_message_time": {"$first": "$created_at"},
+                    "message_status": {"$first": "$message_status"},
+                    "template_name": {"$first": "$template_name"},
+                    "sent_at": {"$first": "$sent_at"},
+                    "delivered_at": {"$first": "$delivered_at"},
+                    "failed_at": {"$first": "$failed_at"}
+                }},
+                # Join with the customers collection using string comparison
+                {"$lookup": {
+                    "from": "customers",
+                    "let": { 
+                        "phone_number": {
+                            "$toLong": {  # Changed from $toInt to $toLong
+                                "$substr": ["$_id", 2, -1]
+                            }
+                        }
+                    },
+                    "pipeline": [
+                        {
+                            "$match": {
+                                "$expr": {
+                                    "$eq": ["$number", "$$phone_number"]
+                                }
+                            }
+                        }
+                    ],
+                    "as": "customer_info"
+                }},
+                # Flatten the customer data (if available)
+                {"$unwind": {
+                    "path": "$customer_info",
+                    "preserveNullAndEmptyArrays": True
+                }},
+                # Rename fields for readability
+                {"$project": {
+                    "profile_name": {"$ifNull": ["$customer_info.name", "$_id"]},
+                    "last_message": 1,
+                    "last_message_time": 1,
+                    "message_status": 1,
+                    "template_name": 1,
+                    "sent_at": 1,
+                    "delivered_at": 1,
+                    "failed_at": 1,
+                    "msg_type": {
+                        "$cond": {
+                            "if": {"$in": ["$message_status", ["read", "delivered", "sent", "error"]]},
+                            "then": 1,
+                            "else": 2
+                        }
+                    }
+                }},
+                {"$sort": {"last_message_time": -1}}
+            ]
+
+            chat_list_data = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
+            print("chat_list_data", chat_list_data)
+            chat_list = []
+            for chat in chat_list_data:
+                msg_type = chat.get("msg_type", 2)
+                chat_list.append({
+                    "number": chat.get("_id")[2:] if chat.get("_id") else "",  # Get all digits after first 2
+                    "profile_name": chat.get("profile_name", "Unknown"),
+                    "last_message": chat.get("last_message", ""),
+                    "last_message_time": chat.get("last_message_time"),
+                    "status": chat.get("message_status", ""),
+                    "template_name": chat.get("template_name", ""),
+                    "sent_at": chat.get("sent_at"),
+                    "delivered_at": chat.get("delivered_at"),
+                    "unread_count": 0 if msg_type == 1 else 1,
+                    "failed_at": chat.get("failed_at"),
+                    "msg_type": chat.get("msg_type", 2)  # Default to 2 if not found
+                })
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Unique chat list retrieved successfully',
+                'chat_list': chat_list
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

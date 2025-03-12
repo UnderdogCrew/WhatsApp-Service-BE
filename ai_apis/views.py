@@ -736,6 +736,7 @@ class UserDashboard(APIView):
 
             # Build query filter based on dates
             filters = {}
+            user_query = {}
             if user_id == "superadmin":
                 query_filter = {}
                 text_filter = {}
@@ -746,15 +747,18 @@ class UserDashboard(APIView):
                 query_filter["created_at"] = {"$gte": start_date}
                 text_filter["created_at"] = {"$gte": start_date}
                 filters["created_at"] = {"$gte": start_date}
+                user_query['created_at'] = {"$gte": start_date}
             if end_date:
                 if "created_at" in query_filter:
                     query_filter["created_at"]["$lte"] = end_date
                     text_filter["created_at"]["$lte"] = end_date
                     filters["created_at"]["$lte"] = end_date
+                    user_query['created_at']["$lte"] = end_date
                 else:
                     query_filter["created_at"] = {"$lte": end_date}
                     text_filter["created_at"] = {"$lte": end_date}
                     filters["created_at"] = {"$lte": end_date}
+                    user_query['created_at'] = {"$lte": end_date}
             
             dollar_price = current_dollar_price()
             # Build filter conditions
@@ -789,6 +793,7 @@ class UserDashboard(APIView):
             total_message_received = len(db.find_documents("whatsapp_message_logs", query_filter))
             text_generation_logs = len(db.find_documents("text_generation_logs", text_filter))
             image_generation_logs = len(db.find_documents("image_generation_logs", text_filter))
+            active_user_count = len(db.find_documents("users", user_query))
 
             response_data = {
                 "total_message": total_message,
@@ -799,6 +804,7 @@ class UserDashboard(APIView):
                 "image_total": f"₹{round(image_total, 2)}",
                 "text_total": f"₹{round(text_total, 2)}",
                 "total_price": f"₹{round(total_price, 2)}",
+                "active_user_count": active_user_count,
                 "final_price": f"₹{round(total_price_with_tax, 2)}",
                 "cgst": f"₹{round(cgst, 2)}",
                 "sgst": f"₹{round(sgst, 2)}",
@@ -1045,3 +1051,135 @@ class UserMessageLogs(APIView):
         except Exception as ex:
             print(f"Error: {ex}")
             return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class WhatsAppMessage(APIView):
+    @swagger_auto_schema(
+        operation_description="Send a message via WhatsApp",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'text': openapi.Schema(type=openapi.TYPE_STRING, description='Text message to send'),
+                "number": openapi.Schema(type=openapi.TYPE_STRING, description='number on which we need to send the message'),
+                'url': openapi.Schema(type=openapi.TYPE_STRING, description='URL of the image or file'),
+
+            },
+            required=['text', 'number']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            422: 'Unprocessable Entity',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required  # Ensure the user is authenticated
+    def post(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
+        try:
+            db = MongoDB()
+            token = request.headers.get('Authorization')  # Extract the token from the Authorization header
+            if token is None or not token.startswith('Bearer '):
+                return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+            token = token.split(' ')[1]  # Get the actual token part
+            user_info = decode_token(token)  # Decode the token to get user information
+            
+            # Check if user_info is a dictionary
+            if isinstance(user_info, dict) and 'user_id' in user_info:
+                user_id = user_info['user_id']  # Access user_id from the decoded token
+                print(f"user id: {user_id}")
+            else:
+                return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+            
+            request_data = request.data
+            # Validate required fields
+            if not request_data:
+                return JsonResponse({"message": "Request body is missing"}, safe=False, status=422)
+            if "text" not in request_data:
+                return JsonResponse({"message": "Text is missing"}, safe=False, status=422)
+
+            headers = {
+                'Authorization': 'Bearer ' + API_TOKEN,
+                'Content-Type': 'application/json'
+            }
+
+            text = request_data['text']
+            image_url = request_data.get('url', "")
+            number = request_data.get('number', "")
+
+            if number == "":
+                return JsonResponse(
+                    {"message": "Numbers is required"},
+                    safe=False,
+                    status=422
+                )
+            
+            user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
+
+            if user_info is not None:
+                business_id = user_info['business_id']
+            else:
+                business_id = "450885871446042"
+
+            url = f"https://graph.facebook.com/v19.0/{business_id}/messages"
+            payload = json.dumps({
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": f"91{number}",
+                "type": "text",
+                "text": {
+                    "body": text
+                }
+            })
+            print(payload)
+            print(f"url: {url}")
+            response = requests.request("POST", url, headers=headers, data=payload)
+            print(response.json())
+            if response.status_code == 200:
+                whatsapp_status_logs = {
+                    "number": f"91{number}",
+                    "message": text,
+                    "user_id": user_id,
+                    "price": 0.125,
+                    "id": response.json()['messages'][0]["id"],
+                    "message_status": "sent",
+                    "created_at": datetime.datetime.now(),
+                    "template_name": "manual"
+                }
+                db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+            else:
+                whatsapp_status_logs = {
+                    "number": f"91{number}",
+                    "message": text,
+                    "user_id": user_id,
+                    "price": 0,
+                    "id": "",
+                    "message_status": "error",
+                    "created_at": datetime.datetime.now(),
+                    "template_name": "manual",
+                    "code": response.json()['error']['code'],
+                    "title": response.json()['error']['type'],
+                    "error_message": response.json()['error']['message'],
+                    "error_data": response.json()['error']['message'],
+                }
+                db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+
+            return JsonResponse({"message": "Messages sent successfully"}, safe=False, status=200)
+
+        except Exception as ex:
+            print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
+            return JsonResponse({"message": "Something went wrong"}, safe=False, status=500)

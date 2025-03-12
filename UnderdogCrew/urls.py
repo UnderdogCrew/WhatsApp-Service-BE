@@ -72,4 +72,6 @@ urlpatterns = [
     path('whatsapp-templates/', whatsapp_apis.WhatsAppTemplateView.as_view(), name='whatsapp-templates'),
     path('customers', whatsapp_apis.CustomersView.as_view(), name='customers'),
     path('chat/history', whatsapp_apis.CustomersChatLogs.as_view(), name='customerchatlogs'),
+    path('chat/list', whatsapp_apis.UniqueChatList.as_view(), name='UniqueChatList'),
+    path('messages', views.WhatsAppMessage.as_view(), name='messages'),
 ]
