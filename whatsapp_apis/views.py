@@ -724,7 +724,7 @@ class UniqueChatList(APIView):
                     "profile_name": chat.get("profile_name", "Unknown"),
                     "last_message": chat.get("last_message", ""),
                     "last_message_time": chat.get("last_message_time"),
-                    "message_status": chat.get("message_status", ""),
+                    "status": chat.get("message_status", ""),
                     "template_name": chat.get("template_name", ""),
                     "sent_at": chat.get("sent_at"),
                     "delivered_at": chat.get("delivered_at"),
