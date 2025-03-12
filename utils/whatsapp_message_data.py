@@ -9,6 +9,8 @@ import os
 import sys
 import django
 from bson import ObjectId
+import time
+
 current_path = os.path.abspath(os.getcwd())
 base_path = os.path.dirname(current_path)  # This will give you /opt/whatsapp_service/WhatsApp-Service-BE
 print(f"base_path: {base_path}")
@@ -239,6 +241,10 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             'Content-Type': 'application/json'
         }
         print(f"Sending bulk message payload: {payload}")
+        
+        if category != "UTILITY":
+            time.sleep(7)
+        
         response = requests.post(url, headers=headers, data=payload)
         print(response.json())
         if response.status_code == 200:
