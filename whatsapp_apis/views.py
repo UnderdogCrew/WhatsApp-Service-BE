@@ -672,8 +672,15 @@ class UniqueChatList(APIView):
                     "from": "customers",
                     "let": { 
                         "phone_number": {
-                            "$toLong": {  # Changed from $toInt to $toLong
-                                "$substr": ["$_id", 2, -1]
+                            "$toDouble": {
+                                "$cond": {
+                                    "if": {"$regexMatch": {
+                                        "input": {"$substr": ["$_id", 2, -1]},
+                                        "regex": "^[0-9]+$"
+                                    }},
+                                    "then": {"$substr": ["$_id", 2, -1]},
+                                    "else": "0"  # Default value if conversion fails
+                                }
                             }
                         }
                     },
