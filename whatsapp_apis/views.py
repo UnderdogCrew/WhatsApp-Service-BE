@@ -665,13 +665,28 @@ class UniqueChatList(APIView):
             # Aggregation Query to Get Unique Numbers with Latest Messages and Join with Customers
             search_text = request.query_params.get('search', '').strip()
 
-            if search_text:
-                match_query["profile_name"] = {"$regex": search_text, "$options": "i"}  # 'i' makes it case-insensitive
-
             pipeline = [
-                {"$match": match_query},  # Filter messages by user_id
-                {"$sort": {"created_at": -1}},  # Sort messages by latest timestamp
-                {"$group": {  # Group by number, keep only the latest message per number
+                # First lookup customers to get matching names
+                {"$lookup": {
+                    "from": "customers",
+                    "let": { "phone_str": {"$substr": ["$number", 2, -1]} },
+                    "pipeline": [
+                        {
+                            "$match": {
+                                "$expr": {"$eq": ["$number", {"$toDouble": "$$phone_str"}]},
+                                **({'name': {'$regex': search_text, '$options': 'i'}} if search_text else {})
+                            }
+                        }
+                    ],
+                    "as": "customer_info"
+                }},
+                # Only keep messages that have matching customers if searching
+                {"$match": {
+                    **match_query,
+                    **({'customer_info': {'$ne': []}} if search_text else {})
+                }},
+                {"$sort": {"created_at": -1}},
+                {"$group": {
                     "_id": "$number",
                     "last_message": {"$first": "$message"},
                     "last_message_time": {"$first": "$created_at"},
@@ -679,42 +694,13 @@ class UniqueChatList(APIView):
                     "template_name": {"$first": "$template_name"},
                     "sent_at": {"$first": "$sent_at"},
                     "delivered_at": {"$first": "$delivered_at"},
-                    "failed_at": {"$first": "$failed_at"}
+                    "failed_at": {"$first": "$failed_at"},
+                    "customer_info": {"$first": "$customer_info"}
                 }},
-                # Join with the customers collection using string comparison
-                {"$lookup": {
-                    "from": "customers",
-                    "let": { 
-                        "phone_number": {
-                            "$toDouble": {
-                                "$cond": {
-                                    "if": {"$regexMatch": {
-                                        "input": {"$substr": ["$_id", 2, -1]},
-                                        "regex": "^[0-9]+$"
-                                    }},
-                                    "then": {"$substr": ["$_id", 2, -1]},
-                                    "else": "0"  # Default value if conversion fails
-                                }
-                            }
-                        }
-                    },
-                    "pipeline": [
-                        {
-                            "$match": {
-                                "$expr": {
-                                    "$eq": ["$number", "$$phone_number"]
-                                }
-                            }
-                        }
-                    ],
-                    "as": "customer_info"
-                }},
-                # Flatten the customer data (if available)
                 {"$unwind": {
                     "path": "$customer_info",
                     "preserveNullAndEmptyArrays": True
                 }},
-                # Rename fields for readability
                 {"$project": {
                     "profile_name": {"$ifNull": ["$customer_info.name", "$_id"]},
                     "last_message": 1,
@@ -732,10 +718,8 @@ class UniqueChatList(APIView):
                         }
                     }
                 }},
+                {"$sort": {"last_message_time": -1}}
             ]
-
-            # Add final sort
-            pipeline.append({"$sort": {"last_message_time": -1}})
 
             chat_list_data = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
             chat_list = []
@@ -755,11 +739,18 @@ class UniqueChatList(APIView):
                     "msg_type": chat.get("msg_type", 2)  # Default to 2 if not found
                 })
 
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Unique chat list retrieved successfully',
-                'chat_list': chat_list
-            }, status=status.HTTP_200_OK)
+            if len(chat_list) > 0:
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'Unique chat list retrieved successfully',
+                    'chat_list': chat_list
+                }, status=status.HTTP_200_OK)
+            else:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Unique chat list not found',
+                    'chat_list': []
+                }, status=status.HTTP_404_NOT_FOUND)
 
         except Exception as e:
             return JsonResponse({
