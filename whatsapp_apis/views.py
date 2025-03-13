@@ -617,6 +617,13 @@ class UniqueChatList(APIView):
                 description="Bearer token",
                 type=openapi.TYPE_STRING,
                 required=True
+            ),
+            openapi.Parameter(
+                'search',
+                openapi.IN_QUERY,
+                description="Searched text based on name",
+                type=openapi.TYPE_STRING,
+                required=True
             )
         ],
         responses={
@@ -653,9 +660,16 @@ class UniqueChatList(APIView):
             user_id = user_info['user_id']
             print(f"user_id: {user_id}")
 
+            match_query = {"user_id": user_id}
+
             # Aggregation Query to Get Unique Numbers with Latest Messages and Join with Customers
+            search_text = request.query_params.get('search', '').strip()
+
+            if search_text:
+                match_query["profile_name"] = {"$regex": search_text, "$options": "i"}  # 'i' makes it case-insensitive
+
             pipeline = [
-                {"$match": {"user_id": user_id}},  # Filter messages by user_id
+                {"$match": match_query},  # Filter messages by user_id
                 {"$sort": {"created_at": -1}},  # Sort messages by latest timestamp
                 {"$group": {  # Group by number, keep only the latest message per number
                     "_id": "$number",
@@ -718,11 +732,12 @@ class UniqueChatList(APIView):
                         }
                     }
                 }},
-                {"$sort": {"last_message_time": -1}}
             ]
 
+            # Add final sort
+            pipeline.append({"$sort": {"last_message_time": -1}})
+
             chat_list_data = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
-            print("chat_list_data", chat_list_data)
             chat_list = []
             for chat in chat_list_data:
                 msg_type = chat.get("msg_type", 2)
