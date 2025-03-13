@@ -746,19 +746,23 @@ class UniqueChatList(APIView):
             chat_list = []
             for chat in chat_list_data:
                 msg_type = chat.get("msg_type", 2)
-                chat_list.append({
-                    "number": chat.get("_id")[2:] if chat.get("_id") else "",  # Get all digits after first 2
-                    "profile_name": chat.get("profile_name", "Unknown"),
-                    "last_message": chat.get("last_message", ""),
-                    "last_message_time": chat.get("last_message_time"),
-                    "status": chat.get("message_status", ""),
-                    "template_name": chat.get("template_name", ""),
-                    "sent_at": chat.get("sent_at"),
-                    "delivered_at": chat.get("delivered_at"),
-                    "unread_count": 0 if msg_type == 1 else 1,
-                    "failed_at": chat.get("failed_at"),
-                    "msg_type": chat.get("msg_type", 2)  # Default to 2 if not found
-                })
+                profile_name = chat.get("profile_name", "Unknown")
+                if profile_name is None or profile_name == "nan" or profile_name == "NaN" or profile_name == "":
+                    pass
+                else:
+                    chat_list.append({
+                        "number": chat.get("_id")[2:] if chat.get("_id") else "",  # Get all digits after first 2
+                        "profile_name": chat.get("profile_name", "Unknown"),
+                        "last_message": chat.get("last_message", ""),
+                        "last_message_time": chat.get("last_message_time"),
+                        "status": chat.get("message_status", ""),
+                        "template_name": chat.get("template_name", ""),
+                        "sent_at": chat.get("sent_at"),
+                        "delivered_at": chat.get("delivered_at"),
+                        "unread_count": 0 if msg_type == 1 else 1,
+                        "failed_at": chat.get("failed_at"),
+                        "msg_type": chat.get("msg_type", 2)  # Default to 2 if not found
+                    })
 
             if len(chat_list) > 0:
                 return JsonResponse({
