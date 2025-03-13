@@ -224,6 +224,9 @@ class SendMessage(APIView):
                     if type(customer_number) != int:
                         customer_number = customer_number.encode('ascii', 'ignore').decode()
                         customer_number = int(customer_number)
+                    
+                    customer_details['number'] = customer_number
+
                     # except:
                     #     pass
                     customer_query = {
@@ -233,6 +236,7 @@ class SendMessage(APIView):
                     }
                     print(f"customer query: {customer_query}")
                     customer_data = db.find_document(collection_name='customers', query=customer_query)
+                    print(customer_data)
                     if customer_data is not None:
                         update_data = {
                             "name": msg_data['name'],
@@ -247,14 +251,14 @@ class SendMessage(APIView):
                     else:
                         db.create_document('customers', customer_details)
 
-                    # send_message_data(
-                    #     number=msg_data['number'],
-                    #     template_name=template_name,
-                    #     text=text,
-                    #     image_url=image_url,
-                    #     user_id=user_id,
-                    #     metadata=msg_data
-                    # )
+                    send_message_data(
+                        number=msg_data['number'],
+                        template_name=template_name,
+                        text=text,
+                        image_url=image_url,
+                        user_id=user_id,
+                        metadata=msg_data
+                    )
 
             elif message_type == 2:
                 for number in numbers:
