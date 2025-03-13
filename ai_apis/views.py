@@ -219,8 +219,14 @@ class SendMessage(APIView):
                         "user_id": user_id,
                         "created_at": datetime.datetime.now()
                     }
+                    customer_number = msg_data['company_name']
+                    try:
+                        customer_number = customer_number.strip() 
+                        customer_number = int(customer_number)
+                    except:
+                        pass
                     customer_query = {
-                        "number": msg_data['number'],
+                        "number": customer_number,
                         "status": 1,
                         "user_id": user_id,
                     }
