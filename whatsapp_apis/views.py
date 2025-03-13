@@ -567,14 +567,26 @@ class CustomersChatLogs(APIView):
                 else:
                     msg_type = 2
 
+                def convert_to_ist(timestamp):
+                    if timestamp is None:
+                        return None
+                    # If timestamp is an integer (Unix timestamp)
+                    if isinstance(timestamp, (int, float)):
+                        timestamp = datetime.fromtimestamp(timestamp, pytz.UTC)
+                    # If timestamp doesn't have timezone info, assume UTC
+                    elif isinstance(timestamp, datetime) and timestamp.tzinfo is None:
+                        timestamp = pytz.UTC.localize(timestamp)
+                    # Convert to IST
+                    return timestamp.astimezone(pytz.timezone('Asia/Kolkata'))
+
                 customer_chat_details.append(
                     {
                         "number": _customer['number'],
                         "message": _customer['message'],
-                        "created_at": _customer['created_at'].astimezone(pytz.timezone('Asia/Kolkata')) if _customer['created_at'] else None,
-                        "updated_at": _customer['updated_at'].astimezone(pytz.timezone('Asia/Kolkata')) if _customer.get('updated_at') else None,
-                        "sent_at": _customer['sent_at'].astimezone(pytz.timezone('Asia/Kolkata')) if _customer.get('sent_at') else None,
-                        "read_at": _customer['read_at'].astimezone(pytz.timezone('Asia/Kolkata')) if _customer.get('read_at') else None,
+                        "created_at": convert_to_ist(_customer.get('created_at')),
+                        "updated_at": convert_to_ist(_customer.get('updated_at')),
+                        "sent_at": convert_to_ist(_customer.get('sent_at')),
+                        "read_at": convert_to_ist(_customer.get('read_at')),
                         "status": _customer['message_status'],
                         "msg_type": msg_type
                     }
