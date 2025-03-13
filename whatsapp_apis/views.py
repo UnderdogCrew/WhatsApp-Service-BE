@@ -669,11 +669,32 @@ class UniqueChatList(APIView):
                 # First lookup customers to get matching names
                 {"$lookup": {
                     "from": "customers",
-                    "let": { "phone_str": {"$substr": ["$number", 2, -1]} },
+                    "let": { 
+                        "phone_str": {
+                            "$replaceAll": {
+                                "input": {"$substr": ["$number", 2, -1]},
+                                "find": " ",
+                                "replacement": ""
+                            }
+                        }
+                    },
                     "pipeline": [
                         {
                             "$match": {
-                                "$expr": {"$eq": ["$number", {"$toDouble": "$$phone_str"}]},
+                                "$expr": {
+                                    "$eq": [
+                                        "$number",
+                                        {
+                                            "$toDouble": {
+                                                "$replaceAll": {
+                                                    "input": "$$phone_str",
+                                                    "find": " ",
+                                                    "replacement": ""
+                                                }
+                                            }
+                                        }
+                                    ]
+                                },
                                 **({'name': {'$regex': search_text, '$options': 'i'}} if search_text else {})
                             }
                         }
