@@ -749,17 +749,31 @@ class UniqueChatList(APIView):
 
             chat_list_data = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
             chat_list = []
+            
+            # Add timezone conversion
+            ist_timezone = pytz.timezone('Asia/Kolkata')
+            
             for chat in chat_list_data:
                 msg_type = chat.get("msg_type", 2)
                 profile_name = chat.get("profile_name", "Unknown")
+                
+                # Convert last_message_time to IST
+                last_message_time = chat.get("last_message_time")
+                if last_message_time:
+                    if not last_message_time.tzinfo:
+                        # If timestamp is naive, assume it's UTC
+                        last_message_time = pytz.utc.localize(last_message_time)
+                    # Convert to IST
+                    last_message_time = last_message_time.astimezone(ist_timezone)
+                
                 if profile_name is None or profile_name == "nan" or profile_name == "NaN" or profile_name == "":
                     pass
                 else:
                     chat_list.append({
-                        "number": chat.get("_id")[2:] if chat.get("_id") else "",  # Get all digits after first 2
-                        "profile_name": chat.get("profile_name", "Unknown"),
+                        "number": chat.get("_id")[2:] if chat.get("_id") else "",
+                        "profile_name": profile_name,
                         "last_message": chat.get("last_message", ""),
-                        "last_message_time": chat.get("last_message_time"),
+                        "last_message_time": last_message_time,
                         "status": chat.get("message_status", ""),
                         "template_name": chat.get("template_name", ""),
                         "sent_at": chat.get("sent_at"),
