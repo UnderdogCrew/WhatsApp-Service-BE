@@ -313,6 +313,7 @@ class FacebookWebhook(APIView):
                                 "id": value['messages'][0]['id'],
                                 "message_status": "received",
                                 "created_at": datetime.datetime.now(),
+                                "updated_at": datetime.datetime.now(),
                                 "template_name": "template_name",
                                 "code": 0,
                                 "title": "",
@@ -347,6 +348,7 @@ class FacebookWebhook(APIView):
                     {
                         'message_status': statuses[0]['status'], 
                         f"{statuses[0]['status']}_at": int(statuses[0]['timestamp']),
+                        "updated_at": datetime.datetime.now(),
                         "code": code,
                         "title": title,
                         "error_message": message,
@@ -1158,6 +1160,7 @@ class WhatsAppMessage(APIView):
                     "id": response.json()['messages'][0]["id"],
                     "message_status": "sent",
                     "created_at": datetime.datetime.now(),
+                    "updated_at": datetime.datetime.now(),
                     "template_name": "manual"
                 }
                 db.create_document('whatsapp_message_logs', whatsapp_status_logs)
@@ -1170,6 +1173,7 @@ class WhatsAppMessage(APIView):
                     "id": "",
                     "message_status": "error",
                     "created_at": datetime.datetime.now(),
+                    "updated_at": datetime.datetime.now(),
                     "template_name": "manual",
                     "code": response.json()['error']['code'],
                     "title": response.json()['error']['type'],
