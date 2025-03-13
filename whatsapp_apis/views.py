@@ -623,7 +623,7 @@ class UniqueChatList(APIView):
                 openapi.IN_QUERY,
                 description="Searched text based on name",
                 type=openapi.TYPE_STRING,
-                required=True
+                required=False
             )
         ],
         responses={
