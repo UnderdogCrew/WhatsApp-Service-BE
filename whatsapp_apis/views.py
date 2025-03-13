@@ -711,11 +711,11 @@ class UniqueChatList(APIView):
                     **match_query,
                     **({'customer_info': {'$ne': []}} if search_text else {})
                 }},
-                {"$sort": {"created_at": -1}},
+                {"$sort": {"updated_at": -1}},
                 {"$group": {
                     "_id": "$number",
                     "last_message": {"$first": "$message"},
-                    "last_message_time": {"$first": "$created_at"},
+                    "last_message_time": {"$first": "$updated_at"},
                     "message_status": {"$first": "$message_status"},
                     "template_name": {"$first": "$template_name"},
                     "sent_at": {"$first": "$sent_at"},
