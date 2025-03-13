@@ -16,7 +16,7 @@ from utils.database import MongoDB
 from utils.whatsapp_message_data import send_message_data
 
 # Define the target date ranges
-target_days = {0, 1, 2, 5, 10, 30}
+target_days = {0, 1, 2, 5, 10}
 
 
 def fetch_scheduled_messages():
@@ -33,9 +33,25 @@ def fetch_scheduled_messages():
         records = list(
             db.find_documents('whatsapp_schedule_message', query={"user_id": "67c1cf4c2763ce36e17d145e"})
         )
-        
-        filtered_records = [record for record in records if 'date' in record and record['date'] in target_dates]
 
+        final_record = []
+
+        for record in records:
+            if isinstance(record['date'], str):
+                try:
+                    date = datetime.strptime(record['date'], "%d/%m/%y")
+                except:
+                    try:
+                        date = datetime.strptime(record['date'], "%m/%d/%y")
+                    except:
+                        continue
+            else:
+                date = record['date']
+            record['date'] = date
+            final_record.append(record)
+        
+        # Check for both datetime objects and formatted date strings
+        filtered_records = [record for record in final_record if 'date' in record and (record['date'] in target_dates)]
         for user in filtered_records:
             reg_number = ""
             model = ""
@@ -55,12 +71,12 @@ def fetch_scheduled_messages():
                 "name" : user['name'],
                 "company_name" : user['company_name'],
                 "policy": policy,
-                "date": user['date'].strftime("%Y-%m-%d")
+                "date": user['date'].strftime("%d-%m-%Y")
             }
             send_message_data(
                 number=user['number'],
                 template_name="insurance_policy",
-                text=user['text'],
+                text=user['text'] if "text" in user else "",
                 image_url="",
                 user_id=user['user_id'],
                 metadata=metadata
