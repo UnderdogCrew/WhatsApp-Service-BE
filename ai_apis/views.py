@@ -245,7 +245,7 @@ class SendMessage(APIView):
                         text=text,
                         image_url=image_url,
                         user_id=user_id,
-                        metadata=metadata
+                        metadata=msg_data
                     )
 
             elif message_type == 2:
