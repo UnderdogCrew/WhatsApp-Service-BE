@@ -219,7 +219,7 @@ class SendMessage(APIView):
                         "user_id": user_id,
                         "created_at": datetime.datetime.now()
                     }
-                    customer_number = msg_data['company_name']
+                    customer_number = msg_data['number']
                     try:
                         customer_number = customer_number.strip() 
                         customer_number = int(customer_number)
