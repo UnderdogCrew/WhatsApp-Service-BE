@@ -571,10 +571,10 @@ class CustomersChatLogs(APIView):
                     {
                         "number": _customer['number'],
                         "message": _customer['message'],
-                        "created_at": _customer['created_at'],
-                        "updated_at": _customer['updated_at'] if "updated_at" in _customer else None,
-                        "sent_at": _customer['sent_at'] if "sent_at" in _customer else None,
-                        "read_at": _customer['read_at'] if "read_at" in _customer else None,
+                        "created_at": _customer['created_at'].astimezone(pytz.timezone('Asia/Kolkata')) if _customer['created_at'] else None,
+                        "updated_at": _customer['updated_at'].astimezone(pytz.timezone('Asia/Kolkata')) if _customer.get('updated_at') else None,
+                        "sent_at": _customer['sent_at'].astimezone(pytz.timezone('Asia/Kolkata')) if _customer.get('sent_at') else None,
+                        "read_at": _customer['read_at'].astimezone(pytz.timezone('Asia/Kolkata')) if _customer.get('read_at') else None,
                         "status": _customer['message_status'],
                         "msg_type": msg_type
                     }
