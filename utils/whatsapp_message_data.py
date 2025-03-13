@@ -139,7 +139,11 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         # Check if there are any BUTTONS in the components
         has_buttons = any(component['type'].upper() == "BUTTONS" for component in template_components)
 
-        template_text = template_components[0]['text'] if "text" in template_components[0] else ""
+        template_text = ""
+        for components in template_components:
+            if components['type'] == "BODY":
+                template_text = components['text']
+        print(f"template_text: {template_text}")
         category = template_data['data'][0]['category']
         language = template_data['data'][0]['language']
 
@@ -199,29 +203,6 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
 
         components = process_components(template_components, msg_details, image_url)
         print(f"components: {template_text}")
-        # if has_buttons:
-        #     payload = json.dumps(
-        #         {
-        #             "messaging_product": "whatsapp",
-        #             "recipient_type": "individual",
-        #             "to": f"91{number}",
-        #             "type": "interactive",
-        #             "interactive": {
-        #                 "type": "cta_url",
-        #                 "body": {
-        #                     "text": template_text
-        #                 },
-        #                 "action": {
-        #                     "name": "cta_url",
-        #                     "parameters": {
-        #                         "display_text": "Review and Pay",
-        #                         "url": "https://wapnexus.netlify.app/"
-        #                     }
-        #                 }
-        #             }
-        #         }
-        #     )
-        # else:
         payload = json.dumps({
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
@@ -246,7 +227,6 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             time.sleep(7)
         
         response = requests.post(url, headers=headers, data=payload)
-        print(response.json())
         if response.status_code == 200:
             whatsapp_status_logs = {
                 "number": f"91{number}",
