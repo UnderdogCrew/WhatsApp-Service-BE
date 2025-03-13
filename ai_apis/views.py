@@ -219,12 +219,24 @@ class SendMessage(APIView):
                         "user_id": user_id,
                         "created_at": datetime.datetime.now()
                     }
+                    customer_number = msg_data['number']
+                    # try:
+                    if type(customer_number) != int:
+                        customer_number = customer_number.encode('ascii', 'ignore').decode()
+                        customer_number = int(customer_number)
+                    
+                    customer_details['number'] = customer_number
+
+                    # except:
+                    #     pass
                     customer_query = {
-                        "number": msg_data['number'],
+                        "number": customer_number,
                         "status": 1,
                         "user_id": user_id,
                     }
+                    print(f"customer query: {customer_query}")
                     customer_data = db.find_document(collection_name='customers', query=customer_query)
+                    print(customer_data)
                     if customer_data is not None:
                         update_data = {
                             "name": msg_data['name'],

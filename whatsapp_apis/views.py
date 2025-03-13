@@ -764,7 +764,7 @@ class UniqueChatList(APIView):
             
             # Add timezone conversion
             ist_timezone = pytz.timezone('Asia/Kolkata')
-            
+
             for chat in chat_list_data:
                 msg_type = chat.get("msg_type", 2)
                 profile_name = chat.get("profile_name", "Unknown")
