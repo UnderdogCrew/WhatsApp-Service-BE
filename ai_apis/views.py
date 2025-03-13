@@ -221,8 +221,9 @@ class SendMessage(APIView):
                     }
                     customer_number = msg_data['number']
                     # try:
-                    customer_number = customer_number.strip() 
-                    customer_number = int(customer_number)
+                    if type(customer_number) != int:
+                        customer_number = customer_number.strip() 
+                        customer_number = int(customer_number)
                     # except:
                     #     pass
                     customer_query = {
