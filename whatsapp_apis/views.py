@@ -660,7 +660,12 @@ class UniqueChatList(APIView):
             user_id = user_info['user_id']
             print(f"user_id: {user_id}")
 
-            match_query = {"user_id": user_id}
+            match_query = {
+                "user_id": user_id,
+                "$expr": {
+                    "$eq": [{"$strLenCP": "$number"}, 12]
+                }
+            }
 
             # Aggregation Query to Get Unique Numbers with Latest Messages and Join with Customers
             search_text = request.query_params.get('search', '').strip()
