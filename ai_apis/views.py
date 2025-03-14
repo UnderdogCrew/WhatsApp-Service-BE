@@ -236,7 +236,6 @@ class SendMessage(APIView):
                     }
                     print(f"customer query: {customer_query}")
                     customer_data = db.find_document(collection_name='customers', query=customer_query)
-                    print(customer_data)
                     if customer_data is not None:
                         update_data = {
                             "name": msg_data['name'],
