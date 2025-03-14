@@ -90,6 +90,19 @@ def process_components(components, msg_data, image_url):
                     "parameters": body_parameters
                 }
                 result_list.append(body_entry)
+            else:
+                # Process BODY
+                body_parameters = [
+                    {
+                        "type": "text",
+                        "text": component['text']
+                    }
+                ]
+                body_entry = {
+                    "type": "body",
+                    "parameters": body_parameters
+                }
+                result_list.append(body_entry)
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
             for buttons in component['buttons']:
@@ -97,19 +110,25 @@ def process_components(components, msg_data, image_url):
                 body_parameters = []
                 if buttons['type'] == "URL":
                     value = buttons.get("text", "")
-                    body_parameters.append({
-                        "type": "text",
-                        "text": "/billing"
-                    })
+                    if "example" in buttons:
+                        body_parameters.append({
+                            "type": "text",
+                            "text": "/billing"
+                        })
+                    else:
+                        body_parameters.append({
+                            "type": "text",
+                            "text": buttons['url']
+                        })
 
-                if "example" in buttons:
-                    body_entry = {
-                        "type": "BUTTON",
-                        "sub_type": "url",
-                        "index": 0,
-                        "parameters": body_parameters
-                    }
-                    result_list.append(body_entry)
+                
+                body_entry = {
+                    "type": "BUTTON",
+                    "sub_type": "url",
+                    "index": 0,
+                    "parameters": body_parameters
+                }
+                result_list.append(body_entry)
 
     return result_list
 
