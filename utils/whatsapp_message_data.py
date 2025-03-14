@@ -35,18 +35,19 @@ def process_components(components, msg_data, image_url):
     for component in components:
         if component['type'].upper() == "HEADER" and component.get('format') == "IMAGE":
             # Process HEADER with type IMAGE
-            header_entry = {
-                "type": "header",
-                "parameters": [
-                    {
-                        "type": "image",
-                        "image": {
-                            "link": image_url
+            if image_url != "":
+                header_entry = {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "image",
+                            "image": {
+                                "link": image_url
+                            }
                         }
-                    }
-                ]
-            }
-            result_list.append(header_entry)
+                    ]
+                }
+                result_list.append(header_entry)
 
         elif component['type'].upper() == "BODY":
             # Check for body_text_named_params
@@ -202,7 +203,6 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             template_text = template_text.format(**msg_details)
 
         components = process_components(template_components, msg_details, image_url)
-        print(f"components: {template_text}")
         payload = json.dumps({
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
@@ -227,6 +227,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             time.sleep(7)
         
         response = requests.post(url, headers=headers, data=payload)
+        print(f"Meta response: {response}")
         if response.status_code == 200:
             whatsapp_status_logs = {
                 "number": f"91{number}",
