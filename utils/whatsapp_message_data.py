@@ -90,19 +90,7 @@ def process_components(components, msg_data, image_url):
                     "parameters": body_parameters
                 }
                 result_list.append(body_entry)
-            else:
-                # Process BODY
-                body_parameters = [
-                    {
-                        "type": "text",
-                        "text": component['text']
-                    }
-                ]
-                body_entry = {
-                    "type": "body",
-                    "parameters": body_parameters
-                }
-                result_list.append(body_entry)
+            
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
             for buttons in component['buttons']:
@@ -220,6 +208,8 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             template_text = template_text.replace("{{", "{")
             template_text = template_text.replace("}}", "}")
             template_text = template_text.format(**msg_details)
+        
+        print(f"template text: {template_text}")
 
         components = process_components(template_components, msg_details, image_url)
         payload = json.dumps({
@@ -246,7 +236,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             time.sleep(7)
         
         response = requests.post(url, headers=headers, data=payload)
-        print(f"Meta response: {response}")
+        print(f"Meta response: {response.status_code}")
         if response.status_code == 200:
             whatsapp_status_logs = {
                 "number": f"91{number}",
