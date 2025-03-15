@@ -17,6 +17,26 @@ from django.conf import settings
 import pytz
 
 
+def format_date(date_str, date_format="%d/%m/%Y"):
+    # Convert string to date object
+    if isinstance(date_str, str):
+        given_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").date()
+    elif isinstance(date_str, datetime):
+        given_date = date_str.date()
+    
+    today = datetime.today().date()
+    # Calculate the difference in days
+    delta_days = (today - given_date).days
+
+    if delta_days == 0:
+        return date_str.strftime("%H:%M")  # Weekday name (Monday, Tuesday, etc.)
+    elif delta_days == 1:
+        return "Yesterday"
+    elif 2 <= delta_days <= 7:
+        return given_date.strftime("%A")  # Weekday name (Monday, Tuesday, etc.)
+    else:
+        return given_date.strftime(date_format)  # Default format dd/mm/yyyy
+
 
 # Function to check phone number and country code
 def check_phone_number(data, phone_number, country_code):
@@ -777,6 +797,10 @@ class UniqueChatList(APIView):
                         last_message_time = pytz.utc.localize(last_message_time)
                     # Convert to IST
                     last_message_time = last_message_time.astimezone(ist_timezone)
+
+                
+                changed_date = format_date(date_str=last_message_time)
+
                 
                 if profile_name is None or profile_name == "nan" or profile_name == "NaN" or profile_name == "":
                     pass
@@ -786,6 +810,7 @@ class UniqueChatList(APIView):
                         "profile_name": profile_name,
                         "last_message": chat.get("last_message", ""),
                         "last_message_time": last_message_time,
+                        "date": changed_date,
                         "status": chat.get("message_status", ""),
                         "template_name": chat.get("template_name", ""),
                         "sent_at": chat.get("sent_at"),
