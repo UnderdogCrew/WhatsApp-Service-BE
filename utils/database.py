@@ -75,6 +75,5 @@ class MongoDB:
             list: Result of the aggregation pipeline
         """
         collection = self.get_collection(collection_name)
-        print(collection)
         # Convert cursor to list to get actual results
         return list(collection.aggregate(pipeline))
