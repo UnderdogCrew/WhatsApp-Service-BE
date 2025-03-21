@@ -577,8 +577,8 @@ class CustomersChatLogs(APIView):
 
             customer_details = db.find_document(collection_name="customers", query=customer_query)
 
-            if customer_details is None:
-                return JsonResponse({"message": "Number is invalid"}, status=422)
+            # if customer_details is None:
+            #     return JsonResponse({"message": "Number is invalid"}, status=422)
 
             customer_chat_data = db.find_documents(collection_name="whatsapp_message_logs", query=query_filter, sort=sort_order)
             for _customer in customer_chat_data:
@@ -613,8 +613,8 @@ class CustomersChatLogs(APIView):
                 )
 
             customers = {
-                "name": customer_details['name'],
-                "number": str(customer_details['number'])
+                "name": customer_details['name'] if customer_details is not None else f"{number}",
+                "number": str(customer_details['number']) if customer_details is not None else f"{number}"
             }
 
             if len(customer_chat_details) > 0:
