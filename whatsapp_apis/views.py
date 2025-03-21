@@ -582,7 +582,7 @@ class CustomersChatLogs(APIView):
 
             customer_chat_data = db.find_documents(collection_name="whatsapp_message_logs", query=query_filter, sort=sort_order)
             for _customer in customer_chat_data:
-                if _customer['message_status'] in ['read', 'delivered', 'sent', 'error']:
+                if _customer['message_status'] in ['read', 'delivered', 'sent', 'error', 'failed']:
                     msg_type = 1
                 else:
                     msg_type = 2
