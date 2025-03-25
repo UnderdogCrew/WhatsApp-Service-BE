@@ -902,7 +902,9 @@ class UserDashboard(APIView):
                 "final_price": f"₹{round(total_price_with_tax, 2)}",
                 "cgst": f"₹{round(cgst, 2)}",
                 "sgst": f"₹{round(sgst, 2)}",
-                "charts": final_result
+                "charts": {
+                    "linechart": final_result
+                }
             }
 
             return JsonResponse(response_data, status=status.HTTP_200_OK)
