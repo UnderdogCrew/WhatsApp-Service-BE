@@ -776,6 +776,7 @@ class UserDashboard(APIView):
             
             ## we need to add the chart data
             chart_query = {
+                "user_id": user_id,
                 "sent_at": { "$gt": 0 } # Optional safeguard for sent_at
             }
             if start_date and end_date:
