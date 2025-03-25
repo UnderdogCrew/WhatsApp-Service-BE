@@ -772,6 +772,65 @@ class UserDashboard(APIView):
                     text_filter["created_at"] = {"$lte": end_date}
                     filters["created_at"] = {"$lte": end_date}
                     user_query['created_at'] = {"$lte": end_date}
+
+            
+            ## we need to add the chart data
+            chart_query = {
+                "sent_at": { "$gt": 0 } # Optional safeguard for sent_at
+            }
+            if start_date and end_date:
+                chart_query['created_at'] = {
+                    "$gte": start_date,
+                    "$lt": end_date
+                }
+
+            pipeline = [
+                {
+                    "$match": chart_query
+                },
+                {
+                    "$addFields": {
+                    "sent_date": {
+                        "$dateToString": {
+                        "format": "%d/%m/%Y",
+                        "date": { "$toDate": { "$multiply": ["$sent_at", 1000] } }
+                        }
+                    }
+                    }
+                },
+                {
+                    "$group": {
+                    "_id": "$sent_date",
+                    "sent": { "$sum": 1 },
+                    "delivered": {
+                        "$sum": {
+                        "$cond": [{ "$gt": ["$delivered_at", 0] }, 1, 0]
+                        }
+                    },
+                    "read": {
+                        "$sum": {
+                        "$cond": [{ "$gt": ["$read_at", 0] }, 1, 0]
+                        }
+                    }
+                    }
+                },
+                {
+                    "$project": {
+                    "_id": 0,
+                    "date": "$_id",
+                    "sent": 1,
+                    "delivered": 1,
+                    "read": 1
+                    }
+                },
+                {
+                    "$sort": {
+                    "date": 1
+                    }
+                }
+            ]
+
+            chart_data = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
             
             dollar_price = current_dollar_price()
             # Build filter conditions
@@ -821,6 +880,7 @@ class UserDashboard(APIView):
                 "final_price": f"₹{round(total_price_with_tax, 2)}",
                 "cgst": f"₹{round(cgst, 2)}",
                 "sgst": f"₹{round(sgst, 2)}",
+                "charts": chart_data
             }
 
             return JsonResponse(response_data, status=status.HTTP_200_OK)
