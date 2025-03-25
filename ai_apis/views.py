@@ -831,7 +831,28 @@ class UserDashboard(APIView):
                 }
             ]
 
-            chart_data = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
+            mongo_result = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
+            # Convert the result to a dictionary for quick lookup
+            result_map = {item['date']: item for item in mongo_result}
+            # Generate all dates between start and end
+            if start_date and end_date:
+                current_date = start_date
+                final_result = []
+
+                while current_date <= end_date:
+                    formatted_date = current_date.strftime("%d/%m/%Y")
+                    if formatted_date in result_map:
+                        final_result.append(result_map[formatted_date])
+                    else:
+                        final_result.append({
+                            "date": formatted_date,
+                            "read": 0,
+                            "delivered": 0,
+                            "sent": 0
+                        })
+                    current_date += datetime.timedelta(days=1)
+            else:
+                final_result = mongo_result
             
             dollar_price = current_dollar_price()
             # Build filter conditions
@@ -881,7 +902,9 @@ class UserDashboard(APIView):
                 "final_price": f"₹{round(total_price_with_tax, 2)}",
                 "cgst": f"₹{round(cgst, 2)}",
                 "sgst": f"₹{round(sgst, 2)}",
-                "charts": chart_data
+                "charts": {
+                    "linechart": final_result
+                }
             }
 
             return JsonResponse(response_data, status=status.HTTP_200_OK)
