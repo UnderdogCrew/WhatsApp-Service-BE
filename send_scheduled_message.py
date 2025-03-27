@@ -66,6 +66,16 @@ def fetch_scheduled_messages():
 
             filtered_records = [record for record in final_record if record['date'] in target_dates]
 
+        unique_records = {}
+        for record in filtered_records:
+            number = record['number']
+            if number not in unique_records:
+                unique_records[number] = record
+
+        filtered_records = list(unique_records.values())
+
+        print(f"filtered_records: {filtered_records}")
+
         # Send messages
         for user in filtered_records:
             reg_number = user.get('reg_number', '')
