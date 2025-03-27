@@ -21,20 +21,15 @@ target_days = {0, 1, 2, 5, 10}
 
 def fetch_scheduled_messages():
     try:
-        
         db = MongoDB()
-        
-        # Calculate date range for the previous month
-        today = datetime.now()
-        target_dates = [today + timedelta(days=day) for day in target_days]
-        target_dates = [d.replace(hour=0, minute=0, second=0, microsecond=0) for d in target_dates]
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        final_record = []
         
         # Fetch all documents
         records = list(
             db.find_documents('whatsapp_schedule_message', query={"user_id": "67c1cf4c2763ce36e17d145e"})
         )
-
-        final_record = []
 
         for record in records:
             if isinstance(record['date'], str):
@@ -47,36 +42,46 @@ def fetch_scheduled_messages():
                         continue
             else:
                 date = record['date']
-            record['date'] = date
+            record['date'] = date.replace(hour=0, minute=0, second=0, microsecond=0)
             final_record.append(record)
-        
-        # Check for both datetime objects and formatted date strings
-        filtered_records = [record for record in final_record if 'date' in record and (record['date'] in target_dates)]
-        for user in filtered_records:
-            reg_number = ""
-            model = ""
-            policy = ""
-            if "reg_number" in user:
-                reg_number = user['reg_number']
-                
-            if "model" in user:
-                model = user['model']
 
-            if reg_number != "" and model != "" and reg_number is not None:
-                policy = f"{reg_number} ({model})"
+        # Determine records to send messages to
+        if today.day == 1:
+            # Current month: first day and last day
+            first_day_this_month = today.replace(day=1)
+            if today.month == 12:
+                last_day_this_month = today.replace(month=12, day=31)
             else:
-                policy = f"{model}"
-            
+                next_month = today.replace(day=28) + timedelta(days=4)  # always gives next month
+                last_day_this_month = next_month.replace(day=1) - timedelta(days=1)
+
+            filtered_records = [
+                record for record in final_record
+                if first_day_this_month <= record['date'] <= last_day_this_month
+            ]
+        else:
+            # Use target_days logic
+            target_dates = [today + timedelta(days=day) for day in target_days]
+            target_dates = [d.replace(hour=0, minute=0, second=0, microsecond=0) for d in target_dates]
+
+            filtered_records = [record for record in final_record if record['date'] in target_dates]
+
+        # Send messages
+        for user in filtered_records:
+            reg_number = user.get('reg_number', '')
+            model = user.get('model', '')
+            policy = f"{reg_number} ({model})" if reg_number and model else model
+
             metadata = {
-                "name" : user['name'],
-                "company_name" : user['company_name'],
+                "name": user['name'],
+                "company_name": user['company_name'],
                 "policy": policy,
                 "date": user['date'].strftime("%d-%m-%Y")
             }
             send_message_data(
                 number=user['number'],
                 template_name="insurance_policy",
-                text=user['text'] if "text" in user else "",
+                text=user.get('text', ''),
                 image_url="",
                 user_id=user['user_id'],
                 metadata=metadata
@@ -86,8 +91,9 @@ def fetch_scheduled_messages():
         return True
 
     except Exception as e:
-        print(f"Error generating monthly invoices: {str(e)}")
+        print(f"Error generating scheduled messages: {str(e)}")
         return False
+
 
 if __name__ == "__main__":
     fetch_scheduled_messages() 
