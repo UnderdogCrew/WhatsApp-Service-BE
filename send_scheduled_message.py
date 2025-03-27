@@ -34,6 +34,7 @@ def fetch_scheduled_messages():
         )
 
         for record in records:
+            print(record['date'])
             if isinstance(record['date'], str):
                 try:
                     date = datetime.strptime(record['date'], "%d/%m/%y")
@@ -42,8 +43,12 @@ def fetch_scheduled_messages():
                         date = datetime.strptime(record['date'], "%m/%d/%y")
                     except:
                         continue
+            elif isinstance(record['date'], float):
+                # Assuming date is a timestamp (float or int)
+                date = datetime.fromtimestamp(record['date'])
             else:
                 date = record['date']
+                
             record['date'] = date.replace(hour=0, minute=0, second=0, microsecond=0)
             final_record.append(record)
 
