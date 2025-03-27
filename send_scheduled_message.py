@@ -3,6 +3,8 @@ import sys
 import django
 from datetime import datetime, timedelta
 import os
+import traceback
+
 current_path = os.path.abspath(os.getcwd())
 base_path = os.path.dirname(current_path)  # This will give you /opt/whatsapp_service/WhatsApp-Service-BE
 print(f"base_path: {base_path}")
@@ -101,7 +103,9 @@ def fetch_scheduled_messages():
         return True
 
     except Exception as e:
-        print(f"Error generating scheduled messages: {str(e)}")
+        tb = traceback.extract_tb(sys.exc_info()[2])[-1]  # Get last traceback frame
+        line_number = tb.lineno
+        print(f"Error generating scheduled messages on line {line_number}: {str(e)}")
         return False
 
 
