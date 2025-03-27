@@ -38,14 +38,16 @@ def fetch_scheduled_messages():
             if isinstance(record['date'], str):
                 try:
                     date = datetime.strptime(record['date'], "%d/%m/%y")
-                except:
+                except ValueError:
                     try:
                         date = datetime.strptime(record['date'], "%m/%d/%y")
-                    except:
-                        continue
+                    except ValueError:
+                        continue  # Skip invalid date strings
             elif isinstance(record['date'], float):
-                # Assuming date is a timestamp (float or int)
-                date = datetime.fromtimestamp(record['date'])
+                if not (record['date'] is None or record['date'] != record['date']):  # Check for NaN
+                    date = datetime.fromtimestamp(record['date'])
+                else:
+                    continue  # Skip NaN values
             else:
                 date = record['date']
                 
