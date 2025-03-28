@@ -25,6 +25,7 @@ env_path = current_directory+"/env"
 # env_path = "/Users/neelpatel/Desktop/project-ai/UnderdogCrew/env"
 load_dotenv(dotenv_path=env_path)
 API_KEY = os.getenv("API_KEY")
+GLAM_API_KEY = os.getenv("GLAM_API_KEY")
 OPEN_AI_KEY=os.getenv("OPEN_AI_KEY")
 MONGODB_ATLAS_CLUSTER_URI = os.getenv("MONGODB_ATLAS_CLUSTER_URI")
 MONGODB_NAME = os.getenv("DB_NAME")

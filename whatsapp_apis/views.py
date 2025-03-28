@@ -228,7 +228,8 @@ class WhatsAppTemplateView(APIView):
             # Call Facebook Graph API
             url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates"
             headers = {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {API_KEY}'
             }
 
             fb_response = requests.post(
