@@ -720,16 +720,23 @@ class UniqueChatList(APIView):
                         {
                             "$match": {
                                 "$expr": {
-                                    "$eq": [
-                                        "$number",
+                                    '$and': [
                                         {
-                                            "$toDouble": {
-                                                "$replaceAll": {
-                                                    "input": "$$phone_str",
-                                                    "find": " ",
-                                                    "replacement": ""
+                                            '$eq': [
+                                            '$number',
+                                            {
+                                                '$toDouble': {
+                                                '$replaceAll': {
+                                                    'input': '$$phone_str',
+                                                    'find': ' ',
+                                                    'replacement': ''
+                                                }
                                                 }
                                             }
+                                            ]
+                                        },
+                                        {
+                                            '$eq': ['$user_id', user_id]
                                         }
                                     ]
                                 },
