@@ -133,7 +133,7 @@ class SendMessage(APIView):
                 print(f"user id: {user_id}")
             else:
                 return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
-            print(f"API_TOKEN: {API_TOKEN}")
+        
             request_data = request.data
             template_name = request_data.get("template_name", None)
             metadata = request_data.get("metadata", None)
@@ -157,6 +157,9 @@ class SendMessage(APIView):
             else:
                 template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
             
+            print(f"API_KEY: {API_KEY}")
+            print(template_url)
+
             headers = {
                 'Authorization': f'Bearer {API_KEY}'
             }
