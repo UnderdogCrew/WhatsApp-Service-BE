@@ -6,7 +6,7 @@ from django.http import HttpResponse, JsonResponse
 import sys
 import requests
 import json
-from UnderdogCrew.settings import API_KEY, OPEN_AI_KEY
+from UnderdogCrew.settings import API_KEY, OPEN_AI_KEY, GLAM_API_KEY
 import pandas as pd
 import openai
 from rest_framework import status
@@ -36,6 +36,7 @@ whatsapp_status = {
     request: phone number to send the otp on number
 '''
 API_TOKEN = API_KEY
+GLAM_API_KEY = GLAM_API_KEY
 
 
 def process_components(components, msg_data, image_url):
@@ -149,8 +150,13 @@ class SendMessage(APIView):
                 return JsonResponse({"message": "Message type is missing"}, safe=False, status=422)
             if template_name is None:
                 return JsonResponse({"message": "Template name is missing"}, safe=False, status=422)
-
-            template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
+            
+            if user_id == "67e6a22d44e08602e5c1e91c":
+                template_url = f"https://graph.facebook.com/v21.0/1156861725908077/message_templates?name={template_name}"
+                API_KEY = GLAM_API_KEY
+            else:
+                template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
+            
             headers = {
                 'Authorization': f'Bearer {API_KEY}'
             }

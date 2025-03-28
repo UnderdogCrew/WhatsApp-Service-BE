@@ -2,7 +2,7 @@ import json
 from utils.database import MongoDB
 import requests
 import datetime
-from UnderdogCrew.settings import API_KEY, OPEN_AI_KEY
+from UnderdogCrew.settings import API_KEY, OPEN_AI_KEY, GLAM_API_KEY
 import traceback
 import pandas as pd
 import os
@@ -132,7 +132,11 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             business_id = "450885871446042"
 
         url = f"https://graph.facebook.com/v19.0/{business_id}/messages"
-        template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
+        if user_id == "67e6a22d44e08602e5c1e91c":
+            template_url = f"https://graph.facebook.com/v21.0/1156861725908077/message_templates?name={template_name}"
+            API_TOKEN = GLAM_API_KEY
+        else:
+            template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
         headers = {
             'Authorization': f'Bearer {API_KEY}'
         }
