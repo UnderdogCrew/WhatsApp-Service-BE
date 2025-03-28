@@ -720,16 +720,23 @@ class UniqueChatList(APIView):
                         {
                             "$match": {
                                 "$expr": {
-                                    "$eq": [
-                                        "$number",
+                                    '$and': [
                                         {
-                                            "$toDouble": {
-                                                "$replaceAll": {
-                                                    "input": "$$phone_str",
-                                                    "find": " ",
-                                                    "replacement": ""
+                                            '$eq': [
+                                            '$number',
+                                            {
+                                                '$toDouble': {
+                                                '$replaceAll': {
+                                                    'input': '$$phone_str',
+                                                    'find': ' ',
+                                                    'replacement': ''
+                                                }
                                                 }
                                             }
+                                            ]
+                                        },
+                                        {
+                                            '$eq': ['$user_id', user_id]
                                         }
                                     ]
                                 },
@@ -779,6 +786,8 @@ class UniqueChatList(APIView):
                 }},
                 {"$sort": {"last_message_time": -1}}
             ]
+
+            print(f"pipeline: {pipeline}")
 
             chat_list_data = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
             chat_list = []
