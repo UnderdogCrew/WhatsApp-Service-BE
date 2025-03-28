@@ -780,6 +780,8 @@ class UniqueChatList(APIView):
                 {"$sort": {"last_message_time": -1}}
             ]
 
+            print(f"pipeline: {pipeline}")
+
             chat_list_data = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
             chat_list = []
             
