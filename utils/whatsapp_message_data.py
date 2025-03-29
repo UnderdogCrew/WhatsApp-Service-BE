@@ -135,11 +135,10 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         if user_id == "67e6a22d44e08602e5c1e91c":
             template_url = f"https://graph.facebook.com/v21.0/1156861725908077/message_templates?name={template_name}"
             API_TOKEN = GLAM_API_KEY
-            API_KEY = GLAM_API_KEY
         else:
             template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
         headers = {
-            'Authorization': f'Bearer {API_KEY}'
+            'Authorization': f'Bearer {API_TOKEN}'
         }
         template_response = requests.request("GET", template_url, headers=headers)
         print(f"template response: {template_response.status_code}")
