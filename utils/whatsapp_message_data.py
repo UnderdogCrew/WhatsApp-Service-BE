@@ -137,6 +137,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             API_TOKEN = GLAM_API_KEY
         else:
             template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
+            API_TOKEN = API_KEY
         headers = {
             'Authorization': f'Bearer {API_TOKEN}'
         }
