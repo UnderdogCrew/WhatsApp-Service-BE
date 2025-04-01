@@ -156,6 +156,7 @@ class SendMessage(APIView):
                 API_KEY = GLAM_API_KEY
             else:
                 template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
+                API_KEY = API_TOKEN
             
             print(f"API_KEY: {API_KEY}")
             print(template_url)
