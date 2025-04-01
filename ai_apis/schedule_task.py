@@ -4,6 +4,7 @@ from utils.whatsapp_message_data import send_message_data
 import threading
 import datetime
 from bson import ObjectId
+import calendar
 
 
 def schedule_message(file_path, user_id, image_url, template_name, text):
@@ -23,7 +24,7 @@ def schedule_message(file_path, user_id, image_url, template_name, text):
 
             ## we need to add the numbers and name as a customer
             customer_details = {
-                "number": row_data['number'],
+                "number": int(row_data['number']),
                 "name": row_data['name'],
                 "user_id": user_id,
                 "insurance_type": row_data['insurance_type'] if "insurance_type" in row_data else "",
@@ -36,7 +37,7 @@ def schedule_message(file_path, user_id, image_url, template_name, text):
                 "created_at": datetime.datetime.now()
             }
             customer_query = {
-                "number": row_data['number'],
+                "number": int(row_data['number']),
                 "status": 1,
                 "user_id": user_id
             }
@@ -60,8 +61,24 @@ def schedule_message(file_path, user_id, image_url, template_name, text):
             # Insert the current entry into MongoDB
             db.create_document('whatsapp_schedule_message', entry)
 
-            send_message_thread = threading.Thread(target=send_message_data, args=(row_data['number'], template_name, text, image_url, user_id, entry,  ),)
-            send_message_thread.start()
+            start_date = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            currnt_month = start_date.month
+            current_month = start_date.month
+            current_year = start_date.year
+
+            # Get the last day of the current month
+            last_day = calendar.monthrange(current_year, current_month)[1]
+
+            # Construct the last datetime of the month
+            end_of_month = datetime.datetime(current_year, current_month, last_day, 23, 59, 59)
+            date_to_check = entry['date']
+            # print(entry['date'])
+            if isinstance(date_to_check, str):
+                date_to_check = datetime.datetime.strptime(date_to_check, "%Y-%m-%d %H:%M:%S")
+
+            if start_date <= date_to_check <= end_of_month:
+                send_message_thread = threading.Thread(target=send_message_data, args=(row_data['number'], template_name, text, image_url, user_id, entry,  ),)
+                send_message_thread.start()
 
 
         print("All data entries inserted successfully.")
