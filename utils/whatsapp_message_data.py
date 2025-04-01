@@ -189,7 +189,10 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             if "date" in entry:
                 # Convert date to string format if it's a datetime object
                 if isinstance(entry['date'], datetime.datetime):
-                    date = entry['date'].strftime("%Y-%m-%d %H:%M:%S")  # Convert to string
+                    try:
+                        date = entry['date'].strftime("%d-%m-%Y")  # Convert to string
+                    except:
+                        date = entry['date']
                 else:
                     date = entry['date']  # Assume it's already a string
         
