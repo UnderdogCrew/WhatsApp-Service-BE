@@ -42,7 +42,13 @@ def schedule_message(file_path, user_id, image_url, template_name, text):
                     "status": 1,
                     "user_id": user_id
                 }
+                schedule_message_query = {
+                    "number": int(row_data['number']),
+                    "reg_number": row_data['reg_number'],
+                    "user_id": user_id
+                }
                 customer_data = db.find_document(collection_name='customers', query=customer_query)
+                schedule_data = db.find_document(collection_name="whatsapp_schedule_message", query=schedule_message_query)
                 if customer_data is not None:
                     update_data = {
                         "name": row_data['name'],
@@ -59,8 +65,20 @@ def schedule_message(file_path, user_id, image_url, template_name, text):
 
                 entry = row_data
 
-                # Insert the current entry into MongoDB
-                db.create_document('whatsapp_schedule_message', entry)
+                if schedule_data is not None:
+                    schedule_update_data = {
+                        "name": entry['name'],
+                        "insurance_type": entry['insurance_type'] if "insurance_type" in entry else "",
+                        "model": entry['model'] if "model" in entry else "",
+                        "reg_number": entry['reg_number'] if "reg_number" in entry else "",
+                        "policy_type": entry['policy_type'] if "policy_type" in entry else "",
+                        "company_name": entry['company_name'] if "company_name" in entry else "",
+                        "date": entry['date'] if "date" in entry else "",
+                    }
+                    db.update_document(collection_name="whatsapp_schedule_message", query={"_id": ObjectId(schedule_data['_id'])}, update_data=schedule_update_data)
+                else:
+                    # Insert the current entry into MongoDB
+                    db.create_document('whatsapp_schedule_message', entry)
 
                 start_date = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
                 currnt_month = start_date.month
@@ -77,9 +95,9 @@ def schedule_message(file_path, user_id, image_url, template_name, text):
                 if isinstance(date_to_check, str):
                     date_to_check = datetime.datetime.strptime(date_to_check, "%Y-%m-%d %H:%M:%S")
 
-                # if start_date <= date_to_check <= end_of_month:
-                #     send_message_thread = threading.Thread(target=send_message_data, args=(row_data['number'], template_name, text, image_url, user_id, entry,  ),)
-                #     send_message_thread.start()
+                if start_date <= date_to_check <= end_of_month:
+                    send_message_thread = threading.Thread(target=send_message_data, args=(row_data['number'], template_name, text, image_url, user_id, entry,  ),)
+                    send_message_thread.start()
             except:
                 pass
 
