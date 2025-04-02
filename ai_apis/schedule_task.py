@@ -81,7 +81,6 @@ def schedule_message(file_path, user_id, image_url, template_name, text):
                     db.create_document('whatsapp_schedule_message', entry)
 
                 start_date = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-                currnt_month = start_date.month
                 current_month = start_date.month
                 current_year = start_date.year
 
