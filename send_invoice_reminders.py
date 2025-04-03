@@ -21,6 +21,23 @@ def send_invoice_reminders():
         # Use UTC for consistency with MongoDB's ISODate
         utc_now = datetime.now(pytz.UTC)
         
+        # First, handle overdue invoices and deactivate accounts
+        overdue_invoices = db.find_documents('invoices', {
+            "payment_status": "Pending",
+            "due_date": {"$lt": utc_now.replace(hour=0, minute=0, second=0, microsecond=0)}
+        })
+        
+        # Deactivate accounts with overdue invoices
+        for invoice in overdue_invoices:
+            user_id = invoice.get('user_id')
+            if user_id:
+                print(f"Deactivating account for user {user_id} due to overdue invoice {invoice.get('invoice_number')}")
+                db.update_document('users',
+                    {"_id": ObjectId(user_id)},
+                    {"is_active": False, "updated_at": utc_now}
+                )
+
+        # Continue with regular reminder logic
         # Define reminder days before due date
         reminder_days = {0, 1, 2}  # Send reminders on due date, 1 day before, 2 days before
         
@@ -58,7 +75,7 @@ def send_invoice_reminders():
 
             # Prepare message metadata
             metadata = {
-                "name": user.get('name', ''),
+                "name": user['first_name'] + " " + user['last_name'],
                 "amount": str(invoice['billing_details']['total_price']),
                 "due_date": due_date.strftime("%Y-%m-%d"),
             }
@@ -66,10 +83,11 @@ def send_invoice_reminders():
             # Select appropriate message template based on days until due
       
 
-            print(f"Sending to {user.get('name')} for invoice {invoice['invoice_number']}")
+            print(f"Sending to {metadata.get('name')} for invoice {invoice['invoice_number']}")
 
             # Send WhatsApp message
             user["phone_number"] = "7567828780"
+            print(f"send message to : {user.get('phone_number')}")
             send_message_data(
                 number=user.get('phone_number'),
                 template_name="invoice_template",
