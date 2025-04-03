@@ -6,7 +6,7 @@ from django.http import HttpResponse, JsonResponse
 import sys
 import requests
 import json
-from UnderdogCrew.settings import API_KEY, OPEN_AI_KEY
+from UnderdogCrew.settings import API_KEY, OPEN_AI_KEY, GLAM_API_KEY
 import pandas as pd
 import openai
 from rest_framework import status
@@ -36,6 +36,7 @@ whatsapp_status = {
     request: phone number to send the otp on number
 '''
 API_TOKEN = API_KEY
+GLAM_API_KEY = GLAM_API_KEY
 
 
 def process_components(components, msg_data, image_url):
@@ -132,7 +133,7 @@ class SendMessage(APIView):
                 print(f"user id: {user_id}")
             else:
                 return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
-            print(f"API_TOKEN: {API_TOKEN}")
+        
             request_data = request.data
             template_name = request_data.get("template_name", None)
             metadata = request_data.get("metadata", None)
@@ -149,8 +150,17 @@ class SendMessage(APIView):
                 return JsonResponse({"message": "Message type is missing"}, safe=False, status=422)
             if template_name is None:
                 return JsonResponse({"message": "Template name is missing"}, safe=False, status=422)
+            
+            if user_id == "67e6a22d44e08602e5c1e91c":
+                template_url = f"https://graph.facebook.com/v21.0/1156861725908077/message_templates?name={template_name}"
+                API_KEY = GLAM_API_KEY
+            else:
+                template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
+                API_KEY = API_TOKEN
+            
+            print(f"API_KEY: {API_KEY}")
+            print(template_url)
 
-            template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
             headers = {
                 'Authorization': f'Bearer {API_KEY}'
             }
@@ -219,11 +229,22 @@ class SendMessage(APIView):
                         "user_id": user_id,
                         "created_at": datetime.datetime.now()
                     }
+                    customer_number = msg_data['number']
+                    # try:
+                    if type(customer_number) != int:
+                        customer_number = customer_number.encode('ascii', 'ignore').decode()
+                        customer_number = int(customer_number)
+                    
+                    customer_details['number'] = customer_number
+
+                    # except:
+                    #     pass
                     customer_query = {
-                        "number": msg_data['number'],
+                        "number": customer_number,
                         "status": 1,
                         "user_id": user_id,
                     }
+                    print(f"customer query: {customer_query}")
                     customer_data = db.find_document(collection_name='customers', query=customer_query)
                     if customer_data is not None:
                         update_data = {
@@ -245,7 +266,7 @@ class SendMessage(APIView):
                         text=text,
                         image_url=image_url,
                         user_id=user_id,
-                        metadata=metadata
+                        metadata=msg_data
                     )
 
             elif message_type == 2:
@@ -313,6 +334,7 @@ class FacebookWebhook(APIView):
                                 "id": value['messages'][0]['id'],
                                 "message_status": "received",
                                 "created_at": datetime.datetime.now(),
+                                "updated_at": datetime.datetime.now(),
                                 "template_name": "template_name",
                                 "code": 0,
                                 "title": "",
@@ -347,6 +369,7 @@ class FacebookWebhook(APIView):
                     {
                         'message_status': statuses[0]['status'], 
                         f"{statuses[0]['status']}_at": int(statuses[0]['timestamp']),
+                        "updated_at": datetime.datetime.now(),
                         "code": code,
                         "title": title,
                         "error_message": message,
@@ -759,6 +782,87 @@ class UserDashboard(APIView):
                     text_filter["created_at"] = {"$lte": end_date}
                     filters["created_at"] = {"$lte": end_date}
                     user_query['created_at'] = {"$lte": end_date}
+
+            
+            ## we need to add the chart data
+            chart_query = {
+                "user_id": user_id,
+                "sent_at": { "$gt": 0 } # Optional safeguard for sent_at
+            }
+            if start_date and end_date:
+                chart_query['created_at'] = {
+                    "$gte": start_date,
+                    "$lt": end_date
+                }
+
+            pipeline = [
+                {
+                    "$match": chart_query
+                },
+                {
+                    "$addFields": {
+                    "sent_date": {
+                        "$dateToString": {
+                        "format": "%d/%m/%Y",
+                        "date": { "$toDate": { "$multiply": ["$sent_at", 1000] } }
+                        }
+                    }
+                    }
+                },
+                {
+                    "$group": {
+                    "_id": "$sent_date",
+                    "sent": { "$sum": 1 },
+                    "delivered": {
+                        "$sum": {
+                        "$cond": [{ "$gt": ["$delivered_at", 0] }, 1, 0]
+                        }
+                    },
+                    "read": {
+                        "$sum": {
+                        "$cond": [{ "$gt": ["$read_at", 0] }, 1, 0]
+                        }
+                    }
+                    }
+                },
+                {
+                    "$project": {
+                    "_id": 0,
+                    "date": "$_id",
+                    "sent": 1,
+                    "delivered": 1,
+                    "read": 1
+                    }
+                },
+                {
+                    "$sort": {
+                    "date": 1
+                    }
+                }
+            ]
+
+            mongo_result = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
+            # Convert the result to a dictionary for quick lookup
+            result_map = {item['date']: item for item in mongo_result}
+            # Generate all dates between start and end
+            if start_date and end_date:
+                current_date = start_date
+                final_result = []
+
+                while current_date <= end_date:
+                    formatted_date = current_date.strftime("%d/%m/%Y")
+                    if formatted_date in result_map:
+                        final_result.append(result_map[formatted_date])
+                    else:
+                        final_result.append({
+                            "date": formatted_date,
+                            "read": 0,
+                            "delivered": 0,
+                            "sent": 0
+                        })
+                    current_date += datetime.timedelta(days=1)
+            else:
+                final_result = mongo_result
             
             dollar_price = current_dollar_price()
             # Build filter conditions
@@ -808,6 +912,9 @@ class UserDashboard(APIView):
                 "final_price": f"₹{round(total_price_with_tax, 2)}",
                 "cgst": f"₹{round(cgst, 2)}",
                 "sgst": f"₹{round(sgst, 2)}",
+                "charts": {
+                    "linechart": final_result
+                }
             }
 
             return JsonResponse(response_data, status=status.HTTP_200_OK)
@@ -1158,6 +1265,7 @@ class WhatsAppMessage(APIView):
                     "id": response.json()['messages'][0]["id"],
                     "message_status": "sent",
                     "created_at": datetime.datetime.now(),
+                    "updated_at": datetime.datetime.now(),
                     "template_name": "manual"
                 }
                 db.create_document('whatsapp_message_logs', whatsapp_status_logs)
@@ -1170,6 +1278,7 @@ class WhatsAppMessage(APIView):
                     "id": "",
                     "message_status": "error",
                     "created_at": datetime.datetime.now(),
+                    "updated_at": datetime.datetime.now(),
                     "template_name": "manual",
                     "code": response.json()['error']['code'],
                     "title": response.json()['error']['type'],

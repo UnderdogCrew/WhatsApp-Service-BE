@@ -362,15 +362,19 @@ class WebhookView(APIView):
                         }
                     )
                     print(subscription)
-
             elif event == "payment.captured":
-                email = payload.get("payload", {}).get("payment", {}).get("entity", {}).get("notes", {}).get("email")
-                invoice_id = payload.get("payload", {}).get("payment", {}).get("entity", {}).get("notes", {}).get("invoice_id")
-                if email:
-                    db.update_document('invoices',
-                        {'invoice_number': invoice_id},
-                        {'payment_status': 'Paid', 'updated_at': datetime.now(timezone.utc)}
-                    )
+                payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
+                notes = payment_entity.get("notes", {})
+                
+                # Handle both dict and list cases for notes
+                if notes and isinstance(notes, dict):
+                    email = notes.get("email")
+                    invoice_id = notes.get("invoice_id")
+                    if email and invoice_id:
+                        db.update_document('invoices',
+                            {'invoice_number': invoice_id},
+                            {'payment_status': 'Paid', 'updated_at': datetime.now(timezone.utc)}
+                        )
 
             return Response({"status": "success"})
             

@@ -20,6 +20,7 @@ class MongoDB:
 
     def __new__(cls):
         if cls._instance is None:
+            print(f"MONGODB_ATLAS_CLUSTER_URI:{settings.MONGODB_ATLAS_CLUSTER_URI}")
             cls._instance = super(MongoDB, cls).__new__(cls)
             cls._instance.client = MongoClient(settings.MONGODB_ATLAS_CLUSTER_URI)
             cls._instance.db = cls._instance.client[settings.MONGODB_NAME]
@@ -61,3 +62,18 @@ class MongoDB:
         collection = self.get_collection(collection_name)
         update_data['updated_at'] = datetime.utcnow()
         return collection.update_one(query, {'$set': update_data})
+
+    def aggregate(self, collection_name, pipeline):
+        """
+        Perform aggregation operations on a collection.
+        
+        Args:
+            collection_name (str): Name of the collection
+            pipeline (list): List of aggregation pipeline stages
+            
+        Returns:
+            list: Result of the aggregation pipeline
+        """
+        collection = self.get_collection(collection_name)
+        # Convert cursor to list to get actual results
+        return list(collection.aggregate(pipeline))

@@ -17,6 +17,26 @@ from django.conf import settings
 import pytz
 
 
+def format_date(date_str, date_format="%d/%m/%Y"):
+    # Convert string to date object
+    if isinstance(date_str, str):
+        given_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").date()
+    elif isinstance(date_str, datetime):
+        given_date = date_str.date()
+    
+    today = datetime.today().date()
+    # Calculate the difference in days
+    delta_days = (today - given_date).days
+
+    if delta_days == 0:
+        return date_str.strftime("%H:%M")  # Weekday name (Monday, Tuesday, etc.)
+    elif delta_days == 1:
+        return "Yesterday"
+    elif 2 <= delta_days <= 7:
+        return given_date.strftime("%A")  # Weekday name (Monday, Tuesday, etc.)
+    else:
+        return given_date.strftime(date_format)  # Default format dd/mm/yyyy
+
 
 # Function to check phone number and country code
 def check_phone_number(data, phone_number, country_code):
@@ -208,7 +228,8 @@ class WhatsAppTemplateView(APIView):
             # Call Facebook Graph API
             url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates"
             headers = {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {API_KEY}'
             }
 
             fb_response = requests.post(
@@ -557,32 +578,44 @@ class CustomersChatLogs(APIView):
 
             customer_details = db.find_document(collection_name="customers", query=customer_query)
 
-            if customer_details is None:
-                return JsonResponse({"message": "Number is invalid"}, status=422)
+            # if customer_details is None:
+            #     return JsonResponse({"message": "Number is invalid"}, status=422)
 
             customer_chat_data = db.find_documents(collection_name="whatsapp_message_logs", query=query_filter, sort=sort_order)
             for _customer in customer_chat_data:
-                if _customer['message_status'] in ['read', 'delivered', 'sent', 'error']:
+                if _customer['message_status'] in ['read', 'delivered', 'sent', 'error', 'failed']:
                     msg_type = 1
                 else:
                     msg_type = 2
+
+                def convert_to_ist(timestamp):
+                    if timestamp is None:
+                        return None
+                    # If timestamp is an integer (Unix timestamp)
+                    if isinstance(timestamp, (int, float)):
+                        timestamp = datetime.fromtimestamp(timestamp, pytz.UTC)
+                    # If timestamp doesn't have timezone info, assume UTC
+                    elif isinstance(timestamp, datetime) and timestamp.tzinfo is None:
+                        timestamp = pytz.UTC.localize(timestamp)
+                    # Convert to IST
+                    return timestamp.astimezone(pytz.timezone('Asia/Kolkata'))
 
                 customer_chat_details.append(
                     {
                         "number": _customer['number'],
                         "message": _customer['message'],
-                        "created_at": _customer['created_at'],
-                        "updated_at": _customer['updated_at'] if "updated_at" in _customer else None,
-                        "sent_at": _customer['sent_at'] if "sent_at" in _customer else None,
-                        "read_at": _customer['read_at'] if "read_at" in _customer else None,
+                        "created_at": convert_to_ist(_customer.get('created_at')),
+                        "updated_at": convert_to_ist(_customer.get('updated_at')),
+                        "sent_at": convert_to_ist(_customer.get('sent_at')),
+                        "read_at": convert_to_ist(_customer.get('read_at')),
                         "status": _customer['message_status'],
                         "msg_type": msg_type
                     }
                 )
 
             customers = {
-                "name": customer_details['name'],
-                "number": str(customer_details['number'])
+                "name": customer_details['name'] if customer_details is not None else f"{number}",
+                "number": str(customer_details['number']) if customer_details is not None else f"{number}"
             }
 
             if len(customer_chat_details) > 0:
@@ -597,6 +630,217 @@ class CustomersChatLogs(APIView):
                     'status': 'success',
                     'message': 'Customer not Found',
                     'data': customer_chat_details
+                }, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class UniqueChatList(APIView):
+
+    @swagger_auto_schema(
+        operation_description="Get the latest message for each unique user number, including customer names",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                'search',
+                openapi.IN_QUERY,
+                description="Searched text based on name",
+                type=openapi.TYPE_STRING,
+                required=False
+            )
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'chat_list': openapi.Schema(
+                        type=openapi.TYPE_ARRAY,
+                        items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                    )
+                }
+            )),
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def get(self, request, current_user_id=None, current_user_email=None):
+        try:
+            db = MongoDB()
+            token = request.headers.get('Authorization')
+
+            if not token or not token.startswith('Bearer '):
+                return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+            token = token.split(' ')[1]
+            user_info = decode_token(token)
+
+            if not isinstance(user_info, dict) or 'user_id' not in user_info:
+                return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+
+            user_id = user_info['user_id']
+            print(f"user_id: {user_id}")
+
+            match_query = {
+                "user_id": user_id,
+                "$expr": {
+                    "$eq": [{"$strLenCP": "$number"}, 12]
+                }
+            }
+
+            # Aggregation Query to Get Unique Numbers with Latest Messages and Join with Customers
+            search_text = request.query_params.get('search', '').strip()
+
+            pipeline = [
+                # First lookup customers to get matching names
+                {"$lookup": {
+                    "from": "customers",
+                    "let": { 
+                        "phone_str": {
+                            "$replaceAll": {
+                                "input": {"$substr": ["$number", 2, -1]},
+                                "find": " ",
+                                "replacement": ""
+                            }
+                        }
+                    },
+                    "pipeline": [
+                        {
+                            "$match": {
+                                "$expr": {
+                                    '$and': [
+                                        {
+                                            '$eq': [
+                                            '$number',
+                                            {
+                                                '$toDouble': {
+                                                '$replaceAll': {
+                                                    'input': '$$phone_str',
+                                                    'find': ' ',
+                                                    'replacement': ''
+                                                }
+                                                }
+                                            }
+                                            ]
+                                        },
+                                        {
+                                            '$eq': ['$user_id', user_id]
+                                        }
+                                    ]
+                                },
+                                **({'name': {'$regex': search_text, '$options': 'i'}} if search_text else {})
+                            }
+                        }
+                    ],
+                    "as": "customer_info"
+                }},
+                # Only keep messages that have matching customers if searching
+                {"$match": {
+                    **match_query,
+                    **({'customer_info': {'$ne': []}} if search_text else {})
+                }},
+                {"$sort": {"updated_at": -1}},
+                {"$group": {
+                    "_id": "$number",
+                    "last_message": {"$first": "$message"},
+                    "last_message_time": {"$first": "$updated_at"},
+                    "message_status": {"$first": "$message_status"},
+                    "template_name": {"$first": "$template_name"},
+                    "sent_at": {"$first": "$sent_at"},
+                    "delivered_at": {"$first": "$delivered_at"},
+                    "failed_at": {"$first": "$failed_at"},
+                    "customer_info": {"$first": "$customer_info"}
+                }},
+                {"$unwind": {
+                    "path": "$customer_info",
+                    "preserveNullAndEmptyArrays": True
+                }},
+                {"$project": {
+                    "profile_name": {"$ifNull": ["$customer_info.name", "$_id"]},
+                    "last_message": 1,
+                    "last_message_time": 1,
+                    "message_status": 1,
+                    "template_name": 1,
+                    "sent_at": 1,
+                    "delivered_at": 1,
+                    "failed_at": 1,
+                    "msg_type": {
+                        "$cond": {
+                            "if": {"$in": ["$message_status", ["read", "delivered", "sent", "error"]]},
+                            "then": 1,
+                            "else": 2
+                        }
+                    }
+                }},
+                {"$sort": {"last_message_time": -1}}
+            ]
+
+            print(f"pipeline: {pipeline}")
+
+            chat_list_data = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
+            chat_list = []
+            
+            # Add timezone conversion
+            ist_timezone = pytz.timezone('Asia/Kolkata')
+
+            for chat in chat_list_data:
+                msg_type = chat.get("msg_type", 2)
+                profile_name = chat.get("profile_name", "Unknown")
+                
+                # Convert last_message_time to IST
+                last_message_time = chat.get("last_message_time")
+                if last_message_time:
+                    if not last_message_time.tzinfo:
+                        # If timestamp is naive, assume it's UTC
+                        last_message_time = pytz.utc.localize(last_message_time)
+                    # Convert to IST
+                    last_message_time = last_message_time.astimezone(ist_timezone)
+
+                
+                changed_date = format_date(date_str=last_message_time)
+
+                
+                if profile_name is None or profile_name == "nan" or profile_name == "NaN" or profile_name == "":
+                    pass
+                else:
+                    chat_list.append({
+                        "number": chat.get("_id")[2:] if chat.get("_id") else "",
+                        "profile_name": profile_name,
+                        "last_message": chat.get("last_message", ""),
+                        "last_message_time": last_message_time,
+                        "date": changed_date,
+                        "status": chat.get("message_status", ""),
+                        "template_name": chat.get("template_name", ""),
+                        "sent_at": chat.get("sent_at"),
+                        "delivered_at": chat.get("delivered_at"),
+                        "unread_count": 0 if msg_type == 1 else 1,
+                        "failed_at": chat.get("failed_at"),
+                        "msg_type": chat.get("msg_type", 2)  # Default to 2 if not found
+                    })
+
+            if len(chat_list) > 0:
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'Unique chat list retrieved successfully',
+                    'chat_list': chat_list
+                }, status=status.HTTP_200_OK)
+            else:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Unique chat list not found',
+                    'chat_list': []
                 }, status=status.HTTP_404_NOT_FOUND)
 
         except Exception as e:

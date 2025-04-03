@@ -2,13 +2,15 @@ import json
 from utils.database import MongoDB
 import requests
 import datetime
-from UnderdogCrew.settings import API_KEY, OPEN_AI_KEY
+from UnderdogCrew.settings import API_KEY, OPEN_AI_KEY, GLAM_API_KEY
 import traceback
 import pandas as pd
 import os
 import sys
 import django
 from bson import ObjectId
+import time
+
 current_path = os.path.abspath(os.getcwd())
 base_path = os.path.dirname(current_path)  # This will give you /opt/whatsapp_service/WhatsApp-Service-BE
 print(f"base_path: {base_path}")
@@ -33,18 +35,19 @@ def process_components(components, msg_data, image_url):
     for component in components:
         if component['type'].upper() == "HEADER" and component.get('format') == "IMAGE":
             # Process HEADER with type IMAGE
-            header_entry = {
-                "type": "header",
-                "parameters": [
-                    {
-                        "type": "image",
-                        "image": {
-                            "link": image_url
+            if image_url != "":
+                header_entry = {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "image",
+                            "image": {
+                                "link": image_url
+                            }
                         }
-                    }
-                ]
-            }
-            result_list.append(header_entry)
+                    ]
+                }
+                result_list.append(header_entry)
 
         elif component['type'].upper() == "BODY":
             # Check for body_text_named_params
@@ -87,6 +90,7 @@ def process_components(components, msg_data, image_url):
                     "parameters": body_parameters
                 }
                 result_list.append(body_entry)
+            
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
             for buttons in component['buttons']:
@@ -94,18 +98,25 @@ def process_components(components, msg_data, image_url):
                 body_parameters = []
                 if buttons['type'] == "URL":
                     value = buttons.get("text", "")
-                    body_parameters.append({
-                        "type": "text",
-                        "text": "/billing"
-                    })
+                    if "example" in buttons:
+                        body_parameters.append({
+                            "type": "text",
+                            "text": "/billing"
+                        })
+                    else:
+                        body_parameters.append({
+                            "type": "text",
+                            "text": buttons['url']
+                        })
 
-                body_entry = {
-                    "type": "BUTTON",
-                    "sub_type": "url",
-                    "index": 0,
-                    "parameters": body_parameters
-                }
-                result_list.append(body_entry)
+                if "example" in buttons:
+                    body_entry = {
+                        "type": "BUTTON",
+                        "sub_type": "url",
+                        "index": 0,
+                        "parameters": body_parameters
+                    }
+                    result_list.append(body_entry)
 
     return result_list
 
@@ -121,9 +132,14 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             business_id = "450885871446042"
 
         url = f"https://graph.facebook.com/v19.0/{business_id}/messages"
-        template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
+        if user_id == "67e6a22d44e08602e5c1e91c":
+            template_url = f"https://graph.facebook.com/v21.0/1156861725908077/message_templates?name={template_name}"
+            API_TOKEN = GLAM_API_KEY
+        else:
+            template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
+            API_TOKEN = API_KEY
         headers = {
-            'Authorization': f'Bearer {API_KEY}'
+            'Authorization': f'Bearer {API_TOKEN}'
         }
         template_response = requests.request("GET", template_url, headers=headers)
         print(f"template response: {template_response.status_code}")
@@ -136,7 +152,11 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         # Check if there are any BUTTONS in the components
         has_buttons = any(component['type'].upper() == "BUTTONS" for component in template_components)
 
-        template_text = template_components[0]['text'] if "text" in template_components[0] else ""
+        template_text = ""
+        for components in template_components:
+            if components['type'] == "BODY":
+                template_text = components['text']
+        print(f"template_text: {template_text}")
         category = template_data['data'][0]['category']
         language = template_data['data'][0]['language']
 
@@ -169,7 +189,10 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             if "date" in entry:
                 # Convert date to string format if it's a datetime object
                 if isinstance(entry['date'], datetime.datetime):
-                    date = entry['date'].strftime("%Y-%m-%d %H:%M:%S")  # Convert to string
+                    try:
+                        date = entry['date'].strftime("%d-%m-%Y")  # Convert to string
+                    except:
+                        date = entry['date']
                 else:
                     date = entry['date']  # Assume it's already a string
         
@@ -193,32 +216,10 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             template_text = template_text.replace("{{", "{")
             template_text = template_text.replace("}}", "}")
             template_text = template_text.format(**msg_details)
+        
+        print(f"template text: {template_text}")
 
         components = process_components(template_components, msg_details, image_url)
-        print(f"components: {template_text}")
-        # if has_buttons:
-        #     payload = json.dumps(
-        #         {
-        #             "messaging_product": "whatsapp",
-        #             "recipient_type": "individual",
-        #             "to": f"91{number}",
-        #             "type": "interactive",
-        #             "interactive": {
-        #                 "type": "cta_url",
-        #                 "body": {
-        #                     "text": template_text
-        #                 },
-        #                 "action": {
-        #                     "name": "cta_url",
-        #                     "parameters": {
-        #                         "display_text": "Review and Pay",
-        #                         "url": "https://wapnexus.netlify.app/"
-        #                     }
-        #                 }
-        #             }
-        #         }
-        #     )
-        # else:
         payload = json.dumps({
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
@@ -238,8 +239,12 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             'Content-Type': 'application/json'
         }
         print(f"Sending bulk message payload: {payload}")
+        
+        if category != "UTILITY":
+            time.sleep(7)
+        
         response = requests.post(url, headers=headers, data=payload)
-        print(response.json())
+        print(f"Meta response: {response.status_code}")
         if response.status_code == 200:
             whatsapp_status_logs = {
                 "number": f"91{number}",
@@ -249,6 +254,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
                 "id": response.json()['messages'][0]["id"],
                 "message_status": response.json()['messages'][0]["message_status"] if "message_status" in response.json()['messages'][0] else "sent",
                 "created_at": datetime.datetime.now(),
+                "updated_at": datetime.datetime.now(),
                 "template_name": template_name
             }
             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
@@ -261,6 +267,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
                 "id": "",
                 "message_status": "error",
                 "created_at": datetime.datetime.now(),
+                "updated_at": datetime.datetime.now(),
                 "template_name": template_name,
                 "code": response.json()['error']['code'],
                 "title": response.json()['error']['type'],
