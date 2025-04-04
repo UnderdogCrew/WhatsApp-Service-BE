@@ -96,7 +96,9 @@ class SignupView(APIView):
                 'business_id': validated_data.get('business_id', ''),
                 'default_credit': 1000,
                 'is_email_verified': False,
-                'account_id': account_id  
+                'status': 'active',
+                'is_active': True,
+                'account_id': account_id
             }
 
             user_id = db.create_document('users', user_data)
@@ -115,7 +117,9 @@ class SignupView(APIView):
                         'last_name': validated_data['last_name'],
                         'business_id': user_data['business_id'],
                         'is_email_verified': user_data['is_email_verified'] if "is_email_verified" in user_data else False,
-                        'account_id': user_data['account_id']
+                        'account_id': user_data['account_id'],
+                        'status': user_data['status'],
+                        'is_active': user_data['is_active']
                     },
                     'tokens': {
                         'access': access_token,
@@ -174,11 +178,6 @@ class LoginView(APIView):
             db = MongoDB()
             user = db.find_document('users', {'email': validated_data['email']})
 
-            if user and user['is_active'] == False if "is_active" in user else True:
-                return JsonResponse({
-                    'message': 'Your account is deactived due to security reasons. Please contact support to activate your account'
-                }, status=status.HTTP_401_UNAUTHORIZED)
-
             if user and check_password(validated_data['password'], user['password']):
                 access_token, refresh_token = generate_tokens(str(user['_id']), validated_data['email'])
                 
@@ -201,7 +200,8 @@ class LoginView(APIView):
                             'first_name': user['first_name'],
                             'last_name': user['last_name'],
                             'is_email_verified': user.get('is_email_verified', False),
-                            'account_id': user.get('account_id', '')
+                            'account_id': user.get('account_id', ''),
+                            'is_active': user.get('is_active', True)
                         },
                         'tokens': {
                             'access': access_token,
