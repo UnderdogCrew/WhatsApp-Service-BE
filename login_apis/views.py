@@ -174,6 +174,11 @@ class LoginView(APIView):
             db = MongoDB()
             user = db.find_document('users', {'email': validated_data['email']})
 
+            if user and user['is_active'] == False if "is_active" in user else True:
+                return JsonResponse({
+                    'message': 'Your account is deactived due to security reasons. Please contact support to activate your account'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+
             if user and check_password(validated_data['password'], user['password']):
                 access_token, refresh_token = generate_tokens(str(user['_id']), validated_data['email'])
                 
