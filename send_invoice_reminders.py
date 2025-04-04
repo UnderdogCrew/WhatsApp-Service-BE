@@ -26,6 +26,8 @@ def send_invoice_reminders():
             "payment_status": "Pending",
             "due_date": {"$lt": utc_now.replace(hour=0, minute=0, second=0, microsecond=0)}
         })
+
+        print(f"Found {len(list(overdue_invoices))} overdue invoices")
         
         # Deactivate accounts with overdue invoices
         for invoice in overdue_invoices:
@@ -85,12 +87,16 @@ def send_invoice_reminders():
 
             print(f"Sending to {metadata.get('name')} for invoice {invoice['invoice_number']}")
 
-            # Send WhatsApp message
-            user["phone_number"] = "7567828780"
-            print(f"send message to : {user.get('phone_number')}")
+            # Clean phone number by removing country code
+            phone_number = user.get('phone_number', '')
+            if phone_number.startswith('+'):
+                phone_number = phone_number[3:]  # Remove '+91' or other country codes
+            elif phone_number.startswith('91'):
+                phone_number = phone_number[2:]  # Remove '91'
+            
             send_message_data(
-                number=user.get('phone_number'),
-                template_name="invoice_template",
+                number=phone_number,
+                template_name="invoice",
                 text="",
                 image_url="",
                 user_id=str(user['_id']),
