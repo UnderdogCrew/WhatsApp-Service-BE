@@ -38,9 +38,9 @@ class MongoDB:
         result = collection.insert_one(document)
         return str(result.inserted_id)
 
-    def find_document(self, collection_name, query):
+    def find_document(self, collection_name, query, projection=None):
         collection = self.get_collection(collection_name)
-        return collection.find_one(query)
+        return collection.find_one(query, projection)
 
     def find_documents(self, collection_name, query, sort=None, skip=None, limit=None, projection=None):
         collection = self.get_collection(collection_name)
