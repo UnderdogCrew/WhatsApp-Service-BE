@@ -74,4 +74,5 @@ urlpatterns = [
     path('chat/history', whatsapp_apis.CustomersChatLogs.as_view(), name='customerchatlogs'),
     path('chat/list', whatsapp_apis.UniqueChatList.as_view(), name='UniqueChatList'),
     path('messages', views.WhatsAppMessage.as_view(), name='messages'),
+    path('user/status', login_service.UserStatusView.as_view(), name='user-status'),
 ]

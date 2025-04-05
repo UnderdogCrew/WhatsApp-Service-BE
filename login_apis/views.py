@@ -96,7 +96,9 @@ class SignupView(APIView):
                 'business_id': validated_data.get('business_id', ''),
                 'default_credit': 1000,
                 'is_email_verified': False,
-                'account_id': account_id  
+                'status': 'active',
+                'is_active': True,
+                'account_id': account_id
             }
 
             user_id = db.create_document('users', user_data)
@@ -115,7 +117,9 @@ class SignupView(APIView):
                         'last_name': validated_data['last_name'],
                         'business_id': user_data['business_id'],
                         'is_email_verified': user_data['is_email_verified'] if "is_email_verified" in user_data else False,
-                        'account_id': user_data['account_id']
+                        'account_id': user_data['account_id'],
+                        'status': user_data['status'],
+                        'is_active': user_data['is_active']
                     },
                     'tokens': {
                         'access': access_token,
@@ -174,11 +178,6 @@ class LoginView(APIView):
             db = MongoDB()
             user = db.find_document('users', {'email': validated_data['email']})
 
-            if user and user['is_active'] == False if "is_active" in user else True:
-                return JsonResponse({
-                    'message': 'Your account is deactived due to security reasons. Please contact support to activate your account'
-                }, status=status.HTTP_401_UNAUTHORIZED)
-
             if user and check_password(validated_data['password'], user['password']):
                 access_token, refresh_token = generate_tokens(str(user['_id']), validated_data['email'])
                 
@@ -201,7 +200,8 @@ class LoginView(APIView):
                             'first_name': user['first_name'],
                             'last_name': user['last_name'],
                             'is_email_verified': user.get('is_email_verified', False),
-                            'account_id': user.get('account_id', '')
+                            'account_id': user.get('account_id', ''),
+                            'is_active': user.get('is_active', True)
                         },
                         'tokens': {
                             'access': access_token,
@@ -1103,3 +1103,99 @@ class UserBillingAPIView(APIView):
             "invoice_number": invoices[0].get('invoice_number') if invoices else "",
             "account_id": account_id
         }, status=status.HTTP_200_OK)
+
+class UserStatusView(APIView):
+    @swagger_auto_schema(
+        operation_description="Get user's active status flags",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'has_active_plan': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            'pending_bills': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            'waba_active': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            'is_active': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            'account_id': openapi.Schema(type=openapi.TYPE_STRING),
+                        }
+                    ),
+                }
+            )),
+            401: 'Unauthorized',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def get(self, request, current_user_id, current_user_email):
+        try:
+            db = MongoDB()
+            
+            # Get user details with specific field projection for performance
+            user = db.find_document(
+                'users', 
+                {'_id': ObjectId(current_user_id)},
+                projection={
+                    'is_active': 1,
+                    'account_id': 1,
+                    'whatsapp_business_details': 1
+                }
+            )
+            
+            if not user:
+                return JsonResponse({
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Check subscription status
+            subscription = db.find_document(
+                'subscriptions',
+                {
+                    'user_email': current_user_email,
+                    'status': 'active',
+                    'has_access': True
+                },
+                projection={'_id': 1}
+            )
+
+            # Check for pending bills
+            pending_invoice = db.find_document(
+                'invoices',
+                {
+                    'user_id': current_user_id,
+                    'payment_status': 'Pending'
+                },
+                projection={'_id': 1}
+            )
+
+            # Prepare response data
+            response_data = {
+                'has_active_plan': bool(subscription),
+                'pending_bills': bool(pending_invoice),
+                'waba_active': bool(user.get('whatsapp_business_details', {}).get('verified', False)),
+                'is_active': user.get('is_active', True),
+                'account_id': user.get('account_id', '')
+            }
+
+            return JsonResponse({
+                'status': 'success',
+                'data': response_data
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
