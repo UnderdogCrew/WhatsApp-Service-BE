@@ -294,7 +294,7 @@ class PlansView(APIView):
 
 class WebhookView(APIView):
     def post(self, request):
-        # try:
+        try:
             # Get the webhook signature from headers
             webhook_signature = request.headers.get('X-Razorpay-Signature')
             if not webhook_signature:
@@ -375,11 +375,13 @@ class WebhookView(APIView):
                             {'invoice_number': invoice_id},
                             {'payment_status': 'Paid', 'updated_at': datetime.now(timezone.utc)}
                         )
-
+                        db.update_document('users',
+                            {'email': email},
+                            {'is_active': True, 'updated_at': datetime.now(timezone.utc)}
+                        )
             return Response({"status": "success"})
-            
-        # except Exception as e:
-        #     return Response(
-        #         {"error": f"Failed to process webhook: {str(e)}"},
-        #         status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        #     )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to process webhook: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
