@@ -88,12 +88,12 @@ def send_invoice_reminders():
             print(f"Sending to {metadata.get('name')} for invoice {invoice['invoice_number']}")
 
             # Clean phone number by removing country code
-            phone_number = user.get('phone_number', '')
+            phone_number = user.get('business_number', '')
             if phone_number.startswith('+'):
                 phone_number = phone_number[3:]  # Remove '+91' or other country codes
             elif phone_number.startswith('91'):
                 phone_number = phone_number[2:]  # Remove '91'
-            
+            print("business_number", phone_number)
             send_message_data(
                 number=phone_number,
                 template_name="invoice",
