@@ -20,7 +20,6 @@ class MongoDB:
 
     def __new__(cls):
         if cls._instance is None:
-            print(f"MONGODB_ATLAS_CLUSTER_URI:{settings.MONGODB_ATLAS_CLUSTER_URI}")
             cls._instance = super(MongoDB, cls).__new__(cls)
             cls._instance.client = MongoClient(settings.MONGODB_ATLAS_CLUSTER_URI)
             cls._instance.db = cls._instance.client[settings.MONGODB_NAME]
