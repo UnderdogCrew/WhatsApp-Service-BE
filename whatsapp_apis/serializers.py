@@ -7,8 +7,12 @@ class VerifyBusinessPhoneNumberSerializer(serializers.Serializer):
 
 
 class ButtonSerializer(serializers.Serializer):
-    type = serializers.ChoiceField(choices=['QUICK_REPLY'], required=True)
+    type = serializers.ChoiceField(choices=['QUICK_REPLY','COPY_CODE','PHONE_NUMBER','URL'], required=True)
     text = serializers.CharField(required=True)
+    phone_number = serializers.CharField(required=False)
+    url = serializers.CharField(required=False)
+    copy_code = serializers.CharField(required=False)
+    example = serializers.CharField(required=False)
 
 class ComponentSerializer(serializers.Serializer):
     type = serializers.ChoiceField(
