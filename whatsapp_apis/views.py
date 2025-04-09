@@ -1,20 +1,21 @@
 # Create your views here.
 from rest_framework.views import APIView
-from django.http import HttpResponse, JsonResponse
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.http import JsonResponse
 from whatsapp_apis.serializers import VerifyBusinessPhoneNumberSerializer, WhatsAppTemplateSerializer
 import sys
 import requests
 from utils.database import MongoDB
 from utils.auth import token_required, decode_token
-from UnderdogCrew.settings import API_KEY
+from UnderdogCrew.settings import API_KEY, FACEBOOK_APP_ID, WABA_ID
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from datetime import datetime, timezone
-from UnderdogCrew.settings import WABA_ID
 from bson.objectid import ObjectId
-from django.conf import settings
 import pytz
+
+
 
 
 def format_date(date_str, date_format="%d/%m/%Y"):
@@ -842,6 +843,222 @@ class UniqueChatList(APIView):
                     'message': 'Unique chat list not found',
                     'chat_list': []
                 }, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class FacebookFileUploadView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+    
+    @swagger_auto_schema(
+        operation_description="Upload a file to Facebook for WhatsApp templates",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                'file',
+                openapi.IN_FORM,
+                description="File to upload",
+                type=openapi.TYPE_FILE,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'file_handle': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            400: 'Bad Request',
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def post(self, request, current_user_id, current_user_email):
+        try:
+            if 'file' not in request.FILES:
+                return JsonResponse({
+                    'message': 'No file provided'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            file = request.FILES['file']
+            
+            # Validate file type
+            allowed_types = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'video/mp4']
+            if file.content_type not in allowed_types:
+                return JsonResponse({
+                    'message': f'Invalid file type. Allowed types: {", ".join(allowed_types)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Step 1: Start upload session
+            session_response = requests.post(
+                f"https://graph.facebook.com/v22.0/{FACEBOOK_APP_ID}/uploads",
+                params={
+                    'access_token': API_KEY,
+                    'file_length': file.size,
+                    'file_type': file.content_type,
+                    'file_name': file.name
+                }
+            )
+
+            if session_response.status_code != 200:
+                return JsonResponse({
+                    'message': 'Failed to initiate upload session',
+                    'error': session_response.json()
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            upload_session_id = session_response.json()['id'].split(':')[1]
+
+            # Step 2: Upload the file
+            headers = {
+                'Authorization': f'OAuth {API_KEY}',
+                'file_offset': '0'
+            }
+
+            upload_response = requests.post(
+                f"https://graph.facebook.com/v22.0/upload:{upload_session_id}",
+                headers=headers,
+                data=file.read()
+            )
+
+            print(f"upload_response: {upload_response}")
+
+            if upload_response.status_code != 200:
+                return JsonResponse({
+                    'message': 'Failed to upload file',
+                    'error': upload_response.json()
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            file_handle = upload_response.json().get('h')
+
+            return JsonResponse({
+                'status': 'success',
+                'file_handle': file_handle,
+                'upload_session_id': upload_session_id
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        operation_description="Resume an interrupted file upload",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                'upload_session_id',
+                openapi.IN_QUERY,
+                description="Upload session ID",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                'file',
+                openapi.IN_FORM,
+                description="File to upload",
+                type=openapi.TYPE_FILE,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'file_handle': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            400: 'Bad Request',
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def put(self, request, current_user_id, current_user_email):
+        try:
+            upload_session_id = request.GET.get('upload_session_id')
+            if not upload_session_id:
+                return JsonResponse({
+                    'message': 'Upload session ID is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get current offset
+            offset_response = requests.get(
+                f"https://graph.facebook.com/v22.0/upload:{upload_session_id}",
+                headers={'Authorization': f' {API_KEY}'}
+            )
+
+            if offset_response.status_code != 200:
+                return JsonResponse({
+                    'message': 'Failed to get upload offset',
+                    'error': offset_response.json()
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            file_offset = offset_response.json().get('file_offset', 0)
+
+            # Resume upload
+            file = request.FILES.get('file')
+            if not file:
+                return JsonResponse({
+                    'message': 'No file provided'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Seek to the offset position
+            file.seek(file_offset)
+
+            headers = {
+                'Authorization': f'OAuth {API_KEY}',
+                'file_offset': str(file_offset)
+            }
+
+            upload_response = requests.post(
+                f"https://graph.facebook.com/v22.0/upload:{upload_session_id}",
+                headers=headers,
+                data=file.read()
+            )
+
+            if upload_response.status_code != 200:
+                return JsonResponse({
+                    'message': 'Failed to resume upload',
+                    'error': upload_response.json()
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            file_handle = upload_response.json().get('h')
+
+            # Update upload record in database
+            db = MongoDB()
+            db.update_document(
+                'facebook_uploads',
+                {'upload_session_id': upload_session_id},
+                {
+                    'file_handle': file_handle,
+                    'updated_at': datetime.now(timezone.utc),
+                    'status': 'completed'
+                }
+            )
+
+            return JsonResponse({
+                'status': 'success',
+                'file_handle': file_handle
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
             return JsonResponse({

@@ -3,7 +3,6 @@ import sys
 import django
 current_path = os.path.abspath(os.getcwd())
 base_path = os.path.dirname(current_path)  # This will give you /opt/whatsapp_service/WhatsApp-Service-BE
-print(f"base_path: {base_path}")
 
 # Set up Django environment
 sys.path.append(base_path)  # Adjust this path accordingly
@@ -20,7 +19,6 @@ class MongoDB:
 
     def __new__(cls):
         if cls._instance is None:
-            print(f"MONGODB_ATLAS_CLUSTER_URI:{settings.MONGODB_ATLAS_CLUSTER_URI}")
             cls._instance = super(MongoDB, cls).__new__(cls)
             cls._instance.client = MongoClient(settings.MONGODB_ATLAS_CLUSTER_URI)
             cls._instance.db = cls._instance.client[settings.MONGODB_NAME]

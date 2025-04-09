@@ -75,4 +75,5 @@ urlpatterns = [
     path('chat/list', whatsapp_apis.UniqueChatList.as_view(), name='UniqueChatList'),
     path('messages', views.WhatsAppMessage.as_view(), name='messages'),
     path('user/status', login_service.UserStatusView.as_view(), name='user-status'),
+    path('whatsapp/upload-file/', whatsapp_apis.FacebookFileUploadView.as_view(), name='facebook-file-upload'),
 ]
