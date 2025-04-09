@@ -3,7 +3,6 @@ import sys
 import django
 current_path = os.path.abspath(os.getcwd())
 base_path = os.path.dirname(current_path)  # This will give you /opt/whatsapp_service/WhatsApp-Service-BE
-print(f"base_path: {base_path}")
 
 # Set up Django environment
 sys.path.append(base_path)  # Adjust this path accordingly
