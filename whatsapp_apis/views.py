@@ -895,7 +895,7 @@ class FacebookFileUploadView(APIView):
             file = request.FILES['file']
             
             # Validate file type
-            allowed_types = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
+            allowed_types = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'video/mp4']
             if file.content_type not in allowed_types:
                 return JsonResponse({
                     'message': f'Invalid file type. Allowed types: {", ".join(allowed_types)}'
@@ -942,22 +942,10 @@ class FacebookFileUploadView(APIView):
 
             file_handle = upload_response.json().get('h')
 
-            # # Store upload details in database for future reference
-            # db = MongoDB()
-            # upload_record = {
-            #     'user_id': current_user_id,
-            #     'file_name': file.name,
-            #     'file_type': file.content_type,
-            #     'file_size': file.size,
-            #     'file_handle': file_handle,
-            #     'upload_session_id': upload_session_id,
-            #     'created_at': datetime.now(timezone.utc)
-            # }
-            # db.create_document('facebook_uploads', upload_record)
-
             return JsonResponse({
                 'status': 'success',
-                'file_handle': file_handle
+                'file_handle': file_handle,
+                'upload_session_id': upload_session_id
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
