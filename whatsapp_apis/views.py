@@ -1,21 +1,21 @@
 # Create your views here.
 from rest_framework.views import APIView
-from django.http import HttpResponse, JsonResponse
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.http import JsonResponse
 from whatsapp_apis.serializers import VerifyBusinessPhoneNumberSerializer, WhatsAppTemplateSerializer
 import sys
 import requests
 from utils.database import MongoDB
 from utils.auth import token_required, decode_token
-from UnderdogCrew.settings import API_KEY
+from UnderdogCrew.settings import API_KEY, FACEBOOK_APP_ID, WABA_ID
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from datetime import datetime, timezone
-from UnderdogCrew.settings import WABA_ID
 from bson.objectid import ObjectId
-from django.conf import settings
 import pytz
-from rest_framework.parsers import MultiPartParser, FormParser
+
+
 
 
 def format_date(date_str, date_format="%d/%m/%Y"):
@@ -903,9 +903,9 @@ class FacebookFileUploadView(APIView):
 
             # Step 1: Start upload session
             session_response = requests.post(
-                f"https://graph.facebook.com/v22.0/939622984340328/uploads",
+                f"https://graph.facebook.com/v22.0/{FACEBOOK_APP_ID}/uploads",
                 params={
-                    'access_token': settings.API_KEY,
+                    'access_token': API_KEY,
                     'file_length': file.size,
                     'file_type': file.content_type,
                     'file_name': file.name
@@ -922,7 +922,7 @@ class FacebookFileUploadView(APIView):
 
             # Step 2: Upload the file
             headers = {
-                'Authorization': f'OAuth {settings.API_KEY}',
+                'Authorization': f'OAuth {API_KEY}',
                 'file_offset': '0'
             }
 
@@ -1003,7 +1003,7 @@ class FacebookFileUploadView(APIView):
             # Get current offset
             offset_response = requests.get(
                 f"https://graph.facebook.com/v22.0/upload:{upload_session_id}",
-                headers={'Authorization': f' {settings.API_KEY}'}
+                headers={'Authorization': f' {API_KEY}'}
             )
 
             if offset_response.status_code != 200:
@@ -1025,7 +1025,7 @@ class FacebookFileUploadView(APIView):
             file.seek(file_offset)
 
             headers = {
-                'Authorization': f'OAuth {settings.API_KEY}',
+                'Authorization': f'OAuth {API_KEY}',
                 'file_offset': str(file_offset)
             }
 
