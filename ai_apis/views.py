@@ -894,7 +894,7 @@ class UserDashboard(APIView):
             # Add CGST and SGST to total_price
             total_price_with_tax = total_price + cgst + sgst
 
-
+            print(f"query_filter: {query_filter}")
             # Fetch data from database
             total_message = len(db.find_documents("whatsapp_message_logs", query_filter))
             query_filter['status'] = "delivered"
