@@ -843,6 +843,8 @@ class UserDashboard(APIView):
                 }
             ]
 
+            print(f"pipeline: {pipeline}")
+
             mongo_result = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
             # Convert the result to a dictionary for quick lookup
             result_map = {item['date']: item for item in mongo_result}
