@@ -791,8 +791,8 @@ class UserDashboard(APIView):
             }
             if start_date and end_date:
                 chart_query['created_at'] = {
-                    "$gte": start_date,
-                    "$lte": end_date
+                    "$gte": start_date_gmt,
+                    "$lte": end_date_gmt
                 }
 
             print(f"chart query: {chart_query}")
