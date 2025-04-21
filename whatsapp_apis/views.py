@@ -1,21 +1,21 @@
 # Create your views here.
 from rest_framework.views import APIView
-from django.http import HttpResponse, JsonResponse
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.http import JsonResponse
 from whatsapp_apis.serializers import VerifyBusinessPhoneNumberSerializer, WhatsAppTemplateSerializer
 import sys
 import requests
 from utils.database import MongoDB
 from utils.auth import token_required, decode_token
-from UnderdogCrew.settings import API_KEY
+from UnderdogCrew.settings import API_KEY, FACEBOOK_APP_ID, WABA_ID
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from datetime import datetime, timezone
-from UnderdogCrew.settings import WABA_ID
 from bson.objectid import ObjectId
-from django.conf import settings
 import pytz
-from rest_framework.parsers import MultiPartParser, FormParser
+
+
 
 
 def format_date(date_str, date_format="%d/%m/%Y"):
@@ -895,7 +895,7 @@ class FacebookFileUploadView(APIView):
             file = request.FILES['file']
             
             # Validate file type
-            allowed_types = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
+            allowed_types = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'video/mp4']
             if file.content_type not in allowed_types:
                 return JsonResponse({
                     'message': f'Invalid file type. Allowed types: {", ".join(allowed_types)}'
@@ -903,9 +903,9 @@ class FacebookFileUploadView(APIView):
 
             # Step 1: Start upload session
             session_response = requests.post(
-                f"https://graph.facebook.com/v22.0/939622984340328/uploads",
+                f"https://graph.facebook.com/v22.0/{FACEBOOK_APP_ID}/uploads",
                 params={
-                    'access_token': settings.API_KEY,
+                    'access_token': API_KEY,
                     'file_length': file.size,
                     'file_type': file.content_type,
                     'file_name': file.name
@@ -922,7 +922,7 @@ class FacebookFileUploadView(APIView):
 
             # Step 2: Upload the file
             headers = {
-                'Authorization': f'OAuth {settings.API_KEY}',
+                'Authorization': f'OAuth {API_KEY}',
                 'file_offset': '0'
             }
 
@@ -942,22 +942,10 @@ class FacebookFileUploadView(APIView):
 
             file_handle = upload_response.json().get('h')
 
-            # # Store upload details in database for future reference
-            # db = MongoDB()
-            # upload_record = {
-            #     'user_id': current_user_id,
-            #     'file_name': file.name,
-            #     'file_type': file.content_type,
-            #     'file_size': file.size,
-            #     'file_handle': file_handle,
-            #     'upload_session_id': upload_session_id,
-            #     'created_at': datetime.now(timezone.utc)
-            # }
-            # db.create_document('facebook_uploads', upload_record)
-
             return JsonResponse({
                 'status': 'success',
-                'file_handle': file_handle
+                'file_handle': file_handle,
+                'upload_session_id': upload_session_id
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -1015,7 +1003,7 @@ class FacebookFileUploadView(APIView):
             # Get current offset
             offset_response = requests.get(
                 f"https://graph.facebook.com/v22.0/upload:{upload_session_id}",
-                headers={'Authorization': f' {settings.API_KEY}'}
+                headers={'Authorization': f' {API_KEY}'}
             )
 
             if offset_response.status_code != 200:
@@ -1037,7 +1025,7 @@ class FacebookFileUploadView(APIView):
             file.seek(file_offset)
 
             headers = {
-                'Authorization': f'OAuth {settings.API_KEY}',
+                'Authorization': f'OAuth {API_KEY}',
                 'file_offset': str(file_offset)
             }
 
