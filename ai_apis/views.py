@@ -795,6 +795,8 @@ class UserDashboard(APIView):
                     "$lt": end_date
                 }
 
+            print(f"chart query: {chart_query}")
+
             pipeline = [
                 {
                     "$match": chart_query
