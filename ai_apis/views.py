@@ -787,13 +787,16 @@ class UserDashboard(APIView):
             ## we need to add the chart data
             chart_query = {
                 "user_id": user_id,
-                "sent_at": { "$gt": 0 } # Optional safeguard for sent_at
+                # "sent_at": { "$gt": 0 } # Optional safeguard for sent_at
+                "message_status" : {"$nin": ["failed", "error"]}
             }
             if start_date and end_date:
                 chart_query['created_at'] = {
-                    "$gte": start_date,
-                    "$lt": end_date
+                    "$gte": start_date_gmt,
+                    "$lte": end_date_gmt
                 }
+
+            print(f"chart query: {chart_query}")
 
             pipeline = [
                 {
@@ -840,6 +843,8 @@ class UserDashboard(APIView):
                     }
                 }
             ]
+
+            print(f"pipeline: {pipeline}")
 
             mongo_result = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
             # Convert the result to a dictionary for quick lookup
@@ -890,7 +895,7 @@ class UserDashboard(APIView):
             # Add CGST and SGST to total_price
             total_price_with_tax = total_price + cgst + sgst
 
-
+            print(f"query_filter: {query_filter}")
             # Fetch data from database
             total_message = len(db.find_documents("whatsapp_message_logs", query_filter))
             query_filter['status'] = "delivered"
