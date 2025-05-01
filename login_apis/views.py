@@ -1170,7 +1170,11 @@ class UserStatusView(APIView):
                 projection={'_id': 1}
             )
 
-            # Check for pending bills
+            # Check for pending bills and date condition
+            today = datetime.now()
+            is_after_eighth = today.day >= 8
+            print(f"is_after_eighth: {is_after_eighth}")
+            
             pending_invoice = db.find_document(
                 'invoices',
                 {
@@ -1183,7 +1187,7 @@ class UserStatusView(APIView):
             # Prepare response data
             response_data = {
                 'has_active_plan': bool(subscription),
-                'pending_bills': bool(pending_invoice),
+                'pending_bills': bool(pending_invoice) if is_after_eighth else False,
                 'waba_active': bool(user.get('whatsapp_business_details', {}).get('verified', False)),
                 'is_active': user.get('is_active', True),
                 'account_id': user.get('account_id', '')
