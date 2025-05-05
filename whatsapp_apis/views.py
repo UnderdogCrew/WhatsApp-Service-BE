@@ -339,6 +339,82 @@ class WhatsAppTemplateView(APIView):
             return JsonResponse({
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+    @swagger_auto_schema(
+        operation_description="Delete a WhatsApp message template by ID",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                'template_name',
+                openapi.IN_QUERY,
+                description="Name of the template to delete",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            400: 'Bad Request',
+            401: 'Unauthorized',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def delete(self, request, current_user_id, current_user_email):
+        try:
+            template_name = request.query_params.get('template_name')
+            if not template_name:
+                return JsonResponse({
+                    'message': 'template_name is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            db = MongoDB()
+            
+            # Get user's WABA ID
+            user = db.find_document('users', {'_id': ObjectId(current_user_id)})
+            waba_id = user.get('waba_id', WABA_ID)
+
+            url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates?name={template_name}"
+
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {API_KEY}'
+            }
+
+            payload = {}
+
+            response = requests.request("DELETE", url, headers=headers, data=payload)
+            print(response.text)
+
+            if response.status_code == 200:
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'Template deleted successfully'
+                }, status=status.HTTP_200_OK)
+            else:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Template not found or not deleted'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
 
