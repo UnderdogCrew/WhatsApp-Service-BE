@@ -2,6 +2,7 @@ import os
 import sys
 import django
 from datetime import datetime, timedelta
+from twilio.rest import Client
 import pytz
 from bson import ObjectId
 current_path = os.path.abspath(os.getcwd())
@@ -14,6 +15,63 @@ django.setup()
 
 from utils.database import MongoDB
 from utils.whatsapp_message_data import send_message_data
+from utils.twilio_otp import send_sms_message
+
+def send_sms_message_invoice(to_number, metadata, user_id, invoice_id):
+    try:
+        # Format message based on template
+        message_body = (
+            f"Hello {metadata['name']},\n\n"
+            f"This is a friendly reminder that your bill of ₹{metadata['amount']} is due on {metadata['due_date']}. "
+            "Kindly make the payment to avoid any service interruptions.\n\n"
+            "You can pay using Pay Now.\n\n"
+            "If you've already made the payment, please ignore this message. Let us know if you need any assistance.\n\n"
+            "Thank you!\n"
+            "WapNexus"
+        )
+        
+        # Send SMS message
+        message , message_sid = send_sms_message(
+            to_number=to_number,
+            message_body=message_body
+        )
+        
+        # Store in database
+        if message_sid:
+            db = MongoDB()
+            sms_record = {
+                'user_id': user_id,
+                'invoice_id': invoice_id,
+                'phone_number': to_number,
+                'message': message_body,
+                'message_sid': message_sid,
+                'status': 'sent',
+                'type': 'invoice_reminder',
+                'metadata': metadata,
+                'created_at': datetime.now(pytz.UTC),
+                'updated_at': datetime.now(pytz.UTC)
+            }   
+            db.create_document('sms_logs', sms_record)
+        return True
+        
+    except Exception as e:
+        # Log failed attempt
+        error_record = {
+            'user_id': user_id,
+            'invoice_id': invoice_id,
+            'phone_number': to_number,
+            'message': message_body,
+            'error': str(e),
+            'status': 'failed',
+            'type': 'invoice_reminder',
+            'metadata': metadata,
+            'created_at': datetime.now(pytz.UTC),
+            'updated_at': datetime.now(pytz.UTC)
+        }
+        db.create_document('sms_logs', error_record)
+        print(f"Error sending SMS: {str(e)}")
+        return False
+
 
 def send_invoice_reminders():
     try:
@@ -83,8 +141,6 @@ def send_invoice_reminders():
             }
 
             # Select appropriate message template based on days until due
-      
-
             print(f"Sending to {metadata.get('name')} for invoice {invoice['invoice_number']}")
 
             # Clean phone number by removing country code
@@ -94,14 +150,22 @@ def send_invoice_reminders():
             elif phone_number.startswith('91'):
                 phone_number = phone_number[2:]  # Remove '91'
             print("business_number", phone_number)
-            send_message_data(
-                number=phone_number,
-                template_name="invoice",
-                text="",
-                image_url="",
+            
+            send_sms_message_invoice(
+                to_number=phone_number,
+                metadata=metadata,
                 user_id=str(user['_id']),
-                metadata=metadata
+                invoice_id=invoice['invoice_number']
             )
+
+            # send_message_data(
+            #     number=phone_number,
+            #     template_name="invoice",
+            #     text="",
+            #     image_url="",
+            #     user_id=str(user['_id']),
+            #     metadata=metadata
+            # )
 
         print("Invoice reminders sent successfully!")
         return True
