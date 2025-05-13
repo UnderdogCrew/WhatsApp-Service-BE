@@ -33,11 +33,11 @@ class LoginSerializer(serializers.Serializer):
 class FileUploadSerializer(serializers.Serializer):
     file = serializers.FileField(
         validators=[FileExtensionValidator(
-            allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx']
+            allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', "mp4"]
         )]
     )
     file_type = serializers.ChoiceField(
-        choices=['image', 'document', 'excel'],
+        choices=['image', 'document', 'excel', "video"],
         required=True
     )
 
