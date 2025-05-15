@@ -28,7 +28,7 @@ db = MongoDB()
 API_TOKEN = API_KEY
 
 
-def process_components(components, msg_data, image_url):
+def process_components(components, msg_data, image_url, latitude=None, longitude=None):
     result_list = []
 
     for component in components:
@@ -48,7 +48,7 @@ def process_components(components, msg_data, image_url):
                 }
                 result_list.append(header_entry)
         elif component['type'].upper() == "HEADER" and component.get('format') == "VIDEO":
-            # Process HEADER with type IMAGE
+            # Process HEADER with type VIDEO
             if image_url != "":
                 header_entry = {
                     "type": "header",
@@ -57,6 +57,37 @@ def process_components(components, msg_data, image_url):
                             "type": "video",
                             "video": {
                                 "link": image_url
+                            }
+                        }
+                    ]
+                }
+                result_list.append(header_entry)
+        elif component['type'].upper() == "HEADER" and component.get('format') == "DOCUMENT":
+            # Process HEADER with type DOCUMENT
+            if image_url != "":
+                header_entry = {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "document",
+                            "document": {
+                                "link": image_url
+                            }
+                        }
+                    ]
+                }
+                result_list.append(header_entry)
+        elif component['type'].upper() == "HEADER" and component.get('format') == "LOCATION":
+            # Process HEADER with type DOCUMENT
+            if image_url != "":
+                header_entry = {
+                    "type": "location",
+                    "parameters": [
+                        {
+                            "type": "location",
+                            "location": {
+                                "latitude": latitude,
+                                "longitude": longitude,
                             }
                         }
                     ]
@@ -135,7 +166,7 @@ def process_components(components, msg_data, image_url):
     return result_list
 
 
-def send_message_data(number, template_name, text, image_url, user_id, entry=None, metadata=None):
+def send_message_data(number, template_name, text, image_url, user_id, entry=None, metadata=None, latitude=None, longitude=None):
     try:
         
         user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
@@ -233,7 +264,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         
         print(f"template text: {template_text}")
 
-        components = process_components(template_components, msg_details, image_url)
+        components = process_components(template_components, msg_details, image_url, latitude=latitude, longitude=longitude)
         payload = json.dumps({
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
