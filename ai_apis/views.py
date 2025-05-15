@@ -104,6 +104,10 @@ class SendMessage(APIView):
                     type=openapi.TYPE_STRING,
                     description='Name or description of the location'
                 ),
+                'address': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description='Address or detailed location information'
+                ),
                 'numbers': openapi.Schema(
                     type=openapi.TYPE_ARRAY,
                     items=openapi.Items(type=openapi.TYPE_STRING),
@@ -152,6 +156,7 @@ class SendMessage(APIView):
             latitude = request_data.get("latitude", None)
             longitude = request_data.get("longitude", None)
             location_name = request_data.get("location_name", None)
+            address = request_data.get("address", None)
             if template_name == "hotel":
                 template_name = "hello_world"
 
@@ -284,7 +289,8 @@ class SendMessage(APIView):
                         metadata=msg_data,
                         latitude=latitude,
                         longitude=longitude,
-                        location_name=location_name
+                        location_name=location_name,
+                        address=address
                     )
 
             elif message_type == 2:
@@ -299,7 +305,8 @@ class SendMessage(APIView):
                         metadata=metadata,
                         latitude=latitude,
                         longitude=longitude,
-                        location_name=location_name
+                        location_name=location_name,
+                        address=address
                     )
 
             return JsonResponse({"message": "Messages sent successfully"}, safe=False, status=200)
