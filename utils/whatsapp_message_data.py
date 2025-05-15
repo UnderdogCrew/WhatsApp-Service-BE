@@ -79,7 +79,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                 result_list.append(header_entry)
         elif component['type'].upper() == "HEADER" and component.get('format') == "LOCATION":
             # Process HEADER with type DOCUMENT
-            if image_url != "":
+            if latitude is not None and longitude is not None:
                 header_entry = {
                     "type": "location",
                     "parameters": [
@@ -129,6 +129,23 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                         "type": "text",
                         "text": msg_data.get('Name') if i == 0 else text
                     })
+
+                body_entry = {
+                    "type": "body",
+                    "parameters": body_parameters
+                }
+                result_list.append(body_entry)
+            elif "text" in component:
+                # Process BODY
+                body_parameters = []
+                text = component['text']
+                # Convert Timestamp to string if necessary
+                if isinstance(text, pd.Timestamp):  # Assuming you are using pandas
+                    text = text.strftime('%Y-%m-%d')  # Format as needed
+                body_parameters.append({
+                    "type": "text",
+                    "text": msg_data.get('Name') if i == 0 else text
+                })
 
                 body_entry = {
                     "type": "body",
