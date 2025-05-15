@@ -273,6 +273,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             }
             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
         else:
+            print(f"Meta response: {response.json()}")
             whatsapp_status_logs = {
                 "number": f"91{number}",
                 "message": template_text,
