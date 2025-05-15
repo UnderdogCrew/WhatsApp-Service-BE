@@ -165,7 +165,7 @@ class SendMessage(APIView):
                 'Authorization': f'Bearer {API_KEY}'
             }
             template_response = requests.request("GET", template_url, headers=headers)
-            print(template_response.status_code)
+            print(template_response.json())
             if template_response.status_code != 200:
                 return JsonResponse({"message": "Template is missing"}, safe=False, status=422)
 
