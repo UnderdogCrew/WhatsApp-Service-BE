@@ -28,7 +28,7 @@ db = MongoDB()
 API_TOKEN = API_KEY
 
 
-def process_components(components, msg_data, image_url, latitude=None, longitude=None):
+def process_components(components, msg_data, image_url, latitude=None, longitude=None, location_name=None):
     result_list = []
 
     for component in components:
@@ -88,6 +88,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                             "location": {
                                 "latitude": latitude,
                                 "longitude": longitude,
+                                "name": location_name,
                             }
                         }
                     ]
@@ -183,7 +184,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
     return result_list
 
 
-def send_message_data(number, template_name, text, image_url, user_id, entry=None, metadata=None, latitude=None, longitude=None):
+def send_message_data(number, template_name, text, image_url, user_id, entry=None, metadata=None, latitude=None, longitude=None, location_name=None):
     try:
         
         user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
@@ -281,7 +282,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         
         print(f"template text: {template_text}")
 
-        components = process_components(template_components, msg_details, image_url, latitude=latitude, longitude=longitude)
+        components = process_components(template_components, msg_details, image_url, latitude=latitude, longitude=longitude, location_name=location_name)
         payload = json.dumps({
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
