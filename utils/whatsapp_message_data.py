@@ -144,7 +144,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                     text = text.strftime('%Y-%m-%d')  # Format as needed
                 body_parameters.append({
                     "type": "text",
-                    "text": msg_data.get('Name') if i == 0 else text
+                    "text": text
                 })
 
                 body_entry = {
