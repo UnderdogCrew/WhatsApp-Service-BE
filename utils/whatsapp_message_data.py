@@ -47,6 +47,21 @@ def process_components(components, msg_data, image_url):
                     ]
                 }
                 result_list.append(header_entry)
+        elif component['type'].upper() == "HEADER" and component.get('format') == "VIDEO":
+            # Process HEADER with type IMAGE
+            if image_url != "":
+                header_entry = {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "video",
+                            "video": {
+                                "link": image_url
+                            }
+                        }
+                    ]
+                }
+                result_list.append(header_entry)
 
         elif component['type'].upper() == "BODY":
             # Check for body_text_named_params
