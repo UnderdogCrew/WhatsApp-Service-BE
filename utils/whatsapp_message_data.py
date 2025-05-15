@@ -81,7 +81,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
             # Process HEADER with type DOCUMENT
             if latitude is not None and longitude is not None:
                 header_entry = {
-                    "type": "location",
+                    "type": "header",
                     "parameters": [
                         {
                             "type": "location",
