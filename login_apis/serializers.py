@@ -62,3 +62,20 @@ class BusinessDetailsSerializer(serializers.Serializer):
     business_name = serializers.CharField(required=True, max_length=255)
     timezone = serializers.CharField(required=True, max_length=200)
     description = serializers.CharField(required=False, allow_blank=True, max_length=500)  # Optional field
+
+class CustomerSerializer(serializers.Serializer):
+    number = serializers.CharField(max_length=15, required=True)
+    name = serializers.CharField(max_length=100, required=True)
+    status = serializers.IntegerField(default=1)
+    tags = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    source = serializers.CharField(max_length=50, required=False, allow_blank=True)
+
+class CustomerUpdateSerializer(serializers.Serializer):
+    customer_id = serializers.CharField(max_length=50, required=False)
+    number = serializers.CharField(max_length=15, required=False)
+    name = serializers.CharField(max_length=100, required=False)
+    status = serializers.IntegerField(required=False)
+    tags = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    source = serializers.CharField(max_length=50, required=False, allow_blank=True)
+
+

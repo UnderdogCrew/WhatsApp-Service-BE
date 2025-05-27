@@ -7,7 +7,7 @@ from bson import ObjectId
 from drf_yasg.utils import swagger_auto_schema
 from utils.database import MongoDB
 from utils.auth import generate_tokens, token_required, decode_token, current_dollar_price
-from .serializers import SignupSerializer, LoginSerializer, FileUploadSerializer, FileUploadResponseSerializer, BusinessDetailsSerializer
+from .serializers import SignupSerializer, LoginSerializer, FileUploadSerializer, FileUploadResponseSerializer, BusinessDetailsSerializer, CustomerSerializer, CustomerUpdateSerializer
 from utils.s3_helper import S3Helper
 from .utils import get_file_extension, validate_file
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -1198,6 +1198,394 @@ class UserStatusView(APIView):
             return JsonResponse({
                 'status': 'success',
                 'data': response_data
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+
+class CustomerAPIView(APIView):
+    @swagger_auto_schema(
+        operation_description="Create a new customer",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        request_body=CustomerSerializer,
+        responses={
+            201: openapi.Response('Created', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(type=openapi.TYPE_OBJECT),
+                }
+            )),
+            400: 'Bad Request',
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def post(self, request, current_user_id, current_user_email):
+        try:
+            serializer = CustomerSerializer(data=request.data)
+            if not serializer.is_valid():
+                return JsonResponse({
+                    'message': 'Validation error',
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            validated_data = serializer.validated_data
+            db = MongoDB()
+
+            # Check if customer with same number already exists for this user
+            existing_customer = db.find_document('customers', {
+                'user_id': current_user_id,
+                'number': validated_data['number']
+            })
+
+            if existing_customer:
+                return JsonResponse({
+                    'message': 'Customer with this number already exists'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Create customer
+            customer_data = {
+                **validated_data,
+                'user_id': current_user_id
+            }
+
+            customer_id = db.create_document('customers', customer_data)
+
+            # Prepare response data
+            customer_data['id'] = customer_id
+            del customer_data['_id']
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Customer created successfully',
+                'data': customer_data
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        operation_description="Get all customers for the authenticated user",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter('search', openapi.IN_QUERY, description="Search by name or number", type=openapi.TYPE_STRING),
+            openapi.Parameter('status', openapi.IN_QUERY, description="Filter by status", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('skip', openapi.IN_QUERY, description="Number of records to skip", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('limit', openapi.IN_QUERY, description="Number of records to return", type=openapi.TYPE_INTEGER),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
+                    'total': openapi.Schema(type=openapi.TYPE_INTEGER),
+                }
+            )),
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def get(self, request, current_user_id, current_user_email):
+        try:
+            db = MongoDB()
+            
+            # Get query parameters
+            search = request.query_params.get('search', '')
+            customer_status = request.query_params.get('status', None)
+            skip = int(request.query_params.get('skip', 0))
+            limit = int(request.query_params.get('limit', 10))
+
+            # Build query
+            query = {'user_id': current_user_id}
+
+            if search:
+                query['$or'] = [
+                    {'name': {'$regex': search, '$options': 'i'}},
+                    {'number': {'$regex': search, '$options': 'i'}}
+                ]
+
+            if customer_status is not None:
+                query['status'] = int(customer_status)
+
+            # Get customers
+            customers = db.find_documents('customers', query, skip=skip, limit=limit, sort=[('created_at', -1)])
+            total = db.find_documents_count('customers', query)
+
+            # Format response
+            for customer in customers:
+                customer['id'] = str(customer['_id'])
+                del customer['_id']
+
+            return JsonResponse({
+                'status': 'success',
+                'data': customers,
+                'total': total
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    @swagger_auto_schema(
+        operation_description="Update a customer",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        request_body=CustomerUpdateSerializer,
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(type=openapi.TYPE_OBJECT),
+                }
+            )),
+            400: 'Bad Request',
+            401: 'Unauthorized',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def patch(self, request, current_user_id, current_user_email):
+        try:
+            customer_id = request.data.get('customer_id')
+            if not customer_id:
+                return JsonResponse({
+                    'message': 'Customer ID is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Remove customer_id from validation data
+            update_data = request.data.copy()
+            del update_data['customer_id']
+
+            serializer = CustomerUpdateSerializer(data=update_data)
+            if not serializer.is_valid():
+                return JsonResponse({
+                    'message': 'Validation error',
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            validated_data = serializer.validated_data
+            db = MongoDB()
+
+            # Check if customer exists and belongs to user
+            customer = db.find_document('customers', {
+                '_id': ObjectId(customer_id),
+                'user_id': current_user_id
+            })
+
+            if not customer:
+                return JsonResponse({
+                    'message': 'Customer not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Check if updating number and it already exists for another customer
+            if 'number' in validated_data:
+                existing_customer = db.find_document('customers', {
+                    'user_id': current_user_id,
+                    'number': validated_data['number'],
+                    '_id': {'$ne': ObjectId(customer_id)}
+                })
+
+                if existing_customer:
+                    return JsonResponse({
+                        'message': 'Another customer with this number already exists'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Update customer
+            update_data = {
+                **validated_data,
+            }
+
+            result = db.update_document('customers', 
+                {'_id': ObjectId(customer_id)}, 
+                update_data
+            )
+
+            if result.modified_count == 0:
+                return JsonResponse({
+                    'message': 'No changes made'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get updated customer
+            updated_customer = db.find_document('customers', {'_id': ObjectId(customer_id)})
+            updated_customer['id'] = str(updated_customer['_id'])
+            del updated_customer['_id']
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Customer updated successfully',
+                'data': updated_customer
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        operation_description="Delete a customer",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                'customer_id',
+                openapi.IN_QUERY,
+                description="Customer ID",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            401: 'Unauthorized',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def delete(self, request, current_user_id, current_user_email):
+        try:
+            customer_id = request.query_params.get('customer_id')
+            if not customer_id:
+                return JsonResponse({
+                    'message': 'Customer ID is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            db = MongoDB()
+
+            # Check if customer exists and belongs to user
+            customer = db.find_document('customers', {
+                '_id': ObjectId(customer_id),
+                'user_id': current_user_id
+            })
+
+            if not customer:
+                return JsonResponse({
+                    'message': 'Customer not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Delete customer
+            result = db.delete_document('customers', {'_id': ObjectId(customer_id)})
+
+            if result.deleted_count == 0:
+                return JsonResponse({
+                    'message': 'Failed to delete customer'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Customer deleted successfully'
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class CustomerDetailAPIView(APIView):
+    @swagger_auto_schema(
+        operation_description="Get a specific customer",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                'customer_id',
+                openapi.IN_QUERY,
+                description="Customer ID",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(type=openapi.TYPE_OBJECT),
+                }
+            )),
+            401: 'Unauthorized',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def get(self, request, current_user_id, current_user_email):
+        try:
+            customer_id = request.query_params.get('customer_id')
+            if not customer_id:
+                return JsonResponse({
+                    'message': 'Customer ID is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            db = MongoDB()
+            
+            customer = db.find_document('customers', {
+                '_id': ObjectId(customer_id),
+                'user_id': current_user_id
+            })
+
+            if not customer:
+                return JsonResponse({
+                    'message': 'Customer not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            customer['id'] = str(customer['_id'])
+            del customer['_id']
+
+            return JsonResponse({
+                'status': 'success',
+                'data': customer
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
