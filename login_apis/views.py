@@ -809,6 +809,7 @@ class VerifyBusinessDetailsView(APIView):
             properties={
                 'user_id': openapi.Schema(type=openapi.TYPE_STRING, description='User ID to update'),
                 'business_id': openapi.Schema(type=openapi.TYPE_STRING, description='Business ID to set'),
+                "verified_name": openapi.Schema(type=openapi.TYPE_STRING, description='name of the business which is verified with META'),
             },
             required=['user_id', 'business_id']
         ),
@@ -829,6 +830,7 @@ class VerifyBusinessDetailsView(APIView):
         try:
             user_id = request.data.get('user_id')
             business_id = request.data.get('business_id')
+            verified_name = request.data.get("verified_name", "")
 
             # Validate user_id and business_id
             if not user_id or not business_id:
@@ -848,7 +850,7 @@ class VerifyBusinessDetailsView(APIView):
             # Update the user's WhatsApp business details to set verified to True and add business_id
             result = db.update_document('users', 
                 {'_id': ObjectId(user['_id'])}, 
-                {'whatsapp_business_details.verified': True, 'business_id': business_id}
+                {'whatsapp_business_details.verified': True, 'business_id': business_id, "verified_name": verified_name}
             )
 
             if result.modified_count == 0:
