@@ -61,6 +61,10 @@ class MongoDB:
         update_data['updated_at'] = datetime.utcnow()
         return collection.update_one(query, {'$set': update_data})
 
+    def delete_document(self, collection_name, query):
+        collection = self.get_collection(collection_name)
+        return collection.delete_one(query)
+    
     def aggregate(self, collection_name, pipeline):
         """
         Perform aggregation operations on a collection.
