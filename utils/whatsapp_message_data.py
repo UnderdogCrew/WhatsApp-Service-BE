@@ -28,7 +28,7 @@ db = MongoDB()
 API_TOKEN = API_KEY
 
 
-def process_components(components, msg_data, image_url):
+def process_components(components, msg_data, image_url, latitude=None, longitude=None, location_name=None, address=None):
     result_list = []
 
     for component in components:
@@ -42,6 +42,54 @@ def process_components(components, msg_data, image_url):
                             "type": "image",
                             "image": {
                                 "link": image_url
+                            }
+                        }
+                    ]
+                }
+                result_list.append(header_entry)
+        elif component['type'].upper() == "HEADER" and component.get('format') == "VIDEO":
+            # Process HEADER with type VIDEO
+            if image_url != "":
+                header_entry = {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "video",
+                            "video": {
+                                "link": image_url
+                            }
+                        }
+                    ]
+                }
+                result_list.append(header_entry)
+        elif component['type'].upper() == "HEADER" and component.get('format') == "DOCUMENT":
+            # Process HEADER with type DOCUMENT
+            if image_url != "":
+                header_entry = {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "document",
+                            "document": {
+                                "link": image_url
+                            }
+                        }
+                    ]
+                }
+                result_list.append(header_entry)
+        elif component['type'].upper() == "HEADER" and component.get('format') == "LOCATION":
+            # Process HEADER with type DOCUMENT
+            if latitude is not None and longitude is not None:
+                header_entry = {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "location",
+                            "location": {
+                                "latitude": latitude,
+                                "longitude": longitude,
+                                "name": location_name,
+                                "address": address
                             }
                         }
                     ]
@@ -89,6 +137,23 @@ def process_components(components, msg_data, image_url):
                     "parameters": body_parameters
                 }
                 result_list.append(body_entry)
+            # elif "text" in component:
+            #     # Process BODY
+            #     body_parameters = []
+            #     text = component['text']
+            #     # Convert Timestamp to string if necessary
+            #     if isinstance(text, pd.Timestamp):  # Assuming you are using pandas
+            #         text = text.strftime('%Y-%m-%d')  # Format as needed
+            #     body_parameters.append({
+            #         "type": "text",
+            #         "text": text
+            #     })
+
+            #     body_entry = {
+            #         "type": "body",
+            #         "parameters": body_parameters
+            #     }
+            #     result_list.append(body_entry)
             
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
@@ -120,7 +185,7 @@ def process_components(components, msg_data, image_url):
     return result_list
 
 
-def send_message_data(number, template_name, text, image_url, user_id, entry=None, metadata=None):
+def send_message_data(number, template_name, text, image_url, user_id, entry=None, metadata=None, latitude=None, longitude=None, location_name=None, address=None):
     try:
         
         user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
@@ -218,7 +283,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         
         print(f"template text: {template_text}")
 
-        components = process_components(template_components, msg_details, image_url)
+        components = process_components(template_components, msg_details, image_url, latitude=latitude, longitude=longitude, location_name=location_name, address=address)
         payload = json.dumps({
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
@@ -258,6 +323,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
             }
             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
         else:
+            print(f"Meta response: {response.json()}")
             whatsapp_status_logs = {
                 "number": f"91{number}",
                 "message": template_text,

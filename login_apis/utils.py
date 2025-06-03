@@ -8,6 +8,7 @@ def validate_file(file):
     # Define allowed types
     ALLOWED_TYPES = {
         'image': ['image/jpeg', 'image/png', 'image/gif'],
+        'video': ['video/mp4'],
         'document': ['application/pdf', 'application/msword'],
         'excel': ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
     }
@@ -24,6 +25,7 @@ def get_file_extension(mime_type):
         'image/jpeg': '.jpg',
         'image/png': '.png',
         'image/gif': '.gif',
+        'video/mp4': '.mp4',
         'application/pdf': '.pdf',
         'application/msword': '.doc',
         'application/vnd.ms-excel': '.xls',
