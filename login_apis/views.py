@@ -556,7 +556,11 @@ class BusinessDetails(APIView):
                 'status': 'success',
                 'message': 'WhatsApp business details retrieved successfully',
                 'data': {
-                    'whatsapp_business_details': user['whatsapp_business_details']
+                    'whatsapp_business_details': user['whatsapp_business_details'],
+                    "phone_number_id": user.get('phone_number_id', ''),
+                    "waba_id": user.get('waba_id', ''),
+                    "auto_reply_enabled": user.get('auto_reply_enabled', False),
+                    "business_id": user.get('business_id', '')
                 }
             }, status=status.HTTP_200_OK)
         except Exception as e:
@@ -950,7 +954,8 @@ class ProfileView(APIView):
                 'account_id': user.get('account_id', ''),
                 'phone_number_id': user.get('phone_number_id', ''),
                 'waba_id': user.get('waba_id', ''),
-                'auto_reply_enabled': user.get('auto_reply_enabled', False)
+                'auto_reply_enabled': user.get('auto_reply_enabled', False),
+                'verified_name': user.get('verified_name', '')
             }
 
             subscription_data = None
