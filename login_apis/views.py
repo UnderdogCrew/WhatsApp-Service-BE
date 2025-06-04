@@ -947,7 +947,10 @@ class ProfileView(APIView):
                 'business_id': user.get('business_id', ''),
                 'is_email_verified': user.get('is_email_verified', False),
                 'default_credit': user.get('default_credit', 0),
-                'account_id': user.get('account_id', '')
+                'account_id': user.get('account_id', ''),
+                'phone_number_id': user.get('phone_number_id', ''),
+                'waba_id': user.get('waba_id', ''),
+                'auto_reply_enabled': user.get('auto_reply_enabled', False)
             }
 
             subscription_data = None
