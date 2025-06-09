@@ -414,6 +414,9 @@ class FacebookWebhook(APIView):
                 from_number = ""
                 msg_type = ""
             
+            print(f"msg_type: {msg_type}")
+            print(f"messages: {messages}")
+            
             if msg_type == "text":
                 ## need to send message back
                 payload = json.dumps(
