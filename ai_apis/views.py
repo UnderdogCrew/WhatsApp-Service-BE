@@ -374,7 +374,7 @@ class FacebookWebhook(APIView):
                             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
                         print(f"auto_reply_enabled: {auto_reply_enabled}")
                         if auto_reply_enabled is True:
-                            data = {
+                            openai_data = {
                                 "model": "gpt-4o-mini",
                                 "messages": [
                                     {"role": "system", "content": "You are a helpful assistant."},
@@ -382,12 +382,18 @@ class FacebookWebhook(APIView):
                                 ]
                             }
 
-                            response = requests.post("https://api.openai.com/v1/chat/completions", json=data, headers=headers)
-                            uses = response.json()['usage']
+                            openai_api_key = OPEN_AI_KEY
+                            openai_headers = {
+                                "Authorization": f"Bearer {openai_api_key}",
+                                "Content-Type": "application/json",
+                            }
+
+                            openai_response = requests.post("https://api.openai.com/v1/chat/completions", json=openai_data, headers=openai_headers)
+                            uses = openai_response.json()['usage']
                             total_tokens = uses['total_tokens']
                             prompt_tokens = uses['prompt_tokens']
                             completion_tokens = uses['completion_tokens']
-                            response_text = response.json()['choices'][0]['message']['content']
+                            response_text = openai_response.json()['choices'][0]['message']['content']
                             payload = json.dumps(
                                 {
                                     "messaging_product": "whatsapp",
