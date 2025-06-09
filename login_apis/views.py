@@ -816,6 +816,7 @@ class VerifyBusinessDetailsView(APIView):
                 "phone_number_id": openapi.Schema(type=openapi.TYPE_STRING, description='Phone number ID to set'),
                 "waba_id": openapi.Schema(type=openapi.TYPE_STRING, description='WABA ID to set'),
                 "auto_reply_enabled": openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Auto reply enabled'),
+                "api_key": openapi.Schema(type=openapi.TYPE_STRING, description='API key to set'),
                 "verified_name": openapi.Schema(type=openapi.TYPE_STRING, description='name of the business which is verified with META'),
             },
             required=['user_id']
@@ -841,6 +842,7 @@ class VerifyBusinessDetailsView(APIView):
             phone_number_id = request.data.get("phone_number_id", "")
             waba_id = request.data.get("waba_id", "")
             auto_reply_enabled = request.data.get("auto_reply_enabled", False)
+            api_key = request.data.get("api_key", "")
 
             # Validate user_id and business_id
             if not user_id:
@@ -869,6 +871,8 @@ class VerifyBusinessDetailsView(APIView):
                 update_data["waba_id"] = waba_id
             if auto_reply_enabled:
                 update_data["auto_reply_enabled"] = auto_reply_enabled
+            if api_key:
+                update_data["api_key"] = api_key
             if business_id:
                 update_data["business_id"] = business_id
 
