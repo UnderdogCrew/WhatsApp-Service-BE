@@ -430,8 +430,8 @@ class FacebookWebhook(APIView):
                                 }
                                 db.create_document('whatsapp_message_logs', whatsapp_status_logs)
 
-                except:
-                    pass
+                except Exception as error:
+                    print(f"Error coming: {str(error)}")
                 
                 return HttpResponse(hub_challenge)
 
