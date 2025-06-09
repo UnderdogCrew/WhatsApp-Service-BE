@@ -415,6 +415,7 @@ class FacebookWebhook(APIView):
                             }
                             url = f"https://graph.facebook.com/v19.0/{phone_number_id}/messages"
                             response = requests.request("POST", url, headers=headers, data=payload)
+                            print(f"message: {response.json()}")
                             if response.status_code == 200:
                                 # Calculate the price and ensure it's stored as a float
                                 price = float((total_tokens / tokens_per_million) * price_per_million_tokens)
