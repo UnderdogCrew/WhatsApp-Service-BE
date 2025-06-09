@@ -348,6 +348,8 @@ class FacebookWebhook(APIView):
                     user_info = db.find_document("users", query={"business_id": phone_number_id})
                     print(user_info)
                     if user_info:
+                        phone_number_id = user_info['phone_number_id'] if "phone_number_id" in user_info else ""
+                        auto_reply_enabled = True #user_info['auto_reply_enabled'] if "auto_reply_enabled" in user_info else False
                         display_phone_number =value['metadata']['display_phone_number']
                         messages = value['messages'][0]['text']['body']
                         from_number = value['messages'][0]['from']
@@ -370,6 +372,63 @@ class FacebookWebhook(APIView):
                                 "error_data": "",
                             }
                             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+                        if auto_reply_enabled:
+                            data = {
+                                "model": "gpt-4o-mini",
+                                "messages": [
+                                    {"role": "system", "content": "You are a helpful assistant."},
+                                    {"role": "user", "content": messages}
+                                ]
+                            }
+
+                            response = requests.post("https://api.openai.com/v1/chat/completions", json=data, headers=headers)
+                            uses = response.json()['usage']
+                            total_tokens = uses['total_tokens']
+                            prompt_tokens = uses['prompt_tokens']
+                            completion_tokens = uses['completion_tokens']
+                            response_text = response.json()['choices'][0]['message']['content']
+                            payload = json.dumps(
+                                {
+                                    "messaging_product": "whatsapp",
+                                    "recipient_type": "individual",
+                                    "to": from_number,
+                                    "type": "text",
+                                    "text": {
+                                        "preview_url": False,
+                                        "body": response_text
+                                    }
+                                }
+                            )
+                            print("from_number", from_number)
+                            headers = {
+                                'Authorization': 'Bearer ' + API_TOKEN,
+                                'Content-Type': 'application/json',
+                                'Cookie': 'ps_l=0; ps_n=0'
+                            }
+                            url = f"https://graph.facebook.com/v19.0/{phone_number_id}/messages"
+                            response = requests.request("POST", url, headers=headers, data=payload)
+                            if response.status_code == 200:
+                                # Calculate the price and ensure it's stored as a float
+                                price = float((total_tokens / tokens_per_million) * price_per_million_tokens)
+                                # Print the result
+                                print(f"Price for {total_tokens} tokens: ${price}")
+                                whatsapp_status_logs = {
+                                    "number": from_number,
+                                    "message": response_text,
+                                    "user_id": str(user_info['_id']),
+                                    "price": price*0.875,
+                                    "id": response.json()['messages'][0]["id"],
+                                    "message_status": response.json()['messages'][0]["message_status"] if "message_status" in response.json()['messages'][0] else "sent",
+                                    "created_at": datetime.datetime.now(),
+                                    "updated_at": datetime.datetime.now(),
+                                    "template_name": "template_name",
+                                    "code": 0,
+                                    "title": "",
+                                    "error_message": "",
+                                    "error_data": "",
+                                }
+                                db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+
                 except:
                     pass
                 
