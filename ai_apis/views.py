@@ -372,7 +372,8 @@ class FacebookWebhook(APIView):
                                 "error_data": "",
                             }
                             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
-                        if auto_reply_enabled:
+                        print(f"auto_reply_enabled: {auto_reply_enabled}")
+                        if auto_reply_enabled is True:
                             data = {
                                 "model": "gpt-4o-mini",
                                 "messages": [
