@@ -556,7 +556,11 @@ class BusinessDetails(APIView):
                 'status': 'success',
                 'message': 'WhatsApp business details retrieved successfully',
                 'data': {
-                    'whatsapp_business_details': user['whatsapp_business_details']
+                    'whatsapp_business_details': user['whatsapp_business_details'],
+                    "phone_number_id": user.get('phone_number_id', ''),
+                    "waba_id": user.get('waba_id', ''),
+                    "auto_reply_enabled": user.get('auto_reply_enabled', False),
+                    "business_id": user.get('business_id', '')
                 }
             }, status=status.HTTP_200_OK)
         except Exception as e:
@@ -809,9 +813,13 @@ class VerifyBusinessDetailsView(APIView):
             properties={
                 'user_id': openapi.Schema(type=openapi.TYPE_STRING, description='User ID to update'),
                 'business_id': openapi.Schema(type=openapi.TYPE_STRING, description='Business ID to set'),
+                "phone_number_id": openapi.Schema(type=openapi.TYPE_STRING, description='Phone number ID to set'),
+                "waba_id": openapi.Schema(type=openapi.TYPE_STRING, description='WABA ID to set'),
+                "auto_reply_enabled": openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Auto reply enabled'),
+                "api_key": openapi.Schema(type=openapi.TYPE_STRING, description='API key to set'),
                 "verified_name": openapi.Schema(type=openapi.TYPE_STRING, description='name of the business which is verified with META'),
             },
-            required=['user_id', 'business_id']
+            required=['user_id']
         ),
         responses={
             200: openapi.Response('Success', openapi.Schema(
@@ -831,11 +839,15 @@ class VerifyBusinessDetailsView(APIView):
             user_id = request.data.get('user_id')
             business_id = request.data.get('business_id')
             verified_name = request.data.get("verified_name", "")
+            phone_number_id = request.data.get("phone_number_id", "")
+            waba_id = request.data.get("waba_id", "")
+            auto_reply_enabled = request.data.get("auto_reply_enabled", False)
+            api_key = request.data.get("api_key", "")
 
             # Validate user_id and business_id
-            if not user_id or not business_id:
+            if not user_id:
                 return JsonResponse({
-                    'message': 'User ID and Business ID are required'
+                    'message': 'User ID is required'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             db = MongoDB()
@@ -848,9 +860,24 @@ class VerifyBusinessDetailsView(APIView):
                 }, status=status.HTTP_404_NOT_FOUND)
 
             # Update the user's WhatsApp business details to set verified to True and add business_id
+            update_data = {
+                'whatsapp_business_details.verified': True, 
+            }
+            if verified_name:
+                update_data["verified_name"] = verified_name
+            if phone_number_id:
+                update_data["phone_number_id"] = phone_number_id
+            if waba_id:
+                update_data["waba_id"] = waba_id
+            if auto_reply_enabled:
+                update_data["auto_reply_enabled"] = auto_reply_enabled
+            if api_key:
+                update_data["api_key"] = api_key
+            if business_id:
+                update_data["business_id"] = business_id
+
             result = db.update_document('users', 
-                {'_id': ObjectId(user['_id'])}, 
-                {'whatsapp_business_details.verified': True, 'business_id': business_id, "verified_name": verified_name}
+                {'_id': ObjectId(user['_id'])}, update_data
             )
 
             if result.modified_count == 0:
@@ -928,7 +955,11 @@ class ProfileView(APIView):
                 'business_id': user.get('business_id', ''),
                 'is_email_verified': user.get('is_email_verified', False),
                 'default_credit': user.get('default_credit', 0),
-                'account_id': user.get('account_id', '')
+                'account_id': user.get('account_id', ''),
+                'phone_number_id': user.get('phone_number_id', ''),
+                'waba_id': user.get('waba_id', ''),
+                'auto_reply_enabled': user.get('auto_reply_enabled', False),
+                'verified_name': user.get('verified_name', '')
             }
 
             subscription_data = None
