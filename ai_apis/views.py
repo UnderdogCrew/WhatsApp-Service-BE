@@ -389,6 +389,7 @@ class FacebookWebhook(APIView):
                             }
 
                             openai_response = requests.post("https://api.openai.com/v1/chat/completions", json=openai_data, headers=openai_headers)
+                            print(f"Open AI response: {openai_response.json()}")
                             uses = openai_response.json()['usage']
                             total_tokens = uses['total_tokens']
                             prompt_tokens = uses['prompt_tokens']
