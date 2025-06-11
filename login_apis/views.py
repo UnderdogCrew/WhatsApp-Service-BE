@@ -559,6 +559,7 @@ class BusinessDetails(APIView):
                     'whatsapp_business_details': user['whatsapp_business_details'],
                     "phone_number_id": user.get('phone_number_id', ''),
                     "waba_id": user.get('waba_id', ''),
+                    "verified_name": user.get("verified_name", ""),
                     "auto_reply_enabled": user.get('auto_reply_enabled', False),
                     "business_id": user.get('business_id', '')
                 }
