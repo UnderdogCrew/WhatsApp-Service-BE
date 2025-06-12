@@ -561,6 +561,7 @@ class BusinessDetails(APIView):
                     "waba_id": user.get('waba_id', ''),
                     "verified_name": user.get("verified_name", ""),
                     "auto_reply_enabled": user.get('auto_reply_enabled', False),
+                    "meta_business_number": user.get("meta_business_number", ""),
                     "business_id": user.get('business_id', '')
                 }
             }, status=status.HTTP_200_OK)
@@ -817,6 +818,7 @@ class VerifyBusinessDetailsView(APIView):
                 "phone_number_id": openapi.Schema(type=openapi.TYPE_STRING, description='Phone number ID to set'),
                 "waba_id": openapi.Schema(type=openapi.TYPE_STRING, description='WABA ID to set'),
                 "auto_reply_enabled": openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Auto reply enabled'),
+                "meta_business_number": openapi.Schema(type=openapi.TYPE_STRING, description='Phone number to set'),
                 "api_key": openapi.Schema(type=openapi.TYPE_STRING, description='API key to set'),
                 "verified_name": openapi.Schema(type=openapi.TYPE_STRING, description='name of the business which is verified with META'),
             },
@@ -843,6 +845,7 @@ class VerifyBusinessDetailsView(APIView):
             phone_number_id = request.data.get("phone_number_id", "")
             waba_id = request.data.get("waba_id", "")
             auto_reply_enabled = request.data.get("auto_reply_enabled", False)
+            meta_business_number = request.data.get("meta_business_number", "")
             api_key = request.data.get("api_key", "")
 
             # Validate user_id and business_id
@@ -872,6 +875,8 @@ class VerifyBusinessDetailsView(APIView):
                 update_data["waba_id"] = waba_id
             if auto_reply_enabled:
                 update_data["auto_reply_enabled"] = auto_reply_enabled
+            if meta_business_number:
+                update_data['meta_business_number'] = meta_business_number
             if api_key:
                 update_data["api_key"] = api_key
             if business_id:
@@ -960,6 +965,7 @@ class ProfileView(APIView):
                 'phone_number_id': user.get('phone_number_id', ''),
                 'waba_id': user.get('waba_id', ''),
                 'auto_reply_enabled': user.get('auto_reply_enabled', False),
+                "meta_business_number": user.get("meta_business_number", ""),
                 'verified_name': user.get('verified_name', '')
             }
 
