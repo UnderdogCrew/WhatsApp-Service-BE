@@ -1,7 +1,7 @@
 # Create your views here.
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from whatsapp_apis.serializers import VerifyBusinessPhoneNumberSerializer, WhatsAppTemplateSerializer
 import sys
 import requests
@@ -14,6 +14,8 @@ from drf_yasg import openapi
 from datetime import datetime, timezone
 from bson.objectid import ObjectId
 import pytz
+import csv
+import io
 
 
 
@@ -133,15 +135,23 @@ class MessageTemplates(APIView):
             500: 'Internal Server Error'
         }
     )
-    def get(self, request):
+    @token_required
+    def get(self, request, current_user_id, current_user_email):
         try:
-            url = "https://graph.facebook.com/v21.0/236353759566806/message_templates"
+            db = MongoDB()
+            user_info = db.find_document(collection_name="users", query={"_id": ObjectId(current_user_id)})
+            if user_info is not None:
+                waba_id = user_info['waba_id']
+                api_key = user_info['api_key']
+            else:
+                return JsonResponse({"message": "User not found"}, safe=False, status=422)
+            
+            url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates"
 
-            payload = {}
             headers = {
-                'Authorization': f'Bearer {API_KEY}'
+                'Authorization': f'Bearer {api_key}'
             }
-            response = requests.request("GET", url, headers=headers, data=payload)
+            response = requests.request("GET", url, headers=headers, data={})
             print(response.text)
             if response.status_code == 200:
                 data = response.json()
@@ -224,13 +234,14 @@ class WhatsAppTemplateView(APIView):
 
             # Get user's WABA ID
             user = db.find_document('users', {'_id': ObjectId(current_user_id)})
-            waba_id = user.get('waba_id', WABA_ID)
+            waba_id = user.get('waba_id')
+            api_key = user.get('api_key')
 
             # Call Facebook Graph API
             url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates"
             headers = {
                 'Content-Type': 'application/json',
-                'Authorization': f'Bearer {API_KEY}'
+                'Authorization': f'Bearer {api_key}'
             }
 
             fb_response = requests.post(
@@ -386,13 +397,14 @@ class WhatsAppTemplateView(APIView):
             
             # Get user's WABA ID
             user = db.find_document('users', {'_id': ObjectId(current_user_id)})
-            waba_id = user.get('waba_id', WABA_ID)
+            waba_id = user.get('waba_id')
+            api_key = user.get('api_key')
 
             url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates?name={template_name}"
 
             headers = {
                 'Content-Type': 'application/json',
-                'Authorization': f'Bearer {API_KEY}'
+                'Authorization': f'Bearer {api_key}'
             }
 
             payload = {}
@@ -419,7 +431,6 @@ class WhatsAppTemplateView(APIView):
 
 
 class CustomersView(APIView):
-
     @swagger_auto_schema(
         operation_description="Get all the customers list",
         manual_parameters=[
@@ -1135,6 +1146,265 @@ class FacebookFileUploadView(APIView):
                 'status': 'success',
                 'file_handle': file_handle
             }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ContactImportView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+    
+    @swagger_auto_schema(
+        operation_description="Import contacts from CSV file",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                'file',
+                openapi.IN_FORM,
+                description="CSV file containing contacts (columns: name, number)",
+                type=openapi.TYPE_FILE,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'imported_count': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'failed_count': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'errors': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_STRING)),
+                }
+            )),
+            400: 'Bad Request',
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def post(self, request, current_user_id=None, current_user_email=None):
+        try:
+            if 'file' not in request.FILES:
+                return JsonResponse({
+                    'message': 'No file provided'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            csv_file = request.FILES['file']
+            if not csv_file.name.endswith('.csv'):
+                return JsonResponse({
+                    'message': 'File must be a CSV'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Read CSV file
+            try:
+                decoded_file = csv_file.read().decode('utf-8')
+            except UnicodeDecodeError:
+                try:
+                    csv_file.seek(0)
+                    decoded_file = csv_file.read().decode('utf-8-sig')
+                except UnicodeDecodeError:
+                    return JsonResponse({
+                        'message': 'Unable to decode CSV file. Please ensure it is UTF-8 encoded.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            csv_reader = csv.DictReader(io.StringIO(decoded_file))
+            
+            # Validate CSV headers
+            required_headers = ['name', 'number']
+            if not all(header.lower() in [h.lower() for h in csv_reader.fieldnames] for header in required_headers):
+                return JsonResponse({
+                    'message': f'CSV must contain columns: {", ".join(required_headers)}. Found: {", ".join(csv_reader.fieldnames or [])}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            db = MongoDB()
+            imported_count = 0
+            failed_count = 0
+            errors = []
+
+            for row_num, row in enumerate(csv_reader, start=2):  # Start from 2 because row 1 is header
+                try:
+                    # Get values with case-insensitive matching
+                    name = None
+                    number = None
+                    for key, value in row.items():
+                        if key.lower() == 'name':
+                            name = str(value).strip() if value else None
+                        elif key.lower() == 'number':
+                            number = str(value).strip() if value else None
+                    
+                    # Validate required fields
+                    if not name or not number:
+                        failed_count += 1
+                        errors.append(f"Row {row_num}: Missing name or number")
+                        continue
+
+                    # Clean phone number (remove spaces, hyphens, and ensure it starts with 91)
+                    phone_number = ''.join(filter(str.isdigit, str(number)))
+                    
+                    # Validate phone number length
+                    if len(phone_number) < 10:
+                        failed_count += 1
+                        errors.append(f"Row {row_num}: Invalid phone number '{number}' - too short")
+                        continue
+                    
+                    # Add country code if not present
+                    if not phone_number.startswith('91'):
+                        if len(phone_number) == 10:
+                            phone_number = f"91{phone_number}"
+                        else:
+                            failed_count += 1
+                            errors.append(f"Row {row_num}: Invalid phone number '{number}' - incorrect format")
+                            continue
+
+                    # Check if contact already exists
+                    existing_contact = db.find_document('customers', {
+                        'user_id': current_user_id,
+                        'number': phone_number
+                    })
+
+                    if existing_contact:
+                        # Update existing contact
+                        db.update_document(
+                            'customers',
+                            {'_id': existing_contact['_id']},
+                            {
+                                'name': name,
+                                'updated_at': datetime.now(timezone.utc)
+                            }
+                        )
+                    else:
+                        # Create new contact
+                        contact_data = {
+                            'user_id': current_user_id,
+                            'name': name,
+                            'number': phone_number,
+                            'status': 1,
+                            'created_at': datetime.now(timezone.utc),
+                            'updated_at': datetime.now(timezone.utc)
+                        }
+                        db.create_document('customers', contact_data)
+
+                    imported_count += 1
+                except Exception as e:
+                    failed_count += 1
+                    errors.append(f"Row {row_num}: {str(e)}")
+
+            return JsonResponse({
+                'status': 'success',
+                'message': f'Import completed. {imported_count} contacts imported, {failed_count} failed.',
+                'imported_count': imported_count,
+                'failed_count': failed_count,
+                'errors': errors[:10]  # Limit errors to first 10
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ContactExportView(APIView):
+    
+    @swagger_auto_schema(
+        operation_description="Export contacts to CSV file",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        responses={
+            200: 'CSV/JSON file download',
+            401: 'Unauthorized',
+            404: 'No contacts found',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def get(self, request, current_user_id=None, current_user_email=None):
+        try:
+            db = MongoDB()
+            export_format = 'csv'
+            
+            print(f"current_user_id: {current_user_id}")
+            # Get all contacts for the user
+            contacts = db.find_documents('customers', {
+                'user_id': current_user_id,
+                'status': 1
+            })
+
+            if not contacts:
+                return JsonResponse({
+                    'message': 'No contacts found to export'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            if export_format == 'json':
+                # Export as JSON
+                contacts_data = []
+                for contact in contacts:
+                    phone_number = contact['number']
+                    if phone_number.startswith('91'):
+                        phone_number = phone_number[2:]
+                    contacts_data.append({
+                        'name': contact['name'],
+                        'number': phone_number,
+                        'created_at': contact.get('created_at', '').isoformat() if contact.get('created_at') else '',
+                        'updated_at': contact.get('updated_at', '').isoformat() if contact.get('updated_at') else ''
+                    })
+                
+                response = JsonResponse({
+                    'status': 'success',
+                    'total_contacts': len(contacts_data),
+                    'contacts': contacts_data
+                }, status=status.HTTP_200_OK)
+                response['Content-Disposition'] = 'attachment; filename="contacts.json"'
+                return response
+            
+            else:
+                # Export as CSV (default)
+                output = io.StringIO()
+                writer = csv.writer(output)
+                
+                # Write header
+                writer.writerow(['Name', 'Phone Number', 'Created Date', 'Updated Date'])
+                
+                # Write data
+                for contact in contacts:
+                    # Remove '91' prefix from phone number for export
+                    phone_number = contact['number']
+                    if phone_number.startswith('91'):
+                        phone_number = phone_number[2:]
+                    
+                    created_date = contact.get('created_at', '').strftime('%Y-%m-%d %H:%M:%S') if contact.get('created_at') else ''
+                    updated_date = contact.get('updated_at', '').strftime('%Y-%m-%d %H:%M:%S') if contact.get('updated_at') else ''
+                    
+                    writer.writerow([
+                        contact['name'], 
+                        phone_number,
+                        created_date,
+                        updated_date
+                    ])
+
+                # Create the HttpResponse object with CSV data
+                response = HttpResponse(
+                    output.getvalue(),
+                    content_type='text/csv'
+                )
+                response['Content-Disposition'] = 'attachment; filename="contacts.csv"'
+                
+                return response
 
         except Exception as e:
             return JsonResponse({

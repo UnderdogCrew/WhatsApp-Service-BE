@@ -171,15 +171,16 @@ class SendMessage(APIView):
             if template_name is None:
                 return JsonResponse({"message": "Template name is missing"}, safe=False, status=422)
             
-            if user_id == "67e6a22d44e08602e5c1e91c":
-                template_url = f"https://graph.facebook.com/v21.0/1156861725908077/message_templates?name={template_name}"
-                API_KEY = GLAM_API_KEY
+            user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
+            if user_info is not None:
+                waba_id = user_info['waba_id']
+                api_key = user_info['api_key']
             else:
-                template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
-                API_KEY = API_TOKEN
+                return JsonResponse({"message": "User not found"}, safe=False, status=422)
             
-            print(f"API_KEY: {API_KEY}")
-            print(template_url)
+            template_url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates?name={template_name}"
+            API_KEY = api_key
+            
 
             headers = {
                 'Authorization': f'Bearer {API_KEY}'
