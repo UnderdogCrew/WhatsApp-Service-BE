@@ -1,8 +1,8 @@
 # Create your views here.
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
-from django.http import JsonResponse
-from whatsapp_apis.serializers import VerifyBusinessPhoneNumberSerializer, WhatsAppTemplateSerializer
+from django.http import JsonResponse, HttpResponse
+from whatsapp_apis.serializers import VerifyBusinessPhoneNumberSerializer, WhatsAppTemplateSerializer, WhatsAppTemplateEditSerializer
 import sys
 import requests
 from utils.database import MongoDB
@@ -340,7 +340,6 @@ class WhatsAppTemplateView(APIView):
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
     @swagger_auto_schema(
         operation_description="Delete a WhatsApp message template by ID",
         manual_parameters=[
@@ -415,7 +414,164 @@ class WhatsAppTemplateView(APIView):
             return JsonResponse({
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
+    @swagger_auto_schema(
+        operation_description="Edit a WhatsApp message template",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                'template_id',
+                openapi.IN_QUERY,
+                description="Facebook template ID to edit",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        request_body=WhatsAppTemplateEditSerializer,
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                }
+            )),
+            400: 'Bad Request',
+            401: 'Unauthorized',
+            403: 'Forbidden - Template cannot be edited',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def put(self, request, current_user_id, current_user_email):
+        try:
+            template_id = request.query_params.get('template_id')
+            if not template_id:
+                return JsonResponse({
+                    'message': 'template_id is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Use the serializer for validation
+            serializer = WhatsAppTemplateEditSerializer(data=request.data)
+            if not serializer.is_valid():
+                return JsonResponse({
+                    'message': 'Validation error',
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            validated_data = serializer.validated_data
+            category = validated_data.get('category')
+            components = validated_data.get('components')
+
+            db = MongoDB()
+            
+            # Get user's API key
+            user = db.find_document('users', {'_id': ObjectId(current_user_id)})
+            if not user:
+                return JsonResponse({
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            api_key = user.get('api_key')
+            
+            # First, get the current template to check its status
+            get_url = f"https://graph.facebook.com/v23.0/{template_id}"
+            get_headers = {
+                'Authorization': f'Bearer {api_key}'
+            }
+            
+            get_response = requests.get(get_url, headers=get_headers)
+            
+            if get_response.status_code != 200:
+                return JsonResponse({
+                    'message': 'Template not found or access denied',
+                    'error': get_response.json() if get_response.content else 'No response content'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            template_data = get_response.json()
+            template_status = template_data.get('status')
+            
+            # Check if template can be edited
+            editable_statuses = ['APPROVED', 'REJECTED', 'PAUSED']
+            if template_status not in editable_statuses:
+                return JsonResponse({
+                    'message': f'Template with status "{template_status}" cannot be edited. Only templates with status APPROVED, REJECTED, or PAUSED can be edited.'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Check if trying to edit category of an approved template
+            if template_status == 'APPROVED' and category and category != template_data.get('category'):
+                return JsonResponse({
+                    'message': 'Cannot edit category of an approved template'
+                }, status=status.HTTP_403_FORBIDDEN)
+
+            # Prepare the edit request body
+            edit_data = {}
+            if category:
+                edit_data['category'] = category
+            if components:
+                edit_data['components'] = components
+
+            # Call Facebook Graph API to edit template
+            edit_url = f"https://graph.facebook.com/v23.0/{template_id}"
+            edit_headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}'
+            }
+
+            edit_response = requests.post(
+                edit_url,
+                headers=edit_headers,
+                json=edit_data
+            )
+
+            if edit_response.status_code != 200:
+                return JsonResponse({
+                    'message': 'Failed to edit template',
+                    'error': edit_response.json() if edit_response.content else 'No response content'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            fb_response_data = edit_response.json()
+
+            # Update local database record if exists
+            local_template = db.find_document('whatsapp_templates', {
+                'user_id': current_user_id,
+                'fb_template_id': template_id
+            })
+            
+            if local_template:
+                update_data = {
+                    'updated_at': datetime.now(timezone.utc)
+                }
+                if category:
+                    update_data['category'] = category
+                if components:
+                    update_data['components'] = components
+                
+                db.update_document(
+                    'whatsapp_templates',
+                    {'_id': local_template['_id']},
+                    update_data
+                )
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Template edited successfully',
+                'success': fb_response_data.get('success', True),
+                'template_id': template_id
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CustomersView(APIView):
