@@ -18,6 +18,8 @@ from UnderdogCrew.settings import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD ,SECRET_
 import re
 import jwt
 import random
+import requests
+import threading
 
 # Create your views here.
 
@@ -809,7 +811,7 @@ class GetAllUsersView(APIView):
 
 class VerifyBusinessDetailsView(APIView):
     @swagger_auto_schema(
-        operation_description="Verify WhatsApp business details and set business ID",
+        operation_description="Verify WhatsApp business details, set business ID, and subscribe to webhooks",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
@@ -848,7 +850,7 @@ class VerifyBusinessDetailsView(APIView):
             meta_business_number = request.data.get("meta_business_number", "")
             api_key = request.data.get("api_key", "")
 
-            # Validate user_id and business_id
+            # Validate user_id
             if not user_id:
                 return JsonResponse({
                     'message': 'User ID is required'
@@ -863,7 +865,7 @@ class VerifyBusinessDetailsView(APIView):
                     'message': 'User not found'
                 }, status=status.HTTP_404_NOT_FOUND)
 
-            # Update the user's WhatsApp business details to set verified to True and add business_id
+            # Update the user's WhatsApp business details
             update_data = {
                 'whatsapp_business_details.verified': True, 
             }
@@ -882,6 +884,7 @@ class VerifyBusinessDetailsView(APIView):
             if business_id:
                 update_data["business_id"] = business_id
 
+            # Update user details
             result = db.update_document('users', 
                 {'_id': ObjectId(user['_id'])}, update_data
             )
@@ -891,15 +894,81 @@ class VerifyBusinessDetailsView(APIView):
                     'message': 'No changes made or user not found'
                 }, status=status.HTTP_404_NOT_FOUND)
 
+                  # Run webhook subscription in background if WABA ID and API key are provided
+            if waba_id and api_key:
+                # Start background thread for webhook subscription
+                webhook_thread = threading.Thread(
+                    target=self.subscribe_to_webhooks,
+                    args=(waba_id, api_key, user_id),
+                    daemon=True
+                )
+                webhook_thread.start()
+
             return JsonResponse({
                 'status': 'success',
-                'message': 'Business details verified and updated successfully'
+                'message': 'Business details verified and updated successfully',
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
             return JsonResponse({
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def subscribe_to_webhooks_background(self, waba_id, api_key, user_id):
+        """
+        Background task to subscribe the app to webhooks for the given WABA ID
+        """
+        try:
+            print(f"Starting webhook subscription for user {user_id}, WABA: {waba_id}")
+            
+            # WhatsApp Business API webhook subscription endpoint
+            url = f"https://graph.facebook.com/v21.0/{waba_id}/subscribed_apps"
+            
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
+
+            # Make the subscription request
+            response = requests.post(url, headers=headers, timeout=30)
+            
+            # Update user record with webhook subscription status
+            db = MongoDB()
+            webhook_status = {
+                'webhook_subscribed': False,
+                'webhook_subscription_error': None,
+                'webhook_subscription_timestamp': datetime.now(timezone.utc)
+            }
+            
+            if response.status_code == 200:
+                response_data = response.json()
+                if response_data.get('success', False):
+                    webhook_status['webhook_subscribed'] = True
+                    print(f"Successfully subscribed to webhooks for user {user_id}")
+                else:
+                    webhook_status['webhook_subscription_error'] = 'API returned false'
+                    print(f"Webhook subscription failed for user {user_id}: API returned false")
+            else:
+                error_data = response.json() if response.content else {}
+                error_message = error_data.get("error", {}).get("message", "Unknown error")
+                webhook_status['webhook_subscription_error'] = f'Status {response.status_code}: {error_message}'
+                print(f"Webhook subscription failed for user {user_id}: {webhook_status['webhook_subscription_error']}")
+
+            # Update user record with webhook status
+            db.update_document('users', 
+                {'_id': ObjectId(user_id)}, 
+                webhook_status
+            )
+
+        except requests.exceptions.Timeout:
+            error_msg = 'Request timeout during webhook subscription'
+            print(f"Webhook subscription timeout for user {user_id}")            
+        except requests.exceptions.RequestException as e:
+            error_msg = f'Network error during webhook subscription: {str(e)}'
+            print(f"Webhook subscription network error for user {user_id}: {error_msg}")
+        except Exception as e:
+            error_msg = f'Unexpected error during webhook subscription: {str(e)}'
+            print(f"Webhook subscription unexpected error for user {user_id}: {error_msg}")
 
 class ProfileView(APIView):
     @swagger_auto_schema(
