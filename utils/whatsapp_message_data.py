@@ -192,16 +192,13 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
 
         if user_info is not None:
             business_id = user_info['business_id']
-        else:
-            business_id = "450885871446042"
-
+            waba_id = user_info['waba_id']
+            api_key = user_info['api_key']
+        
         url = f"https://graph.facebook.com/v19.0/{business_id}/messages"
-        if user_id == "67e6a22d44e08602e5c1e91c":
-            template_url = f"https://graph.facebook.com/v21.0/1156861725908077/message_templates?name={template_name}"
-            API_TOKEN = GLAM_API_KEY
-        else:
-            template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
-            API_TOKEN = API_KEY
+        template_url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates?name={template_name}"
+        API_TOKEN = api_key
+        
         headers = {
             'Authorization': f'Bearer {API_TOKEN}'
         }
