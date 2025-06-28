@@ -942,35 +942,17 @@ class VerifyBusinessDetailsView(APIView):
             }
 
             # Make the subscription request
-            response = requests.post(url, headers=headers, json=payload, timeout=30)
-            
-            # Update user record with webhook subscription status
-            db = MongoDB()
-            webhook_status = {
-                'webhook_subscribed': False,
-                'webhook_subscription_error': None,
-                'webhook_subscription_timestamp': datetime.now(timezone.utc)
-            }
-            
+            response = requests.post(url, headers=headers, json=payload, timeout=30) 
             if response.status_code == 200:
                 response_data = response.json()
                 if response_data.get('success', False):
-                    webhook_status['webhook_subscribed'] = True
                     print(f"Successfully subscribed to webhooks for user {user_id}")
                 else:
-                    webhook_status['webhook_subscription_error'] = 'API returned false'
                     print(f"Webhook subscription failed for user {user_id}: API returned false")
             else:
                 error_data = response.json() if response.content else {}
                 error_message = error_data.get("error", {}).get("message", "Unknown error")
-                webhook_status['webhook_subscription_error'] = f'Status {response.status_code}: {error_message}'
-                print(f"Webhook subscription failed for user {user_id}: {webhook_status['webhook_subscription_error']}")
-
-            # Update user record with webhook status
-            db.update_document('users', 
-                {'_id': ObjectId(user_id)}, 
-                webhook_status
-            )
+                print(f"Webhook subscription failed for user {user_id}: Status {response.status_code}: {error_message}")
 
         except requests.exceptions.Timeout:
             error_msg = 'Request timeout during webhook subscription'
