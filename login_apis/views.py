@@ -14,13 +14,12 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from utils.twilio_otp import generate_otp, send_otp
 from datetime import datetime, timezone
 import twilio
-from UnderdogCrew.settings import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD ,SECRET_KEY
+from UnderdogCrew.settings import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, SECRET_KEY, WEBHOOK_URL, WEBHOOK_VERIFY_TOKEN
 import re
 import jwt
 import random
 import requests
 import threading
-
 # Create your views here.
 
 class SignupView(APIView):
@@ -894,11 +893,11 @@ class VerifyBusinessDetailsView(APIView):
                     'message': 'No changes made or user not found'
                 }, status=status.HTTP_404_NOT_FOUND)
 
-                  # Run webhook subscription in background if WABA ID and API key are provided
+                # Run webhook subscription in background if WABA ID and API key are provided
             if waba_id and api_key:
                 # Start background thread for webhook subscription
                 webhook_thread = threading.Thread(
-                    target=self.subscribe_to_webhooks,
+                    target=self.subscribe_to_webhooks_background,
                     args=(waba_id, api_key, user_id),
                     daemon=True
                 )
@@ -921,16 +920,29 @@ class VerifyBusinessDetailsView(APIView):
         try:
             print(f"Starting webhook subscription for user {user_id}, WABA: {waba_id}")
             
+            # Validate webhook environment variables
+            if not WEBHOOK_URL or not WEBHOOK_VERIFY_TOKEN:
+                error_msg = 'Missing webhook environment variables (WEBHOOK_URL or WEBHOOK_VERIFY_TOKEN)'
+                print(f"Webhook subscription failed for user {user_id}: {error_msg}")
+                return
+            
             # WhatsApp Business API webhook subscription endpoint
-            url = f"https://graph.facebook.com/v21.0/{waba_id}/subscribed_apps"
+            url = f"https://graph.facebook.com/v23.0/{waba_id}/subscribed_apps"
             
             headers = {
                 'Authorization': f'Bearer {api_key}',
                 'Content-Type': 'application/json'
             }
 
+            # Request body matching the working curl format
+            payload = {
+                "override_callback_uri": WEBHOOK_URL,
+                "verify_token": WEBHOOK_VERIFY_TOKEN,
+                "object": "whatsapp_business_account"
+            }
+
             # Make the subscription request
-            response = requests.post(url, headers=headers, timeout=30)
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
             
             # Update user record with webhook subscription status
             db = MongoDB()
