@@ -14,11 +14,12 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from utils.twilio_otp import generate_otp, send_otp
 from datetime import datetime, timezone
 import twilio
-from UnderdogCrew.settings import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD ,SECRET_KEY
+from UnderdogCrew.settings import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, SECRET_KEY, WEBHOOK_URL, WEBHOOK_VERIFY_TOKEN
 import re
 import jwt
 import random
-
+import requests
+import threading
 # Create your views here.
 
 class SignupView(APIView):
@@ -809,7 +810,7 @@ class GetAllUsersView(APIView):
 
 class VerifyBusinessDetailsView(APIView):
     @swagger_auto_schema(
-        operation_description="Verify WhatsApp business details and set business ID",
+        operation_description="Verify WhatsApp business details, set business ID, and subscribe to webhooks",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
@@ -848,7 +849,7 @@ class VerifyBusinessDetailsView(APIView):
             meta_business_number = request.data.get("meta_business_number", "")
             api_key = request.data.get("api_key", "")
 
-            # Validate user_id and business_id
+            # Validate user_id
             if not user_id:
                 return JsonResponse({
                     'message': 'User ID is required'
@@ -863,7 +864,7 @@ class VerifyBusinessDetailsView(APIView):
                     'message': 'User not found'
                 }, status=status.HTTP_404_NOT_FOUND)
 
-            # Update the user's WhatsApp business details to set verified to True and add business_id
+            # Update the user's WhatsApp business details
             update_data = {
                 'whatsapp_business_details.verified': True, 
             }
@@ -882,6 +883,7 @@ class VerifyBusinessDetailsView(APIView):
             if business_id:
                 update_data["business_id"] = business_id
 
+            # Update user details
             result = db.update_document('users', 
                 {'_id': ObjectId(user['_id'])}, update_data
             )
@@ -891,15 +893,76 @@ class VerifyBusinessDetailsView(APIView):
                     'message': 'No changes made or user not found'
                 }, status=status.HTTP_404_NOT_FOUND)
 
+                # Run webhook subscription in background if WABA ID and API key are provided
+            if waba_id and api_key:
+                # Start background thread for webhook subscription
+                webhook_thread = threading.Thread(
+                    target=self.subscribe_to_webhooks_background,
+                    args=(waba_id, api_key, user_id),
+                    daemon=True
+                )
+                webhook_thread.start()
+
             return JsonResponse({
                 'status': 'success',
-                'message': 'Business details verified and updated successfully'
+                'message': 'Business details verified and updated successfully',
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
             return JsonResponse({
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def subscribe_to_webhooks_background(self, waba_id, api_key, user_id):
+        """
+        Background task to subscribe the app to webhooks for the given WABA ID
+        """
+        try:
+            print(f"Starting webhook subscription for user {user_id}, WABA: {waba_id}")
+            
+            # Validate webhook environment variables
+            if not WEBHOOK_URL or not WEBHOOK_VERIFY_TOKEN:
+                error_msg = 'Missing webhook environment variables (WEBHOOK_URL or WEBHOOK_VERIFY_TOKEN)'
+                print(f"Webhook subscription failed for user {user_id}: {error_msg}")
+                return
+            
+            # WhatsApp Business API webhook subscription endpoint
+            url = f"https://graph.facebook.com/v23.0/{waba_id}/subscribed_apps"
+            
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
+
+            # Request body matching the working curl format
+            payload = {
+                "override_callback_uri": WEBHOOK_URL,
+                "verify_token": WEBHOOK_VERIFY_TOKEN,
+                "object": "whatsapp_business_account"
+            }
+
+            # Make the subscription request
+            response = requests.post(url, headers=headers, json=payload, timeout=30) 
+            if response.status_code == 200:
+                response_data = response.json()
+                if response_data.get('success', False):
+                    print(f"Successfully subscribed to webhooks for user {user_id}")
+                else:
+                    print(f"Webhook subscription failed for user {user_id}: API returned false")
+            else:
+                error_data = response.json() if response.content else {}
+                error_message = error_data.get("error", {}).get("message", "Unknown error")
+                print(f"Webhook subscription failed for user {user_id}: Status {response.status_code}: {error_message}")
+
+        except requests.exceptions.Timeout:
+            error_msg = 'Request timeout during webhook subscription'
+            print(f"Webhook subscription timeout for user {user_id}")            
+        except requests.exceptions.RequestException as e:
+            error_msg = f'Network error during webhook subscription: {str(e)}'
+            print(f"Webhook subscription network error for user {user_id}: {error_msg}")
+        except Exception as e:
+            error_msg = f'Unexpected error during webhook subscription: {str(e)}'
+            print(f"Webhook subscription unexpected error for user {user_id}: {error_msg}")
 
 class ProfileView(APIView):
     @swagger_auto_schema(
