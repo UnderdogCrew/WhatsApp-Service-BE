@@ -118,6 +118,11 @@ class SendMessage(APIView):
                     description='Additional metadata for the message',
                     additional_properties=openapi.Schema(type=openapi.TYPE_STRING)  # Dynamic fields
                 ),
+                'paramsFallbackValue': openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    description='Fallback values for template parameters (e.g., {"Name": "Neel"})',
+                    additional_properties=openapi.Schema(type=openapi.TYPE_STRING)
+                ),
             },
             required=['text', 'message_type', 'template_name']
         ),
@@ -197,6 +202,7 @@ class SendMessage(APIView):
 
             image_url = request_data.get('image_url', "")
             numbers = request_data.get('numbers', [])
+            params_fallback_value = request_data.get("paramsFallbackValue", {})
 
             if message_type == 2 and not numbers:
                 return JsonResponse(
@@ -291,7 +297,8 @@ class SendMessage(APIView):
                         latitude=latitude,
                         longitude=longitude,
                         location_name=location_name,
-                        address=address
+                        address=address,
+                        params_fallback_value=params_fallback_value
                     )
 
             elif message_type == 2:
@@ -307,7 +314,8 @@ class SendMessage(APIView):
                         latitude=latitude,
                         longitude=longitude,
                         location_name=location_name,
-                        address=address
+                        address=address,
+                        params_fallback_value=params_fallback_value
                     )
 
             return JsonResponse({"message": "Messages sent successfully"}, safe=False, status=200)

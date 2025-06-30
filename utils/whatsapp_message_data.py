@@ -185,7 +185,19 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
     return result_list
 
 
-def send_message_data(number, template_name, text, image_url, user_id, entry=None, metadata=None, latitude=None, longitude=None, location_name=None, address=None):
+def send_message_data(
+        number,
+        template_name,
+        text, image_url,
+        user_id,
+        entry=None,
+        metadata=None,
+        latitude=None,
+        longitude=None,
+        location_name=None,
+        address=None,
+        params_fallback_value=None
+    ):
     try:
         
         user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
@@ -224,6 +236,24 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         if entry is not None:
             if "name" in entry:
                 text = entry['name']
+                if entry['name'] == "$Name":
+                    customer_details = db.find_document(
+                        collection_name="customers",
+                        query={
+                            "number": number
+                        }
+                    )
+                    if customer_details is not None:
+                        text = customer_details['name']
+                    else:
+                        if params_fallback_value is not None:
+                            if "name" in params_fallback_value:
+                                text = params_fallback_value['name']
+                            else:
+                                pass
+                    metadata['name'] = text
+                else:
+                    pass
         
         company_name = ""
         if entry is not None:
@@ -280,7 +310,15 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         
         print(f"template text: {template_text}")
 
-        components = process_components(template_components, msg_details, image_url, latitude=latitude, longitude=longitude, location_name=location_name, address=address)
+        components = process_components(
+            template_components,
+            msg_details,
+            image_url,
+            latitude=latitude,
+            longitude=longitude,
+            location_name=location_name,
+            address=address
+        )
         payload = json.dumps({
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
