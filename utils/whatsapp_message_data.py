@@ -308,6 +308,7 @@ def send_message_data(
         if template_text != "":
             template_text = template_text.replace("{{", "{")
             template_text = template_text.replace("}}", "}")
+            print(f"Update text: {template_text}")
             template_text = template_text.format(**msg_details)
         
         print(f"template text: {template_text}")
