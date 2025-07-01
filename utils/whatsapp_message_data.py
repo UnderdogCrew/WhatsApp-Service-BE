@@ -229,7 +229,6 @@ def send_message_data(
         for components in template_components:
             if components['type'] == "BODY":
                 template_text = components['text']
-        print(f"template_text: {template_text}")
         category = template_data['data'][0]['category']
         language = template_data['data'][0]['language']
 
@@ -308,8 +307,12 @@ def send_message_data(
         if template_text != "":
             template_text = template_text.replace("{{", "{")
             template_text = template_text.replace("}}", "}")
-            print(f"Update text: {template_text}")
-            template_text = template_text.format(**msg_details)
+            try:
+                template_text = template_text.format(**msg_details)
+            except:
+                # Convert keys to a list in order: 1, 2, 3, ...
+                args = [msg_details[str(i)] for i in range(1, len(msg_details) + 1)]
+                template_text = template_text.format(*args)
         
         print(f"template text: {template_text}")
 
