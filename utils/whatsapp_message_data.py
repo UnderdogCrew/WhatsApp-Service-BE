@@ -204,10 +204,11 @@ def send_message_data(
 
         if user_info is not None:
             business_id = user_info['business_id']
+            phone_number_id = user_info['phone_number_id']
             waba_id = user_info['waba_id']
             api_key = user_info['api_key']
         
-        url = f"https://graph.facebook.com/v19.0/{business_id}/messages"
+        url = f"https://graph.facebook.com/v19.0/{phone_number_id}/messages"
         template_url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates?name={template_name}"
         API_TOKEN = api_key
         
