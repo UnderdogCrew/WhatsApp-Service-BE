@@ -312,6 +312,7 @@ def send_message_data(
             except:
                 # Convert keys to a list in order: 1, 2, 3, ...
                 args = [msg_details[str(i)] for i in range(1, len(msg_details) + 1)]
+                print(f"args: {args}")
                 template_text = template_text.format(*args)
         
         print(f"template text: {template_text}")
