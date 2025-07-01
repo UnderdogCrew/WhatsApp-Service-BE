@@ -254,6 +254,26 @@ def send_message_data(
                 else:
                     pass
         
+        if metadata is not None:
+            for key, value in metadata.items():
+                if value == "$Name":
+                    customer_details = db.find_document(
+                            collection_name="customers",
+                            query={
+                                "number": number
+                            }
+                        )
+                    if customer_details is not None:
+                        text = customer_details['name']
+                    else:
+                        if params_fallback_value is not None:
+                            if "name" in params_fallback_value:
+                                text = params_fallback_value['name']
+                            else:
+                                pass
+                    metadata[key] = text
+
+        
         company_name = ""
         if entry is not None:
             if "company_name" in entry:
@@ -311,9 +331,7 @@ def send_message_data(
                 template_text = template_text.format(**msg_details)
             except:
                 # Convert keys to a list in order: 1, 2, 3, ...
-                args = [msg_details[str(i)] for i in range(1, len(msg_details) + 1)]
-                print(f"args: {args}")
-                template_text = template_text.format(*args)
+                pass
         
         print(f"template text: {template_text}")
 
