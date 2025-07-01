@@ -333,8 +333,6 @@ def send_message_data(
                 # Convert keys to a list in order: 1, 2, 3, ...
                 pass
         
-        print(f"template text: {template_text}")
-
         components = process_components(
             template_components,
             msg_details,
@@ -358,6 +356,8 @@ def send_message_data(
                     }
                 }
         )
+        print(f"url: {url}")
+        print(f"API_TOKEN: {API_TOKEN}")
         headers = {
             'Authorization': 'Bearer ' + API_TOKEN,
             'Content-Type': 'application/json'
