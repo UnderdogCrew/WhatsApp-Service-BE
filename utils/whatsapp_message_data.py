@@ -310,7 +310,8 @@ def send_message_data(
             except:
                 # Convert keys to a list in order: 1, 2, 3, ...
                 pass
-        template_text = template_text.replace("\n\n", "\n")
+        template_text = template_text.replace("\n\n", "")
+        template_text = template_text.replace("\t", "")
         components = process_components(
             template_components,
             msg_details,
