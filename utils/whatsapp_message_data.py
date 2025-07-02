@@ -32,6 +32,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
     result_list = []
 
     for component in components:
+        print(component)
         if component['type'].upper() == "HEADER" and component.get('format') == "IMAGE":
             # Process HEADER with type IMAGE
             if image_url != "":
