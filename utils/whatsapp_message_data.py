@@ -335,6 +335,7 @@ def send_message_data(
                 # Convert keys to a list in order: 1, 2, 3, ...
                 pass
         print(f"template_text: {template_text}")
+        print(f"template_components: {template_components}")
         components = process_components(
             template_components,
             msg_details,
