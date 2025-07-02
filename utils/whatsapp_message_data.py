@@ -28,7 +28,7 @@ db = MongoDB()
 API_TOKEN = API_KEY
 
 
-def process_components(components, msg_data, image_url, latitude=None, longitude=None, location_name=None, address=None):
+def process_components(components, msg_data, image_url, latitude=None, longitude=None, location_name=None, address=None, template_text=None):
     result_list = []
 
     for component in components:
@@ -141,17 +141,10 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
             elif "text" in component:
                 # Process BODY
                 body_parameters = []
-                text = component['text']
-                # Convert Timestamp to string if necessary
-                if isinstance(text, pd.Timestamp):  # Assuming you are using pandas
-                    text = text.strftime('%Y-%m-%d')  # Format as needed
-                if isinstance(text, str):
-                    text = text.strftime('%Y-%m-%d')  # Format as needed
                 body_parameters.append({
                     "type": "text",
-                    "text": text
+                    "text": template_text
                 })
-
                 body_entry = {
                     "type": "body",
                     "parameters": body_parameters
@@ -345,7 +338,8 @@ def send_message_data(
             latitude=latitude,
             longitude=longitude,
             location_name=location_name,
-            address=address
+            address=address,
+            template_text=template_text
         )
         payload = json.dumps({
             "messaging_product": "whatsapp",
