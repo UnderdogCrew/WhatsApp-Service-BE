@@ -137,23 +137,23 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                     "parameters": body_parameters
                 }
                 result_list.append(body_entry)
-            # elif "text" in component:
-            #     # Process BODY
-            #     body_parameters = []
-            #     text = component['text']
-            #     # Convert Timestamp to string if necessary
-            #     if isinstance(text, pd.Timestamp):  # Assuming you are using pandas
-            #         text = text.strftime('%Y-%m-%d')  # Format as needed
-            #     body_parameters.append({
-            #         "type": "text",
-            #         "text": text
-            #     })
+            elif "text" in component:
+                # Process BODY
+                body_parameters = []
+                text = component['text']
+                # Convert Timestamp to string if necessary
+                if isinstance(text, pd.Timestamp):  # Assuming you are using pandas
+                    text = text.strftime('%Y-%m-%d')  # Format as needed
+                body_parameters.append({
+                    "type": "text",
+                    "text": text
+                })
 
-            #     body_entry = {
-            #         "type": "body",
-            #         "parameters": body_parameters
-            #     }
-            #     result_list.append(body_entry)
+                body_entry = {
+                    "type": "body",
+                    "parameters": body_parameters
+                }
+                result_list.append(body_entry)
             
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
@@ -346,7 +346,7 @@ def send_message_data(
         payload = json.dumps({
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
-            "to": f"91{number}",
+            "to": f"{number}",
             "type": "template",
             "template": {
                     "name": template_name,
