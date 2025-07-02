@@ -331,11 +331,12 @@ def send_message_data(
         if template_text != "":
             template_text = template_text.replace("{{", "{")
             template_text = template_text.replace("}}", "}")
-            # try:
-            template_text = template_text.format(**msg_details)
-            # except:
-            #     # Convert keys to a list in order: 1, 2, 3, ...
-            #     pass
+            try:
+                for key, val in msg_details.items():
+                    template_text = template_text.replace(f'{{{key}}}', val)
+            except:
+                # Convert keys to a list in order: 1, 2, 3, ...
+                pass
         print(f"template_text: {template_text}")
         components = process_components(
             template_components,
