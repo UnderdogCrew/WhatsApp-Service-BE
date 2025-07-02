@@ -120,25 +120,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                 result_list.append(body_entry)
 
             # Existing condition for body_text
-            elif 'body_text' in component.get('example', {}):
-                # Process BODY
-                body_parameters = []
-                print(component['example']['body_text'][0])
-                for i, text in enumerate(component['example']['body_text'][0]):
-                    # Convert Timestamp to string if necessary
-                    if isinstance(text, pd.Timestamp):  # Assuming you are using pandas
-                        text = text.strftime('%Y-%m-%d')  # Format as needed
-                    body_parameters.append({
-                        "type": "text",
-                        "text": msg_data.get('Name') if i == 0 else text
-                    })
-
-                body_entry = {
-                    "type": "body",
-                    "parameters": body_parameters
-                }
-                result_list.append(body_entry)
-            elif "text" in component:
+            elif 'body_text' in component.get('example', {}) or "text" in component:
                 # Process BODY
                 body_parameters = []
                 body_parameters.append({
