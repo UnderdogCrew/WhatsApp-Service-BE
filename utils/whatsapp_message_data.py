@@ -145,6 +145,8 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                 # Convert Timestamp to string if necessary
                 if isinstance(text, pd.Timestamp):  # Assuming you are using pandas
                     text = text.strftime('%Y-%m-%d')  # Format as needed
+                if isinstance(text, str):
+                    text = text.strftime('%Y-%m-%d')  # Format as needed
                 body_parameters.append({
                     "type": "text",
                     "text": text
@@ -329,13 +331,12 @@ def send_message_data(
         if template_text != "":
             template_text = template_text.replace("{{", "{")
             template_text = template_text.replace("}}", "}")
-            try:
-                template_text = template_text.format(**msg_details)
-            except:
-                # Convert keys to a list in order: 1, 2, 3, ...
-                pass
+            # try:
+            template_text = template_text.format(**msg_details)
+            # except:
+            #     # Convert keys to a list in order: 1, 2, 3, ...
+            #     pass
         print(f"template_text: {template_text}")
-        print(f"template_components: {template_components}")
         components = process_components(
             template_components,
             msg_details,
