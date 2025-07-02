@@ -32,7 +32,6 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
     result_list = []
 
     for component in components:
-        print(component)
         if component['type'].upper() == "HEADER" and component.get('format') == "IMAGE":
             # Process HEADER with type IMAGE
             if image_url != "":
@@ -194,7 +193,6 @@ def send_message_data(
             'Authorization': f'Bearer {API_TOKEN}'
         }
         template_response = requests.request("GET", template_url, headers=headers)
-        print(f"template response: {template_response.status_code}")
         if template_response.status_code != 200:
             return False
         
@@ -312,7 +310,7 @@ def send_message_data(
             except:
                 # Convert keys to a list in order: 1, 2, 3, ...
                 pass
-        print(f"template_text: {template_text}")
+        template_text = template_text.replace("\n\n", "\n")
         components = process_components(
             template_components,
             msg_details,
