@@ -898,7 +898,7 @@ class VerifyBusinessDetailsView(APIView):
                 # Start background thread for webhook subscription
                 webhook_thread = threading.Thread(
                     target=self.subscribe_to_webhooks_background,
-                    args=(waba_id, api_key, user_id),
+                    args=(waba_id, api_key, user_id, phone_number_id),
                     daemon=True
                 )
                 webhook_thread.start()
@@ -913,7 +913,7 @@ class VerifyBusinessDetailsView(APIView):
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def subscribe_to_webhooks_background(self, waba_id, api_key, user_id):
+    def subscribe_to_webhooks_background(self, waba_id, api_key, user_id, phone_number_id):
         """
         Background task to subscribe the app to webhooks for the given WABA ID
         """
@@ -953,6 +953,22 @@ class VerifyBusinessDetailsView(APIView):
                 error_data = response.json() if response.content else {}
                 error_message = error_data.get("error", {}).get("message", "Unknown error")
                 print(f"Webhook subscription failed for user {user_id}: Status {response.status_code}: {error_message}")
+
+            ## need to register the phone number to the whatsapp business account
+            register_url = f"https://graph.facebook.com/v23.0/{phone_number_id}/register"
+            register_headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
+            payload = {
+                "messaging_product": "whatsapp",
+                "pin": "123456"
+            }
+            register_response = requests.post(register_url, headers=register_headers, json=payload, timeout=30)
+            if register_response.status_code == 200:
+                print(f"Successfully registered phone number {phone_number_id} to WhatsApp business account {waba_id}")
+            else:
+                print(f"Failed to register phone number {phone_number_id} to WhatsApp business account {waba_id}")
 
         except requests.exceptions.Timeout:
             error_msg = 'Request timeout during webhook subscription'
