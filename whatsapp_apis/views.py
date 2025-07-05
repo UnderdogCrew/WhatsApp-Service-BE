@@ -1413,9 +1413,9 @@ class ContactImportView(APIView):
                         continue
                     
                     # Add country code if not present
-                    if not phone_number.startswith('91'):
+                    if not phone_number.startswith('+91'):
                         if len(phone_number) == 10:
-                            phone_number = f"91{phone_number}"
+                            phone_number = f"+91{phone_number}"
                         else:
                             failed_count += 1
                             errors.append(f"Row {row_num}: Invalid phone number '{number}' - incorrect format")
@@ -1443,6 +1443,8 @@ class ContactImportView(APIView):
                             'user_id': current_user_id,
                             'name': name,
                             'number': phone_number,
+                            'source': 'import',
+                            'tags': "imported",
                             'status': 1,
                             'created_at': datetime.now(timezone.utc),
                             'updated_at': datetime.now(timezone.utc)
@@ -1511,13 +1513,11 @@ class ContactExportView(APIView):
                 contacts_data = []
                 for contact in contacts:
                     phone_number = contact['number']
-                    if phone_number.startswith('91'):
-                        phone_number = phone_number[2:]
+                    if phone_number.startswith('+91'):
+                        phone_number = phone_number[3:]
                     contacts_data.append({
                         'name': contact['name'],
                         'number': phone_number,
-                        'created_at': contact.get('created_at', '').isoformat() if contact.get('created_at') else '',
-                        'updated_at': contact.get('updated_at', '').isoformat() if contact.get('updated_at') else ''
                     })
                 
                 response = JsonResponse({
@@ -1534,23 +1534,18 @@ class ContactExportView(APIView):
                 writer = csv.writer(output)
                 
                 # Write header
-                writer.writerow(['Name', 'Phone Number', 'Created Date', 'Updated Date'])
+                writer.writerow(['name', 'number'])
                 
                 # Write data
                 for contact in contacts:
                     # Remove '91' prefix from phone number for export
                     phone_number = contact['number']
-                    if phone_number.startswith('91'):
-                        phone_number = phone_number[2:]
-                    
-                    created_date = contact.get('created_at', '').strftime('%Y-%m-%d %H:%M:%S') if contact.get('created_at') else ''
-                    updated_date = contact.get('updated_at', '').strftime('%Y-%m-%d %H:%M:%S') if contact.get('updated_at') else ''
+                    if phone_number.startswith('+91'):
+                        phone_number = phone_number[3:]
                     
                     writer.writerow([
                         contact['name'], 
                         phone_number,
-                        created_date,
-                        updated_date
                     ])
 
                 # Create the HttpResponse object with CSV data
