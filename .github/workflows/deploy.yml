@@ -26,7 +26,7 @@ jobs:
       - name: Deploy to server
         run: |
           ssh ubuntu@${{ secrets.SERVER_IP }} '
-            sudo su - <<EOF
+            sudo su
             cd ${{ secrets.PROJECT_PATH }} &&
             source enve/bin/activate &&
             cd WhatsApp-Service-BE &&
