@@ -80,4 +80,5 @@ urlpatterns = [
     path('messages', views.WhatsAppMessage.as_view(), name='messages'),
     path('user/status', login_service.UserStatusView.as_view(), name='user-status'),
     path('whatsapp/upload-file/', whatsapp_apis.FacebookFileUploadView.as_view(), name='facebook-file-upload'),
+    path('dashboard/data', views.UserDashboardData.as_view(), name='dashboard-data'),
 ]

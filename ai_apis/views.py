@@ -1405,3 +1405,139 @@ class WhatsAppMessage(APIView):
         except Exception as ex:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
             return JsonResponse({"message": "Something went wrong"}, safe=False, status=500)
+        
+
+class UserDashboardData(APIView):
+    @swagger_auto_schema(
+        operation_description="Fetch user dashboard data",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                "start_date",
+                openapi.IN_QUERY,
+                description="Start date for filtering data (optional, format: YYYY-MM-DD)",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "end_date",
+                openapi.IN_QUERY,
+                description="End date for filtering data (optional, format: YYYY-MM-DD)",
+                type=openapi.TYPE_STRING,
+                required=False,
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                "Success",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "data": openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_OBJECT)),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                    },
+                )
+            ),
+            401: "Unauthorized",
+            500: "Internal Server Error",
+        }
+    )
+    @token_required  # Ensure the user is authenticated
+    def get(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
+        try:
+            token = request.headers.get('Authorization')  # Extract the token from the Authorization header
+            if token is None or not token.startswith('Bearer '):
+                return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+            token = token.split(' ')[1]  # Get the actual token part
+            user_info = decode_token(token)  # Decode the token to get user information
+
+            sent_count = 0
+            delivered_count = 0
+            read_count = 0
+            
+            # Check if user_info is a dictionary
+            if isinstance(user_info, dict) and 'user_id' in user_info:
+                user_id = user_info['user_id']  # Access user_id from the decoded token
+            else:
+                return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+            
+            ## we need to get the user info from the database
+            db = MongoDB()
+            user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
+            if user_info is None:
+                return JsonResponse({"message": "User not found"}, status=404)
+            
+            ## we need to get the phone number id from the database
+            waba_id = user_info['waba_id']
+            meta_business_number = user_info['meta_business_number']
+            meta_business_number = meta_business_number.replace("+", "")
+            meta_business_number = meta_business_number.replace(" ", "")
+            api_key = user_info['api_key']
+                        
+            # Parse optional query parameters
+            start_date = request.query_params.get("start_date", None)
+            end_date = request.query_params.get("end_date", None)
+
+            if start_date is None and end_date is None:
+                return JsonResponse({"message": "Start date and end date are required"}, status=400)
+
+            # Validate and process date formats
+            if start_date:
+                try:
+                    start_date_gmt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+
+                    # Localize to Asia/Kolkata timezone
+                    kolkata_timezone = pytz.timezone("Asia/Kolkata")
+                    start_date_localized = kolkata_timezone.localize(start_date_gmt)
+                    # Convert to timestamp
+                    start_date = int(start_date_localized.timestamp())
+                except ValueError:
+                    return JsonResponse(
+                        {"message": "Invalid start_date format. Use YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            if end_date:
+                try:
+                    end_date_gmt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+                    end_date_gmt = end_date_gmt.replace(hour=23, minute=59, second=59, microsecond=59)
+
+                    # Localize to Asia/Kolkata timezone
+                    kolkata_timezone = pytz.timezone("Asia/Kolkata")
+                    end_date_localized = kolkata_timezone.localize(end_date_gmt)
+                    # Convert to timestamp
+                    end_date = int(end_date_localized.timestamp())
+                except ValueError:
+                    return JsonResponse(
+                        {"message": "Invalid end_date format. Use YYYY-MM-DD."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            api_url = f"https://graph.facebook.com/v23.0/{waba_id}?fields=analytics.start({start_date}).end({end_date}).granularity(DAY).phone_numbers([{meta_business_number}])"
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
+            response = requests.get(api_url, headers=headers)
+            if response.status_code == 200:
+                if "analytics" in response.json():
+                    analytics_data = response.json()['analytics']['data_points']
+                    for data in analytics_data:
+                        sent_count += data['sent'] if 'sent' in data else 0
+                        delivered_count += data['delivered'] if 'delivered' in data else 0
+                        read_count += data['read'] if 'read' in data else 0
+                    return JsonResponse({"sent_count": sent_count, "delivered_count": delivered_count, "read_count": read_count}, status=status.HTTP_200_OK)
+                else:
+                    return JsonResponse({"message": "No analytics data found"}, status=404)
+            else:
+                return JsonResponse({"message": response.text}, status=response.status_code)
+
+        except Exception as ex:
+            print(f"Error: {ex}")
+            return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
