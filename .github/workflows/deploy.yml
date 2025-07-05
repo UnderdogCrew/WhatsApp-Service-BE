@@ -1,9 +1,9 @@
-name: Whatsapp service Deploy
+name: Whatsapp Service Production Deploy
 
 on:
   push:
     branches:
-      - develop  # or master, depending on your default branch name
+      - develop
 
 jobs:
   deploy:
@@ -21,15 +21,17 @@ jobs:
       - name: Add known hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.PROD_SERVER_IP }} >> ~/.ssh/known_hosts
 
       - name: Deploy to server
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.SERVER_IP }} "
-            cd '${{ secrets.PROJECT_PATH }}/WhatsApp-Service-BE' &&
-            source ../enve/bin/activate &&
-            git -c safe.directory='${{ secrets.PROJECT_PATH }}/WhatsApp-Service-BE' pull origin develop &&
+          ssh ubuntu@${{ secrets.PROD_SERVER_IP }} '
+            sudo su - <<EOF
+            cd ${{ secrets.PROD_PROJECT_PATH }} &&
+            source .enve/bin/activate &&
+            cd WhatsApp-Service-BE &&
+            git config --global --add safe.directory $PWD &&
+            git pull origin main &&
             pip install -r req.txt &&
             pm2 restart whatsapp-service
-          "
-
+          '
