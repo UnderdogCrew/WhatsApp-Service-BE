@@ -1631,8 +1631,8 @@ class CustomerCredits(APIView):
             if user_info is None:
                 return JsonResponse({"message": "User not found"}, status=404)
             
-            template_type = request.query_params.get("template_type", None)
-            if template_type is None:
+            template_type = int(request.query_params.get("template_type", 0))
+            if template_type == 0:
                 return JsonResponse({"message": "Template type is required"}, status=400)
             
             if template_type not in [1, 2, 3]:
