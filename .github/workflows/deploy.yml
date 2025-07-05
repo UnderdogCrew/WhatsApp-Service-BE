@@ -28,9 +28,10 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.SERVER_IP }} "
             cd '${{ secrets.PROJECT_PATH }}/WhatsApp-Service-BE' &&
             source ../enve/bin/activate &&
-            GIT_CONFIG_GLOBAL=/dev/null git pull origin develop &&
+            GIT_SAFE_DIRECTORY='${{ secrets.PROJECT_PATH }}/WhatsApp-Service-BE' git pull origin develop &&
             pip install -r req.txt &&
             pm2 restart whatsapp-service
           "
+
 
 
