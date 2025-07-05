@@ -1548,3 +1548,104 @@ class UserDashboardData(APIView):
         except Exception as ex:
             print(f"Error: {ex}")
             return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+
+class CustomerCredits(APIView):
+    @swagger_auto_schema(
+        operation_description="Fetch customer credits",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                "template_type",
+                openapi.IN_QUERY,
+                description="Template type(1 for marketing, 2 for utility, 3 for authentication)",
+                type=openapi.TYPE_INTEGER,
+                required=True
+            ),
+            openapi.Parameter(
+                "customer_count",
+                openapi.IN_QUERY,
+                description="Number of customers",
+                type=openapi.TYPE_INTEGER,
+                required=True
+            )
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            422: 'Unprocessable Entity',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required  # Ensure the user is authenticated
+    def get(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
+        try:
+            token = request.headers.get('Authorization')  # Extract the token from the Authorization header
+            if token is None or not token.startswith('Bearer '):
+                return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+            token = token.split(' ')[1]  # Get the actual token part
+            user_info = decode_token(token)  # Decode the token to get user information
+            
+            # Check if user_info is a dictionary
+            if isinstance(user_info, dict) and 'user_id' in user_info:
+                user_id = user_info['user_id']  # Access user_id from the decoded token
+            else:
+                return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+            
+            ## we need to get the user info from the database
+            db = MongoDB()
+            user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
+            if user_info is None:
+                return JsonResponse({"message": "User not found"}, status=404)
+            
+            template_type = request.query_params.get("template_type", None)
+            if template_type is None:
+                return JsonResponse({"message": "Template type is required"}, status=400)
+            
+            if template_type not in [1, 2, 3]:
+                return JsonResponse({"message": "Invalid template type"}, status=400)
+            
+            customer_count = request.query_params.get("customer_count", None)
+            if customer_count is None:
+                return JsonResponse({"message": "Customer count is required"}, status=400)
+            
+            ## we need to get the credits from the database
+            user_credits = user_info['default_credit']
+            
+            if template_type == 1:
+                credits = customer_count * 0.875
+            elif template_type == 2:
+                credits = customer_count * 0.125
+            elif template_type == 3:
+                credits = customer_count * 0.125
+            else:
+                return JsonResponse({"message": "Invalid template type"}, status=400)
+            
+            if user_credits < credits:
+                return JsonResponse({"message": "Insufficient credits"}, status=400)
+            
+            response = {
+                "message": "Credits fetched successfully",
+                "credits_required": credits,
+                "remaining_credits": user_credits - credits,
+                "user_credits": user_credits
+            }
+            
+            return JsonResponse(response, status=200)
+            
+        except Exception as ex:
+            print(f"Error: {ex}")
+            return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
