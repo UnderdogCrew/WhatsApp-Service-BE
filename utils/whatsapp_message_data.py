@@ -178,12 +178,14 @@ def send_message_data(
     try:
         
         user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
+        user_credit = 0
 
         if user_info is not None:
             business_id = user_info['business_id']
             phone_number_id = user_info['phone_number_id']
             waba_id = user_info['waba_id']
             api_key = user_info['api_key']
+            user_credit = user_info['default_credit']
         
         url = f"https://graph.facebook.com/v19.0/{phone_number_id}/messages"
         template_url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates?name={template_name}"
@@ -363,6 +365,16 @@ def send_message_data(
                 "template_name": template_name
             }
             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+            db.update_document(
+                collection_name="users",
+                query={"_id": ObjectId(user_id)},
+                update_data={
+                    "$set": {
+                        "default_credit": user_credit - 0.125 if category == "UTILITY" else 0.875
+                    }
+                }
+            )
+
         else:
             print(f"Meta response: {response.json()}")
             whatsapp_status_logs = {
