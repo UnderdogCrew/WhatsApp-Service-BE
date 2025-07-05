@@ -1,9 +1,9 @@
-name: Whatsapp Service Production Deploy
+name: Whatsapp service Deploy
 
 on:
   push:
     branches:
-      - develop
+      - develop  # or master, depending on your default branch name
 
 jobs:
   deploy:
@@ -28,10 +28,10 @@ jobs:
           ssh ubuntu@${{ secrets.SERVER_IP }} '
             sudo su - <<EOF
             cd ${{ secrets.PROJECT_PATH }} &&
-            source .enve/bin/activate &&
+            source enve/bin/activate &&
             cd WhatsApp-Service-BE &&
             git config --global --add safe.directory $PWD &&
             git pull origin develop &&
             pip install -r req.txt &&
             pm2 restart whatsapp-service
-          '
+          ' 
