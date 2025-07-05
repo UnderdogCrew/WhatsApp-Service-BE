@@ -1638,7 +1638,7 @@ class CustomerCredits(APIView):
             if template_type not in [1, 2, 3]:
                 return JsonResponse({"message": "Invalid template type"}, status=400)
             
-            customer_count = request.query_params.get("customer_count", None)
+            customer_count = int(request.query_params.get("customer_count", 0))
             if customer_count is None:
                 return JsonResponse({"message": "Customer count is required"}, status=400)
             
