@@ -21,17 +21,17 @@ jobs:
       - name: Add known hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.PROD_SERVER_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
 
       - name: Deploy to server
         run: |
-          ssh ubuntu@${{ secrets.PROD_SERVER_IP }} '
+          ssh ubuntu@${{ secrets.SERVER_IP }} '
             sudo su - <<EOF
-            cd ${{ secrets.PROD_PROJECT_PATH }} &&
+            cd ${{ secrets.PROJECT_PATH }} &&
             source .enve/bin/activate &&
             cd WhatsApp-Service-BE &&
             git config --global --add safe.directory $PWD &&
-            git pull origin main &&
+            git pull origin develop &&
             pip install -r req.txt &&
             pm2 restart whatsapp-service
           '
