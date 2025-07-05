@@ -179,7 +179,6 @@ class SendMessage(APIView):
                 API_KEY = API_TOKEN
             
             print(f"API_KEY: {API_KEY}")
-            print(template_url)
 
             headers = {
                 'Authorization': f'Bearer {API_KEY}'
