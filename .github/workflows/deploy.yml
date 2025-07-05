@@ -25,13 +25,15 @@ jobs:
 
       - name: Deploy to server
         run: |
-          ssh ubuntu@${{ secrets.SERVER_IP }} '
-            sudo su
-            cd ${{ secrets.PROJECT_PATH }} &&
-            source enve/bin/activate &&
-            cd WhatsApp-Service-BE &&
-            git config --global --add safe.directory $PWD &&
-            git pull origin develop &&
-            pip install -r req.txt &&
-            pm2 restart whatsapp-service
-          ' 
+          ssh ubuntu@${{ secrets.SERVER_IP }} <<'EOF'
+            sudo su - <<EOS
+              cd ${{ secrets.PROJECT_PATH }} &&
+              source enve/bin/activate &&
+              cd WhatsApp-Service-BE &&
+              git config --add safe.directory $PWD &&
+              git pull origin develop &&
+              pip install -r req.txt &&
+              pm2 restart whatsapp-service
+            EOS
+          EOF
+ 
