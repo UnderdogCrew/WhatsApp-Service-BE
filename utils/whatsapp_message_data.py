@@ -369,9 +369,7 @@ def send_message_data(
                 collection_name="users",
                 query={"_id": ObjectId(user_id)},
                 update_data={
-                    "$set": {
-                        "default_credit": user_credit - 0.125 if category == "UTILITY" else 0.875
-                    }
+                    "default_credit": user_credit - 0.125 if category == "UTILITY" else 0.875
                 }
             )
 
