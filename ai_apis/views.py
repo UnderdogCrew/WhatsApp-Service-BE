@@ -1590,6 +1590,27 @@ class CustomerCredits(APIView):
     )
     @token_required  # Ensure the user is authenticated
     def get(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
+        '''
+            API For calculating the credits required for the template
+                - Get the user info from the database
+                - Get the template type from the request
+                - Get the customer count from the request
+                - Calculate the credits required for the template
+                - Check if the user has sufficient credits
+                - Return the response
+            template_type:
+                1: marketing
+                2: utility
+                3: authentication
+            customer_count:
+                number of customers
+            credits:
+                credits required for the template
+            remaining_credits:
+                remaining credits after the transaction
+            user_credits:
+                total credits of the user
+        '''
         try:
             token = request.headers.get('Authorization')  # Extract the token from the Authorization header
             if token is None or not token.startswith('Bearer '):
