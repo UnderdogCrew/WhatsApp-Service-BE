@@ -187,7 +187,7 @@ def send_message_data(
             api_key = user_info['api_key']
             user_credit = user_info['default_credit']
         
-        url = f"https://graph.facebook.com/v19.0/{phone_number_id}/messages"
+        url = f"https://graph.facebook.com/v23.0/{phone_number_id}/messages"
         template_url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates?name={template_name}"
         API_TOKEN = api_key
         
@@ -312,8 +312,8 @@ def send_message_data(
             except:
                 # Convert keys to a list in order: 1, 2, 3, ...
                 pass
-        template_text = template_text.replace("\n", "")
-        template_text = template_text.replace("\n\n", "")
+        # template_text = template_text.replace("\n", "")
+        # template_text = template_text.replace("\n\n", "")
         template_text = template_text.replace("\t", "")
         components = process_components(
             template_components,
