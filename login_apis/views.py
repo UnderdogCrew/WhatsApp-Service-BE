@@ -892,6 +892,7 @@ class VerifyBusinessDetailsView(APIView):
                     update_data['email'] = profile_data['email']
                     update_data['profile_picture_url'] = profile_data['profile_picture_url']
                     update_data['websites'] = profile_data['websites']
+                    update_data["vertical"] = profile_data["vertical"]
 
             if waba_id:
                 update_data["waba_id"] = waba_id
@@ -1075,7 +1076,8 @@ class ProfileView(APIView):
                 "description": user.get("description", ""),
                 "email": user.get("email", ""),
                 "profile_picture_url": user.get("profile_picture_url", ""),
-                "websites": user.get("websites", "")
+                "websites": user.get("websites", []),
+                "vertical": user.get("", "")
             }
 
             subscription_data = None
