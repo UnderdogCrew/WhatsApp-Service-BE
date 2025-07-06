@@ -312,7 +312,7 @@ def send_message_data(
                 pass
         
         
-        template_text = template_text.replace("\n", "")
+        # template_text = template_text.replace("\n", "")
         template_text = template_text.replace("\n\n", "\\n")
         template_text = template_text.replace("\t", "")
         print(f"template_text:\n {template_text}")
