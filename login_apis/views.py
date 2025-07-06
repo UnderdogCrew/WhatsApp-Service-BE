@@ -872,6 +872,27 @@ class VerifyBusinessDetailsView(APIView):
                 update_data["verified_name"] = verified_name
             if phone_number_id:
                 update_data["phone_number_id"] = phone_number_id
+
+                phone_number_url = f"https://graph.facebook.com/v23.0/{phone_number_id}"
+                phoner_number_header = {
+                    "Authorization": api_key
+                }
+                phone_number_response = requests.get(url=phone_number_url, headers=phoner_number_header)
+                if phone_number_response.status_code == 200:
+                    update_data["quality_rating"] = phone_number_response.json()['quality_rating']
+                    update_data['platform_type'] = phone_number_response.json()['platform_type']
+                    update_data['throughput'] = phone_number_response.json()['throughput']
+
+                profile_details_url = f"https://graph.facebook.com/v23.0/{phone_number_id}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical"
+                profile_details_response = requests.get(url=profile_details_url, headers=phoner_number_header)
+                if profile_details_response.status_code == 200:
+                    profile_data = profile_details_response.json()['data'][0]
+                    update_data["about"] = profile_data['about']
+                    update_data['description'] = profile_data['description']
+                    update_data['email'] = profile_data['email']
+                    update_data['profile_picture_url'] = profile_data['profile_picture_url']
+                    update_data['websites'] = profile_data['websites']
+
             if waba_id:
                 update_data["waba_id"] = waba_id
             if auto_reply_enabled:
@@ -1045,7 +1066,16 @@ class ProfileView(APIView):
                 'waba_id': user.get('waba_id', ''),
                 'auto_reply_enabled': user.get('auto_reply_enabled', False),
                 "meta_business_number": user.get("meta_business_number", ""),
-                'verified_name': user.get('verified_name', '')
+                'verified_name': user.get('verified_name', ''),
+                "quality_rating": user.get('quality_rating', 'Pending'),
+                'platform_type': user.get('platform_type', ''),
+                'throughput': user.get('throughput', {}),
+                "remaining_quota": 1000,
+                "about": user.get("about", ""),
+                "description": user.get("description", ""),
+                "email": user.get("email", ""),
+                "profile_picture_url": user.get("profile_picture_url", ""),
+                "websites": user.get("websites", "")
             }
 
             subscription_data = None
