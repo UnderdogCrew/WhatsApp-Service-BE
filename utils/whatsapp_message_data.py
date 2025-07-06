@@ -313,12 +313,13 @@ def send_message_data(
                 pass
         
         
-        # template_text = template_text.replace("\n", "")
-        template_text = template_text.replace("\n\n", "\\n")   # replaces only *double* line-breaks
-        template_text = template_text.replace("\t", "")
-        template_text = re.sub(r" {5,}", "    ", template_text)   # max 4 spaces
-        # c) **escape every newline**
-        template_text = re.sub(r"\r?\n", r"\\n", template_text)
+        # # template_text = template_text.replace("\n", "")
+        # template_text = template_text.replace("\n\n", "\\n")   # replaces only *double* line-breaks
+        # template_text = template_text.replace("\t", "")
+        # template_text = re.sub(r" {5,}", "    ", template_text)   # max 4 spaces
+        # # c) **escape every newline**
+        # template_text = re.sub(r"\r?\n", r"\\n", template_text)
+        template_text = re.sub(r"\r?\n", r"\\n", template_text)   # ← key line
 
         print(f"template_text:\n {template_text}")
         components = process_components(
