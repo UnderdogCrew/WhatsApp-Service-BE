@@ -10,6 +10,7 @@ import sys
 import django
 from bson import ObjectId
 import time
+import re
 
 current_path = os.path.abspath(os.getcwd())
 base_path = os.path.dirname(current_path)  # This will give you /opt/whatsapp_service/WhatsApp-Service-BE
@@ -313,8 +314,9 @@ def send_message_data(
         
         
         # template_text = template_text.replace("\n", "")
-        template_text = template_text.replace("\n\n", "\\n")
+        template_text = template_text.replace("\n\n", "\\n")   # replaces only *double* line-breaks
         template_text = template_text.replace("\t", "")
+        template_text = re.sub(r" {5,}", "    ", template_text)   # max 4 spaces
         print(f"template_text:\n {template_text}")
         components = process_components(
             template_components,
