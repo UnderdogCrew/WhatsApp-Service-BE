@@ -123,15 +123,15 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
             elif 'body_text' in component.get('example', {}) or "text" in component:
                 # Process BODY
                 body_parameters = []
-                print(f"Inside template_text:\n\n\n\n {template_text}")
                 body_parameters.append({
                     "type": "text",
-                    "text": repr(template_text)
+                    "text": template_text
                 })
                 body_entry = {
                     "type": "body",
                     "parameters": body_parameters
                 }
+                print(f"Inside template_text:\n\n\n\n {body_entry}")
                 result_list.append(body_entry)
             
         elif component['type'].upper() == "BUTTONS":
