@@ -131,7 +131,6 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                     "type": "body",
                     "parameters": body_parameters
                 }
-                print(f"Inside template_text:\n\n\n\n {body_entry}")
                 result_list.append(body_entry)
             
         elif component['type'].upper() == "BUTTONS":
@@ -346,7 +345,8 @@ def send_message_data(
                     },
                     "components": components
                 }
-            }
+            },
+            ensure_ascii=False
         )
         print(f"url: {url}")
         print(f"API_TOKEN: {API_TOKEN}")
