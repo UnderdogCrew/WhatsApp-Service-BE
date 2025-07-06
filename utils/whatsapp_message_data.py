@@ -321,8 +321,7 @@ def send_message_data(
 
         # 3. **escape EVERY newline (CR, LF, CRLF)**
         template_text = template_text.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
-
-        print(f"template_text:\n {template_text}")
+        print("sanitised repr ->\n\n", repr(template_text))   # should show *only* “\\n”
         components = process_components(
             template_components,
             msg_details,
