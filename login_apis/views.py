@@ -1077,7 +1077,7 @@ class ProfileView(APIView):
                 "email": user.get("email", ""),
                 "profile_picture_url": user.get("profile_picture_url", ""),
                 "websites": user.get("websites", []),
-                "vertical": user.get("", "")
+                "vertical": user.get("vertical", "")
             }
 
             subscription_data = None
