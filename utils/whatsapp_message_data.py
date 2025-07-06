@@ -125,7 +125,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                 body_parameters = []
                 body_parameters.append({
                     "type": "text",
-                    "text": template_text
+                    "text": repr(template_text)
                 })
                 body_entry = {
                     "type": "body",
@@ -332,19 +332,20 @@ def send_message_data(
             address=address,
             template_text=template_text
         )
-        payload = json.dumps({
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": f"{number}",
-            "type": "template",
-            "template": {
+        payload = json.dumps(
+            {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": f"{number}",
+                "type": "template",
+                "template": {
                     "name": template_name,
-                        "language": {
-                            "code": language
-                        },
-                        "components": components
-                    }
+                    "language": {
+                        "code": language
+                    },
+                    "components": components
                 }
+            }
         )
         print(f"url: {url}")
         print(f"API_TOKEN: {API_TOKEN}")
