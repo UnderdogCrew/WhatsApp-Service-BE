@@ -301,8 +301,6 @@ def send_message_data(
                 "Name": text
             }
 
-        print(f"msg_details: {msg_details}")
-
         if template_text != "":
             template_text = template_text.replace("{{", "{")
             template_text = template_text.replace("}}", "}")
@@ -312,6 +310,8 @@ def send_message_data(
             except:
                 # Convert keys to a list in order: 1, 2, 3, ...
                 pass
+        
+        print(f"template_text\n: {template_text}")
         template_text = template_text.replace("\n", "")
         template_text = template_text.replace("\n\n", "\\n")
         template_text = template_text.replace("\t", "")
