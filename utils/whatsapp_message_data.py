@@ -315,7 +315,7 @@ def send_message_data(
         
         # 1. remove hard TABs
         template_text = template_text.replace("\t", "")
-        template_text = template_text.replace("\n", "")
+        template_text = template_text.replace("\n\n", "")
 
         # 2. collapse runs of ≥5 spaces (rule: max 4)
         template_text = re.sub(r" {5,}", "    ", template_text)
