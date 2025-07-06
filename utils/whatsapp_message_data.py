@@ -332,22 +332,19 @@ def send_message_data(
             address=address,
             template_text=template_text
         )
-        payload = json.dumps(
-            {
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": f"{number}",
-                "type": "template",
-                "template": {
-                    "name": template_name,
-                    "language": {
-                        "code": language
-                    },
-                    "components": components
-                }
-            },
-            ensure_ascii=False
-        )
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": f"{number}",
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {
+                    "code": language
+                },
+                "components": components
+            }
+        }
         print(f"url: {url}")
         print(f"API_TOKEN: {API_TOKEN}")
         headers = {
@@ -359,7 +356,7 @@ def send_message_data(
         if category != "UTILITY":
             time.sleep(7)
         
-        response = requests.post(url, headers=headers, data=payload)
+        response = requests.post(url, headers=headers, json=payload)
         print(f"Meta response: {response.status_code}")
         if response.status_code == 200:
             whatsapp_status_logs = {
