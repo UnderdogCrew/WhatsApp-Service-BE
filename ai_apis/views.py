@@ -1646,11 +1646,11 @@ class CustomerCredits(APIView):
             user_credits = user_info['default_credit']
             
             if template_type == 1:
-                credits = customer_count * 0.875
+                credits = round(customer_count * 0.875, 2)
             elif template_type == 2:
-                credits = customer_count * 0.125
+                credits = round(customer_count * 0.125, 2)
             elif template_type == 3:
-                credits = customer_count * 0.125
+                credits = round(customer_count * 0.125, 2)
             else:
                 return JsonResponse({"message": "Invalid template type"}, status=400)
             

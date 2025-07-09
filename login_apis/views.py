@@ -1072,6 +1072,7 @@ class ProfileView(APIView):
                 'platform_type': user.get('platform_type', ''),
                 'throughput': user.get('throughput', {}),
                 "remaining_quota": 1000,
+                "whatsapp_api_status": "LIVE",
                 "about": user.get("about", ""),
                 "description": user.get("description", ""),
                 "email": user.get("email", ""),
