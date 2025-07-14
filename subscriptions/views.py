@@ -9,11 +9,13 @@ from drf_yasg import openapi
 from utils.database import MongoDB
 from .serializers import (
     SubscriptionSerializer, PlanSerializer,
-    SubscriptionCancelRequestSerializer, RazorpayOrderRequestSerializer
+    SubscriptionCancelRequestSerializer, RazorpayOrderRequestSerializer,
+    PaymentVerificationRequestSerializer, PaymentVerificationResponseSerializer
 )
 from utils.razorpay_helper import (
     create_razorpay_subscription, cancel_razorpay_subscription,
-    get_subscription_invoices, create_razorpay_order
+    get_subscription_invoices, create_razorpay_order,
+    verify_razorpay_payment, verify_payment_signature
 )
 from bson import ObjectId
 from utils.auth import token_required
@@ -158,6 +160,211 @@ class CreateOrderView(APIView):
                 {"error": f"Failed to create order: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class CreateCreditOrderView(APIView):
+    @swagger_auto_schema(
+        operation_description="Create a new Razorpay order for credits",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        request_body=RazorpayOrderRequestSerializer,
+        responses={
+            200: openapi.Response('Order created successfully', schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'order_id': openapi.Schema(type=openapi.TYPE_STRING)
+                }
+            )),
+            500: 'Internal server error'
+        }
+    )
+    @token_required
+    def post(self, request, current_user_id, current_user_email):
+        serializer = RazorpayOrderRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        db = MongoDB()
+        try:
+            order_data, error = create_razorpay_order(
+                amount=serializer.validated_data['amount'],
+                currency=serializer.validated_data['currency'],
+                receipt=serializer.validated_data['receipt'],
+                notes={"email": current_user_email, "user_id": current_user_id, "credits": serializer.validated_data['amount'] / 100}
+            )
+
+            db.create_document('payment_orders', {
+                "order_id": order_data.get("id"),
+                "user_email": current_user_email,
+                "user_id": current_user_id,
+                "amount": serializer.validated_data['amount'],
+                "status": "created",
+                "created_at": datetime.now()
+            })
+
+            if error:
+                return Response(
+                    {"error": f"Failed to create order: {error}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            return Response({
+                "message": "Order created successfully",
+                "order_id": order_data.get("id"),
+            })
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to create order: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class PaymentVerificationView(APIView):
+    @swagger_auto_schema(
+        operation_description="Verify Razorpay payment and update payment order status",
+        request_body=PaymentVerificationRequestSerializer,
+        responses={
+            200: PaymentVerificationResponseSerializer,
+            400: 'Bad Request',
+            500: 'Internal Server Error'
+        }
+    )
+    def post(self, request):
+        """
+        Verify Razorpay payment and add credits
+        """
+        try:
+            # Validate request data
+            serializer = PaymentVerificationRequestSerializer(data=request.data)
+            if not serializer.is_valid():
+                return Response({
+                    'success': False,
+                    'message': 'Validation error',
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            validated_data = serializer.validated_data
+            
+            # Verify signature
+            params_dict = {
+                'razorpay_payment_id': validated_data['razorpay_payment_id'],
+                'razorpay_order_id': validated_data['razorpay_order_id'],
+                'razorpay_signature': validated_data['razorpay_signature']
+            }
+
+            if not verify_payment_signature(params_dict):
+                return Response({
+                    'success': False,
+                    'message': 'Payment verification failed'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get payment details
+            payment, error = verify_razorpay_payment(
+                validated_data['razorpay_payment_id'], 
+                validated_data['razorpay_order_id']
+            )
+            
+            if error:
+                return Response({
+                    'success': False,
+                    'message': f'Payment verification failed: {str(error)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if payment['status'] != "captured":
+                return Response({
+                    'success': False,
+                    'message': 'Payment not captured'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get payment order details from MongoDB
+            db = MongoDB()
+            payment_order = db.find_document(
+                'payment_orders',
+                {"order_id": validated_data['razorpay_order_id']}
+            )
+
+            if not payment_order:
+                return Response({
+                    'success': False,
+                    'message': 'Payment order not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            if payment_order.get('status') == 'completed':
+                return Response({
+                    'success': False,
+                    'message': 'Payment already processed'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Calculate credits to add (amount is in paise, so divide by 100)
+            amount_in_rupees = payment_order['amount'] / 100
+            credits_to_add = amount_in_rupees  # 1 rupee = 1 credit
+
+            # Update payment status
+            result = db.update_document(
+                'payment_orders',
+                {"order_id": validated_data['razorpay_order_id']},
+                {
+                    "status": "completed",
+                    "payment_id": validated_data['razorpay_payment_id'],
+                    "completed_at": datetime.now(),
+                    "credits_added": credits_to_add
+                }
+            )
+
+            if result.modified_count == 0:
+                return Response({
+                    'success': False,
+                    'message': 'Failed to update payment order'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # Get current user details
+            user = db.find_document(
+                'users',
+                {"_id": ObjectId(payment_order['user_id'])}
+            )
+
+            if not user:
+                return Response({
+                    'success': False,
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Update user credits
+            current_credits = user.get('default_credit', 0)
+            new_credits = current_credits + credits_to_add
+
+            credit_update_result = db.update_document(
+                'users',
+                {"_id": ObjectId(payment_order['user_id'])},
+                {"default_credit": new_credits}
+            )
+
+            if credit_update_result.modified_count == 0:
+                return Response({
+                    'success': False,
+                    'message': 'Failed to update user credits'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({
+                'success': True,
+                'message': 'Payment verified successfully and credits added',
+                'data': {
+                    'credits_added': credits_to_add,
+                    'new_credit_balance': new_credits,
+                    'amount_paid': amount_in_rupees
+                }
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': f'Payment verification failed: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class SubscriptionView(APIView):
     @swagger_auto_schema(
@@ -385,3 +592,4 @@ class WebhookView(APIView):
                 {"error": f"Failed to process webhook: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
