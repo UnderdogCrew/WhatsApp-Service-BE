@@ -67,8 +67,8 @@ urlpatterns = [
     path('subscriptions', subscription_views.SubscriptionView.as_view(), name='subscription_view'),
     path('subscriptions/cancel', subscription_views.SubscriptionCancelView.as_view(), name='subscription_cancel'),
     path('subscriptions/create-order', subscription_views.CreateOrderView.as_view(), name='create_order'),
-    path('verify-payment', subscription_views.PaymentVerificationView.as_view(), name='verify_payment'),
-    path('create-credit-order', subscription_views.CreateCreditOrderView.as_view(), name='create_credit_order'),
+    path('credits/verify-payment', subscription_views.PaymentVerificationView.as_view(), name='verify_payment'),
+    path('credits/create-order', subscription_views.CreateCreditOrderView.as_view(), name='create_credit_order'),
     path('subscriptions/plans', subscription_views.PlansView.as_view(), name='plans'),
     path('subscriptions/webhook', subscription_views.WebhookView.as_view(), name='webhook'),
     path('whatsapp-templates/', whatsapp_apis.WhatsAppTemplateView.as_view(), name='whatsapp-templates'),
@@ -84,4 +84,6 @@ urlpatterns = [
     path('whatsapp/upload-file/', whatsapp_apis.FacebookFileUploadView.as_view(), name='facebook-file-upload'),
     path('dashboard/data', views.UserDashboardData.as_view(), name='dashboard-data'),
     path('credits', views.CustomerCredits.as_view(), name='customer-credits'),
+    path('credits/verify-payment', subscription_views.PaymentVerificationView.as_view(), name='verify_payment'),
+    path('credits/create-order', subscription_views.CreateCreditOrderView.as_view(), name='create_credit_order'),
 ]
