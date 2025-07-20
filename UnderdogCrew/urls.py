@@ -83,7 +83,5 @@ urlpatterns = [
     path('user/status', login_service.UserStatusView.as_view(), name='user-status'),
     path('whatsapp/upload-file/', whatsapp_apis.FacebookFileUploadView.as_view(), name='facebook-file-upload'),
     path('dashboard/data', views.UserDashboardData.as_view(), name='dashboard-data'),
-    path('credits', views.CustomerCredits.as_view(), name='customer-credits'),
-    path('credits/verify-payment', subscription_views.PaymentVerificationView.as_view(), name='verify_payment'),
-    path('credits/create-order', subscription_views.CreateCreditOrderView.as_view(), name='create_credit_order'),
+    path('credits', views.CustomerCredits.as_view(), name='customer-credits')
 ]

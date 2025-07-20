@@ -186,6 +186,7 @@ class SendMessage(APIView):
             template_url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates?name={template_name}"
             API_KEY = api_key
             
+            print(f"API_KEY: {API_KEY}")
 
             headers = {
                 'Authorization': f'Bearer {API_KEY}'
@@ -841,7 +842,9 @@ class UserDashboard(APIView):
 
                     # Localize to Asia/Kolkata timezone
                     kolkata_timezone = pytz.timezone("Asia/Kolkata")
-                    start_date = kolkata_timezone.localize(start_date_gmt)
+                    start_date_localized = kolkata_timezone.localize(start_date_gmt)
+                    # Convert to timestamp
+                    start_date = int(start_date_localized.timestamp())
                 except ValueError:
                     return JsonResponse(
                         {"message": "Invalid start_date format. Use YYYY-MM-DD."},
@@ -854,7 +857,9 @@ class UserDashboard(APIView):
 
                     # Localize to Asia/Kolkata timezone
                     kolkata_timezone = pytz.timezone("Asia/Kolkata")
-                    end_date = kolkata_timezone.localize(end_date_gmt)
+                    end_date_localized = kolkata_timezone.localize(end_date_gmt)
+                    # Convert to timestamp
+                    end_date = int(end_date_localized.timestamp())
                 except ValueError:
                     return JsonResponse(
                         {"message": "Invalid end_date format. Use YYYY-MM-DD."},
@@ -900,8 +905,8 @@ class UserDashboard(APIView):
             }
             if start_date and end_date:
                 chart_query['created_at'] = {
-                    "$gte": start_date_gmt,
-                    "$lte": end_date_gmt
+                    "$gte": start_date,
+                    "$lte": end_date
                 }
 
             print(f"chart query: {chart_query}")
@@ -963,7 +968,7 @@ class UserDashboard(APIView):
                 final_result = []
 
                 while current_date <= end_date:
-                    formatted_date = current_date.strftime("%d/%m/%Y")
+                    formatted_date = current_date
                     if formatted_date in result_map:
                         final_result.append(result_map[formatted_date])
                     else:
@@ -973,7 +978,7 @@ class UserDashboard(APIView):
                             "delivered": 0,
                             "sent": 0
                         })
-                    current_date += datetime.timedelta(days=1)
+                    current_date += 86400  # Add one day in seconds
             else:
                 final_result = mongo_result
             
@@ -1116,7 +1121,9 @@ class UserMessageLogs(APIView):
 
                     # Localize to Asia/Kolkata timezone
                     kolkata_timezone = pytz.timezone("Asia/Kolkata")
-                    start_date = kolkata_timezone.localize(start_date_gmt)
+                    start_date_localized = kolkata_timezone.localize(start_date_gmt)
+                    # Convert to timestamp
+                    start_date = int(start_date_localized.timestamp())
                 except ValueError:
                     return JsonResponse(
                         {"message": "Invalid start_date format. Use YYYY-MM-DD."},
@@ -1129,7 +1136,9 @@ class UserMessageLogs(APIView):
 
                     # Localize to Asia/Kolkata timezone
                     kolkata_timezone = pytz.timezone("Asia/Kolkata")
-                    end_date = kolkata_timezone.localize(end_date_gmt)
+                    end_date_localized = kolkata_timezone.localize(end_date_gmt)
+                    # Convert to timestamp
+                    end_date = int(end_date_localized.timestamp())
                 except ValueError:
                     return JsonResponse(
                         {"message": "Invalid end_date format. Use YYYY-MM-DD."},
@@ -1405,8 +1414,8 @@ class WhatsAppMessage(APIView):
         except Exception as ex:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
             return JsonResponse({"message": "Something went wrong"}, safe=False, status=500)
-        
 
+          
 class UserDashboardData(APIView):
     @swagger_auto_schema(
         operation_description="Fetch user dashboard data",
@@ -1549,8 +1558,7 @@ class UserDashboardData(APIView):
             print(f"Error: {ex}")
             return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-
-
+        
 class CustomerCredits(APIView):
     @swagger_auto_schema(
         operation_description="Fetch customer credits",
@@ -1669,4 +1677,3 @@ class CustomerCredits(APIView):
         except Exception as ex:
             print(f"Error: {ex}")
             return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
