@@ -1113,148 +1113,6 @@ class ProfileView(APIView):
 
 
 
-class UserBillingAPIView(APIView):
-    """
-    API to get user billing details from WhatsApp, Image Generation, and Text Generation logs.
-    """
-
-    @swagger_auto_schema(
-        operation_description="Get total billing for a user within a date range",
-        manual_parameters=[
-            openapi.Parameter(
-                name="Authorization",
-                in_=openapi.IN_HEADER,
-                description="Bearer <your_token>",
-                type=openapi.TYPE_STRING,
-                required=True
-            ),
-            openapi.Parameter(
-                name="start_date",
-                in_=openapi.IN_QUERY,
-                description="Filter records starting from this date (YYYY-MM-DD)",
-                type=openapi.TYPE_STRING,
-                required=False
-            ),
-            openapi.Parameter(
-                name="end_date",
-                in_=openapi.IN_QUERY,
-                description="Filter records up to this date (YYYY-MM-DD)",
-                type=openapi.TYPE_STRING,
-                required=False
-            ),
-        ],
-        responses={
-            200: openapi.Response(
-                description="Total billing details",
-                examples={
-                    "application/json": {
-                        "user_id": "677fff42d9fba430631d4478",
-                        "start_date": "2025-02-14",
-                        "end_date": "2025-02-15",
-                        "whatsapp_total": 0.125,
-                        "image_total": 0.08,
-                        "text_total": 0.00001335,
-                        "total_price": 0.20501335
-                    }
-                }
-            ),
-            400: openapi.Response(
-                description="Invalid date format",
-                examples={
-                    "application/json": {
-                        "error": "Invalid date format. Use YYYY-MM-DD."
-                    }
-                }
-            )
-        }
-    )
-    @token_required  # Ensure the user is authenticated
-    def get(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
-        db = MongoDB()
-
-        # Get query parameters for start and end date
-        start_date = request.GET.get('start_date')
-        end_date = request.GET.get('end_date')
-        dollar_price = current_dollar_price()
-
-        # Check if start_date and end_date are provided
-        if not start_date or not end_date:
-            return JsonResponse({"error": "Both start_date and end_date are required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Convert dates to ISO format
-        try:
-            start_date = datetime.strptime(start_date, "%Y-%m-%d")
-            end_date = datetime.strptime(end_date, "%Y-%m-%d")
-
-            # Set time for start_date to 00:00:00
-            start_date = start_date.replace(hour=0, minute=0, second=0)
-
-            # Set time for end_date to 23:59:59
-            end_date = end_date.replace(hour=23, minute=59, second=59)
-        except ValueError:
-            return JsonResponse({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Build filter conditions
-        filters = {"user_id": current_user_id, "created_at": {"$gte": start_date, "$lte": end_date}}
-
-        # Get total billing from WhatsApp logs
-        whatsapp_logs = db.find_documents('whatsapp_message_logs', filters)
-        whatsapp_total = sum(log.get('price', 0) for log in whatsapp_logs)
-
-        # Get total billing from Image Generation logs
-        image_logs = db.find_documents('image_generation_logs', filters)
-        image_total = sum(log.get('price', 0) for log in image_logs)
-        image_total = dollar_price * image_total
-
-        # Get total billing from Text Generation logs
-        text_logs = db.find_documents('text_generation_logs', filters)
-        text_total = sum(log.get('price', 0) for log in text_logs)
-        text_total = dollar_price * text_total
-
-        # Calculate final total
-        total_price = whatsapp_total + image_total + text_total
-        
-        # Calculate CGST and SGST
-        cgst = total_price * 0.09  # 9% of total_price
-        sgst = total_price * 0.09  # 9% of total_price
-        
-        # Add CGST and SGST to total_price
-        total_price_with_tax = total_price + cgst + sgst
-
-        # Check for invoices in the given date range
-        invoice_filters = {
-            "user_id": current_user_id,
-            "created_at": {"$gte": start_date, "$lte": end_date}
-        }
-        invoices = db.find_documents('invoices', invoice_filters)
-        invoice_status = "Issued"
-        if invoices:
-            if invoices[0].get('payment_status') == "Paid":
-                invoice_status = "Paid"
-        else:
-            invoice_status = "Pending"
-        # Fetch user details from the database
-        user = db.find_document('users', {'_id': ObjectId(current_user_id)})
-        account_id = user.get('account_id', '') if user else ''  # Get account_id if user exists, else empty string
-
-        # Format billing period
-        billing_period = f"{start_date.strftime('%B %d')} - {end_date.strftime('%B %d, %Y')}"
-
-        return JsonResponse({
-            "user_id": current_user_id,
-            "billing_period": billing_period,  # Include billing period in the response
-            "whatsapp_total": f"₹{round(whatsapp_total, 2)}",
-            "image_total": f"₹{round(image_total, 2)}",
-            "text_total": f"₹{round(text_total, 2)}",
-            "total_price": f"₹{round(total_price, 2)}",
-            "final_price": f"₹{round(total_price_with_tax, 2)}",
-            "cgst": f"₹{round(cgst, 2)}",
-            "sgst": f"₹{round(sgst, 2)}",
-            "invoice_status": invoice_status,
-            "payment_status": invoices[0].get('payment_status') if invoices else "Pending",
-            "invoice_number": invoices[0].get('invoice_number') if invoices else "",
-            "account_id": account_id
-        }, status=status.HTTP_200_OK)
 
 class UserStatusView(APIView):
     @swagger_auto_schema(
@@ -1327,19 +1185,10 @@ class UserStatusView(APIView):
             is_after_eighth = today.day >= 8
             print(f"is_after_eighth: {is_after_eighth}")
             
-            pending_invoice = db.find_document(
-                'invoices',
-                {
-                    'user_id': current_user_id,
-                    'payment_status': 'Pending'
-                },
-                projection={'_id': 1}
-            )
 
             # Prepare response data
             response_data = {
                 'has_active_plan': bool(subscription),
-                'pending_bills': bool(pending_invoice) if is_after_eighth else False,
                 'waba_active': bool(user.get('whatsapp_business_details', {}).get('verified', False)),
                 'is_active': user.get('is_active', True),
                 'account_id': user.get('account_id', '')
