@@ -14,11 +14,12 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from utils.twilio_otp import generate_otp, send_otp
 from datetime import datetime, timezone
 import twilio
-from UnderdogCrew.settings import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD ,SECRET_KEY
+from UnderdogCrew.settings import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, SECRET_KEY, WEBHOOK_URL, WEBHOOK_VERIFY_TOKEN
 import re
 import jwt
 import random
-
+import requests
+import threading
 # Create your views here.
 
 class SignupView(APIView):
@@ -559,7 +560,9 @@ class BusinessDetails(APIView):
                     'whatsapp_business_details': user['whatsapp_business_details'],
                     "phone_number_id": user.get('phone_number_id', ''),
                     "waba_id": user.get('waba_id', ''),
+                    "verified_name": user.get("verified_name", ""),
                     "auto_reply_enabled": user.get('auto_reply_enabled', False),
+                    "meta_business_number": user.get("meta_business_number", ""),
                     "business_id": user.get('business_id', '')
                 }
             }, status=status.HTTP_200_OK)
@@ -807,7 +810,7 @@ class GetAllUsersView(APIView):
 
 class VerifyBusinessDetailsView(APIView):
     @swagger_auto_schema(
-        operation_description="Verify WhatsApp business details and set business ID",
+        operation_description="Verify WhatsApp business details, set business ID, and subscribe to webhooks",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
@@ -816,6 +819,7 @@ class VerifyBusinessDetailsView(APIView):
                 "phone_number_id": openapi.Schema(type=openapi.TYPE_STRING, description='Phone number ID to set'),
                 "waba_id": openapi.Schema(type=openapi.TYPE_STRING, description='WABA ID to set'),
                 "auto_reply_enabled": openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Auto reply enabled'),
+                "meta_business_number": openapi.Schema(type=openapi.TYPE_STRING, description='Phone number to set'),
                 "api_key": openapi.Schema(type=openapi.TYPE_STRING, description='API key to set'),
                 "verified_name": openapi.Schema(type=openapi.TYPE_STRING, description='name of the business which is verified with META'),
             },
@@ -842,9 +846,10 @@ class VerifyBusinessDetailsView(APIView):
             phone_number_id = request.data.get("phone_number_id", "")
             waba_id = request.data.get("waba_id", "")
             auto_reply_enabled = request.data.get("auto_reply_enabled", False)
+            meta_business_number = request.data.get("meta_business_number", "")
             api_key = request.data.get("api_key", "")
 
-            # Validate user_id and business_id
+            # Validate user_id
             if not user_id:
                 return JsonResponse({
                     'message': 'User ID is required'
@@ -859,7 +864,7 @@ class VerifyBusinessDetailsView(APIView):
                     'message': 'User not found'
                 }, status=status.HTTP_404_NOT_FOUND)
 
-            # Update the user's WhatsApp business details to set verified to True and add business_id
+            # Update the user's WhatsApp business details
             update_data = {
                 'whatsapp_business_details.verified': True, 
             }
@@ -867,15 +872,40 @@ class VerifyBusinessDetailsView(APIView):
                 update_data["verified_name"] = verified_name
             if phone_number_id:
                 update_data["phone_number_id"] = phone_number_id
+
+                phone_number_url = f"https://graph.facebook.com/v23.0/{phone_number_id}"
+                phoner_number_header = {
+                    "Authorization": api_key
+                }
+                phone_number_response = requests.get(url=phone_number_url, headers=phoner_number_header)
+                if phone_number_response.status_code == 200:
+                    update_data["quality_rating"] = phone_number_response.json()['quality_rating']
+                    update_data['platform_type'] = phone_number_response.json()['platform_type']
+                    update_data['throughput'] = phone_number_response.json()['throughput']
+
+                profile_details_url = f"https://graph.facebook.com/v23.0/{phone_number_id}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical"
+                profile_details_response = requests.get(url=profile_details_url, headers=phoner_number_header)
+                if profile_details_response.status_code == 200:
+                    profile_data = profile_details_response.json()['data'][0]
+                    update_data["about"] = profile_data['about']
+                    update_data['description'] = profile_data['description']
+                    update_data['email'] = profile_data['email']
+                    update_data['profile_picture_url'] = profile_data['profile_picture_url']
+                    update_data['websites'] = profile_data['websites']
+                    update_data["vertical"] = profile_data["vertical"]
+
             if waba_id:
                 update_data["waba_id"] = waba_id
             if auto_reply_enabled:
                 update_data["auto_reply_enabled"] = auto_reply_enabled
+            if meta_business_number:
+                update_data['meta_business_number'] = meta_business_number
             if api_key:
                 update_data["api_key"] = api_key
             if business_id:
                 update_data["business_id"] = business_id
 
+            # Update user details
             result = db.update_document('users', 
                 {'_id': ObjectId(user['_id'])}, update_data
             )
@@ -885,15 +915,92 @@ class VerifyBusinessDetailsView(APIView):
                     'message': 'No changes made or user not found'
                 }, status=status.HTTP_404_NOT_FOUND)
 
+                # Run webhook subscription in background if WABA ID and API key are provided
+            if waba_id and api_key:
+                # Start background thread for webhook subscription
+                webhook_thread = threading.Thread(
+                    target=self.subscribe_to_webhooks_background,
+                    args=(waba_id, api_key, user_id, phone_number_id),
+                    daemon=True
+                )
+                webhook_thread.start()
+
             return JsonResponse({
                 'status': 'success',
-                'message': 'Business details verified and updated successfully'
+                'message': 'Business details verified and updated successfully',
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
             return JsonResponse({
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def subscribe_to_webhooks_background(self, waba_id, api_key, user_id, phone_number_id):
+        """
+        Background task to subscribe the app to webhooks for the given WABA ID
+        """
+        try:
+            print(f"Starting webhook subscription for user {user_id}, WABA: {waba_id}")
+            
+            # Validate webhook environment variables
+            if not WEBHOOK_URL or not WEBHOOK_VERIFY_TOKEN:
+                error_msg = 'Missing webhook environment variables (WEBHOOK_URL or WEBHOOK_VERIFY_TOKEN)'
+                print(f"Webhook subscription failed for user {user_id}: {error_msg}")
+                return
+            
+            # WhatsApp Business API webhook subscription endpoint
+            url = f"https://graph.facebook.com/v23.0/{waba_id}/subscribed_apps"
+            
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
+
+            # Request body matching the working curl format
+            payload = {
+                "override_callback_uri": WEBHOOK_URL,
+                "verify_token": WEBHOOK_VERIFY_TOKEN,
+                "object": "whatsapp_business_account"
+            }
+
+            # Make the subscription request
+            response = requests.post(url, headers=headers, json=payload, timeout=30) 
+            if response.status_code == 200:
+                response_data = response.json()
+                if response_data.get('success', False):
+                    print(f"Successfully subscribed to webhooks for user {user_id}")
+                else:
+                    print(f"Webhook subscription failed for user {user_id}: API returned false")
+            else:
+                error_data = response.json() if response.content else {}
+                error_message = error_data.get("error", {}).get("message", "Unknown error")
+                print(f"Webhook subscription failed for user {user_id}: Status {response.status_code}: {error_message}")
+
+            ## need to register the phone number to the whatsapp business account
+            register_url = f"https://graph.facebook.com/v23.0/{phone_number_id}/register"
+            register_headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
+            payload = {
+                "messaging_product": "whatsapp",
+                "pin": "123456"
+            }
+            register_response = requests.post(register_url, headers=register_headers, json=payload, timeout=30)
+            if register_response.status_code == 200:
+                print(f"Successfully registered phone number {phone_number_id} to WhatsApp business account {waba_id}")
+            else:
+                print(f"Failed to register phone number {phone_number_id} to WhatsApp business account {waba_id}")
+
+        except requests.exceptions.Timeout:
+            error_msg = 'Request timeout during webhook subscription'
+            print(f"Webhook subscription timeout for user {user_id}")            
+        except requests.exceptions.RequestException as e:
+            error_msg = f'Network error during webhook subscription: {str(e)}'
+            print(f"Webhook subscription network error for user {user_id}: {error_msg}")
+        except Exception as e:
+            error_msg = f'Unexpected error during webhook subscription: {str(e)}'
+            print(f"Webhook subscription unexpected error for user {user_id}: {error_msg}")
 
 class ProfileView(APIView):
     @swagger_auto_schema(
@@ -959,7 +1066,19 @@ class ProfileView(APIView):
                 'phone_number_id': user.get('phone_number_id', ''),
                 'waba_id': user.get('waba_id', ''),
                 'auto_reply_enabled': user.get('auto_reply_enabled', False),
-                'verified_name': user.get('verified_name', '')
+                "meta_business_number": user.get("meta_business_number", ""),
+                'verified_name': user.get('verified_name', ''),
+                "quality_rating": user.get('quality_rating', 'Pending'),
+                'platform_type': user.get('platform_type', ''),
+                'throughput': user.get('throughput', {}),
+                "remaining_quota": 1000,
+                "whatsapp_api_status": "LIVE",
+                "about": user.get("about", ""),
+                "description": user.get("description", ""),
+                "email": user.get("email", ""),
+                "profile_picture_url": user.get("profile_picture_url", ""),
+                "websites": user.get("websites", []),
+                "vertical": user.get("vertical", "")
             }
 
             subscription_data = None

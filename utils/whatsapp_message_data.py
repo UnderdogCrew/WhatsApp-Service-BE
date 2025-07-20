@@ -10,6 +10,7 @@ import sys
 import django
 from bson import ObjectId
 import time
+import re
 
 current_path = os.path.abspath(os.getcwd())
 base_path = os.path.dirname(current_path)  # This will give you /opt/whatsapp_service/WhatsApp-Service-BE
@@ -28,7 +29,7 @@ db = MongoDB()
 API_TOKEN = API_KEY
 
 
-def process_components(components, msg_data, image_url, latitude=None, longitude=None, location_name=None, address=None):
+def process_components(components, msg_data, image_url, latitude=None, longitude=None, location_name=None, address=None, template_text=None):
     result_list = []
 
     for component in components:
@@ -119,41 +120,18 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                 result_list.append(body_entry)
 
             # Existing condition for body_text
-            elif 'body_text' in component.get('example', {}):
+            elif 'body_text' in component.get('example', {}) or "text" in component:
                 # Process BODY
                 body_parameters = []
-                print(component['example']['body_text'][0])
-                for i, text in enumerate(component['example']['body_text'][0]):
-                    # Convert Timestamp to string if necessary
-                    if isinstance(text, pd.Timestamp):  # Assuming you are using pandas
-                        text = text.strftime('%Y-%m-%d')  # Format as needed
-                    body_parameters.append({
-                        "type": "text",
-                        "text": msg_data.get('Name') if i == 0 else text
-                    })
-
+                body_parameters.append({
+                    "type": "text",
+                    "text": template_text
+                })
                 body_entry = {
                     "type": "body",
                     "parameters": body_parameters
                 }
                 result_list.append(body_entry)
-            # elif "text" in component:
-            #     # Process BODY
-            #     body_parameters = []
-            #     text = component['text']
-            #     # Convert Timestamp to string if necessary
-            #     if isinstance(text, pd.Timestamp):  # Assuming you are using pandas
-            #         text = text.strftime('%Y-%m-%d')  # Format as needed
-            #     body_parameters.append({
-            #         "type": "text",
-            #         "text": text
-            #     })
-
-            #     body_entry = {
-            #         "type": "body",
-            #         "parameters": body_parameters
-            #     }
-            #     result_list.append(body_entry)
             
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
@@ -185,28 +163,39 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
     return result_list
 
 
-def send_message_data(number, template_name, text, image_url, user_id, entry=None, metadata=None, latitude=None, longitude=None, location_name=None, address=None):
+def send_message_data(
+        number,
+        template_name,
+        text, image_url,
+        user_id,
+        entry=None,
+        metadata=None,
+        latitude=None,
+        longitude=None,
+        location_name=None,
+        address=None,
+        params_fallback_value=None
+    ):
     try:
         
         user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
+        user_credit = 0
 
         if user_info is not None:
             business_id = user_info['business_id']
-        else:
-            business_id = "450885871446042"
-
-        url = f"https://graph.facebook.com/v19.0/{business_id}/messages"
-        if user_id == "67e6a22d44e08602e5c1e91c":
-            template_url = f"https://graph.facebook.com/v21.0/1156861725908077/message_templates?name={template_name}"
-            API_TOKEN = GLAM_API_KEY
-        else:
-            template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
-            API_TOKEN = API_KEY
+            phone_number_id = user_info['phone_number_id']
+            waba_id = user_info['waba_id']
+            api_key = user_info['api_key']
+            user_credit = user_info['default_credit']
+        
+        url = f"https://graph.facebook.com/v23.0/{phone_number_id}/messages"
+        template_url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates?name={template_name}"
+        API_TOKEN = api_key
+        
         headers = {
             'Authorization': f'Bearer {API_TOKEN}'
         }
         template_response = requests.request("GET", template_url, headers=headers)
-        print(f"template response: {template_response.status_code}")
         if template_response.status_code != 200:
             return False
         
@@ -220,13 +209,50 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         for components in template_components:
             if components['type'] == "BODY":
                 template_text = components['text']
-        print(f"template_text: {template_text}")
         category = template_data['data'][0]['category']
         language = template_data['data'][0]['language']
 
         if entry is not None:
             if "name" in entry:
                 text = entry['name']
+                if entry['name'] == "$Name":
+                    customer_details = db.find_document(
+                        collection_name="customers",
+                        query={
+                            "number": number
+                        }
+                    )
+                    if customer_details is not None:
+                        text = customer_details['name']
+                    else:
+                        if params_fallback_value is not None:
+                            if "name" in params_fallback_value:
+                                text = params_fallback_value['name']
+                            else:
+                                pass
+                    metadata['name'] = text
+                else:
+                    pass
+        
+        if metadata is not None:
+            for key, value in metadata.items():
+                if value == "$Name":
+                    customer_details = db.find_document(
+                            collection_name="customers",
+                            query={
+                                "number": number
+                            }
+                        )
+                    if customer_details is not None:
+                        text = customer_details['name']
+                    else:
+                        if params_fallback_value is not None:
+                            if "name" in params_fallback_value:
+                                text = params_fallback_value['name']
+                            else:
+                                pass
+                    metadata[key] = text
+
         
         company_name = ""
         if entry is not None:
@@ -279,25 +305,49 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         if template_text != "":
             template_text = template_text.replace("{{", "{")
             template_text = template_text.replace("}}", "}")
-            template_text = template_text.format(**msg_details)
+            try:
+                for key, val in msg_details.items():
+                    template_text = template_text.replace(f'{{{key}}}', val)
+            except:
+                # Convert keys to a list in order: 1, 2, 3, ...
+                pass
         
-        print(f"template text: {template_text}")
+        
+        # 1. remove hard TABs
+        template_text = template_text.replace("\t", "")
+        template_text = template_text.replace("\n\n", "")
 
-        components = process_components(template_components, msg_details, image_url, latitude=latitude, longitude=longitude, location_name=location_name, address=address)
-        payload = json.dumps({
+        # 2. collapse runs of ≥5 spaces (rule: max 4)
+        template_text = re.sub(r" {5,}", "    ", template_text)
+
+        # 3. **escape EVERY newline (CR, LF, CRLF)**
+        template_text = template_text.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
+        print("sanitised repr ->\n\n", repr(template_text))   # should show *only* “\\n”
+        components = process_components(
+            template_components,
+            msg_details,
+            image_url,
+            latitude=latitude,
+            longitude=longitude,
+            location_name=location_name,
+            address=address,
+            template_text=template_text
+        )
+        payload = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
-            "to": f"91{number}",
+            "to": f"{number}",
             "type": "template",
             "template": {
-                    "name": template_name,
-                        "language": {
-                            "code": language
-                        },
-                        "components": components
-                    }
-                }
-        )
+                "name": template_name,
+                "language": {
+                    "code": language
+                },
+                "components": components
+            }
+        }
+        print(f"url: {url}")
+        print(f"API_TOKEN: {API_TOKEN}")
         headers = {
             'Authorization': 'Bearer ' + API_TOKEN,
             'Content-Type': 'application/json'
@@ -307,7 +357,7 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
         if category != "UTILITY":
             time.sleep(7)
         
-        response = requests.post(url, headers=headers, data=payload)
+        response = requests.post(url, headers=headers, json=payload)
         print(f"Meta response: {response.status_code}")
         if response.status_code == 200:
             whatsapp_status_logs = {
@@ -322,6 +372,14 @@ def send_message_data(number, template_name, text, image_url, user_id, entry=Non
                 "template_name": template_name
             }
             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+            db.update_document(
+                collection_name="users",
+                query={"_id": ObjectId(user_id)},
+                update_data={
+                    "default_credit": user_credit - 0.125 if category == "UTILITY" else user_credit - 0.875
+                }
+            )
+
         else:
             print(f"Meta response: {response.json()}")
             whatsapp_status_logs = {

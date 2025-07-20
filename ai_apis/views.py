@@ -118,6 +118,11 @@ class SendMessage(APIView):
                     description='Additional metadata for the message',
                     additional_properties=openapi.Schema(type=openapi.TYPE_STRING)  # Dynamic fields
                 ),
+                'paramsFallbackValue': openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    description='Fallback values for template parameters (e.g., {"Name": "Neel"})',
+                    additional_properties=openapi.Schema(type=openapi.TYPE_STRING)
+                ),
             },
             required=['text', 'message_type', 'template_name']
         ),
@@ -171,12 +176,15 @@ class SendMessage(APIView):
             if template_name is None:
                 return JsonResponse({"message": "Template name is missing"}, safe=False, status=422)
             
-            if user_id == "67e6a22d44e08602e5c1e91c":
-                template_url = f"https://graph.facebook.com/v21.0/1156861725908077/message_templates?name={template_name}"
-                API_KEY = GLAM_API_KEY
+            user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
+            if user_info is not None:
+                waba_id = user_info['waba_id']
+                api_key = user_info['api_key']
             else:
-                template_url = f"https://graph.facebook.com/v21.0/236353759566806/message_templates?name={template_name}"
-                API_KEY = API_TOKEN
+                return JsonResponse({"message": "User not found"}, safe=False, status=422)
+            
+            template_url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates?name={template_name}"
+            API_KEY = api_key
             
             print(f"API_KEY: {API_KEY}")
 
@@ -195,6 +203,7 @@ class SendMessage(APIView):
 
             image_url = request_data.get('image_url', "")
             numbers = request_data.get('numbers', [])
+            params_fallback_value = request_data.get("paramsFallbackValue", {})
 
             if message_type == 2 and not numbers:
                 return JsonResponse(
@@ -289,7 +298,8 @@ class SendMessage(APIView):
                         latitude=latitude,
                         longitude=longitude,
                         location_name=location_name,
-                        address=address
+                        address=address,
+                        params_fallback_value=params_fallback_value
                     )
 
             elif message_type == 2:
@@ -305,7 +315,8 @@ class SendMessage(APIView):
                         latitude=latitude,
                         longitude=longitude,
                         location_name=location_name,
-                        address=address
+                        address=address,
+                        params_fallback_value=params_fallback_value
                     )
 
             return JsonResponse({"message": "Messages sent successfully"}, safe=False, status=200)
@@ -1403,10 +1414,8 @@ class WhatsAppMessage(APIView):
         except Exception as ex:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
             return JsonResponse({"message": "Something went wrong"}, safe=False, status=500)
-        
 
-
-
+          
 class UserDashboardData(APIView):
     @swagger_auto_schema(
         operation_description="Fetch user dashboard data",
@@ -1532,12 +1541,139 @@ class UserDashboardData(APIView):
                         sent_count += data['sent'] if 'sent' in data else 0
                         delivered_count += data['delivered'] if 'delivered' in data else 0
                         read_count += data['read'] if 'read' in data else 0
-                    return JsonResponse({"sent_count": sent_count, "delivered_count": delivered_count, "read_count": read_count}, status=status.HTTP_200_OK)
+                    return JsonResponse(
+                        {
+                            "sent_count": sent_count,
+                            "delivered_count": delivered_count,
+                            "read_count": read_count,
+                            "message": "Analytics data fetched successfully",
+                            "data": analytics_data
+                        }, status=status.HTTP_200_OK)
                 else:
                     return JsonResponse({"message": "No analytics data found"}, status=404)
             else:
                 return JsonResponse({"message": response.text}, status=response.status_code)
 
+        except Exception as ex:
+            print(f"Error: {ex}")
+            return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+class CustomerCredits(APIView):
+    @swagger_auto_schema(
+        operation_description="Fetch customer credits",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                "template_type",
+                openapi.IN_QUERY,
+                description="Template type(1 for marketing, 2 for utility, 3 for authentication)",
+                type=openapi.TYPE_INTEGER,
+                required=True
+            ),
+            openapi.Parameter(
+                "customer_count",
+                openapi.IN_QUERY,
+                description="Number of customers",
+                type=openapi.TYPE_INTEGER,
+                required=True
+            )
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            422: 'Unprocessable Entity',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required  # Ensure the user is authenticated
+    def get(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
+        '''
+            API For calculating the credits required for the template
+                - Get the user info from the database
+                - Get the template type from the request
+                - Get the customer count from the request
+                - Calculate the credits required for the template
+                - Check if the user has sufficient credits
+                - Return the response
+            template_type:
+                1: marketing
+                2: utility
+                3: authentication
+            customer_count:
+                number of customers
+            credits:
+                credits required for the template
+            remaining_credits:
+                remaining credits after the transaction
+            user_credits:
+                total credits of the user
+        '''
+        try:
+            token = request.headers.get('Authorization')  # Extract the token from the Authorization header
+            if token is None or not token.startswith('Bearer '):
+                return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+            token = token.split(' ')[1]  # Get the actual token part
+            user_info = decode_token(token)  # Decode the token to get user information
+            
+            # Check if user_info is a dictionary
+            if isinstance(user_info, dict) and 'user_id' in user_info:
+                user_id = user_info['user_id']  # Access user_id from the decoded token
+            else:
+                return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+            
+            ## we need to get the user info from the database
+            db = MongoDB()
+            user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
+            if user_info is None:
+                return JsonResponse({"message": "User not found"}, status=404)
+            
+            template_type = int(request.query_params.get("template_type", 0))
+            if template_type == 0:
+                return JsonResponse({"message": "Template type is required"}, status=400)
+            
+            if template_type not in [1, 2, 3]:
+                return JsonResponse({"message": "Invalid template type"}, status=400)
+            
+            customer_count = int(request.query_params.get("customer_count", 0))
+            if customer_count is None:
+                return JsonResponse({"message": "Customer count is required"}, status=400)
+            
+            ## we need to get the credits from the database
+            user_credits = user_info['default_credit']
+            
+            if template_type == 1:
+                credits = round(customer_count * 0.875, 2)
+            elif template_type == 2:
+                credits = round(customer_count * 0.125, 2)
+            elif template_type == 3:
+                credits = round(customer_count * 0.125, 2)
+            else:
+                return JsonResponse({"message": "Invalid template type"}, status=400)
+            
+            if user_credits < credits:
+                return JsonResponse({"message": "Insufficient credits"}, status=400)
+            
+            response = {
+                "message": "Credits fetched successfully",
+                "credits_required": credits,
+                "remaining_credits": user_credits - credits,
+                "user_credits": user_credits
+            }
+            
+            return JsonResponse(response, status=200)
+            
         except Exception as ex:
             print(f"Error: {ex}")
             return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

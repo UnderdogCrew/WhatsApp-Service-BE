@@ -34,4 +34,4 @@ jobs:
             git pull origin develop &&
             pip install -r req.txt &&
             pm2 restart whatsapp-service
-          ' 
+          '

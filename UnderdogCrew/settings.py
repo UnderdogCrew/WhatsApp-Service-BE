@@ -54,6 +54,10 @@ REDIS_USER = os.getenv("REDIS_USER")
 WABA_ID = os.getenv("WABA_ID")
 SWAGGER_URL = os.getenv("SWAGGER_URL")
 
+# Webhook settings
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+WEBHOOK_VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN")
+
 # Connect to Redis (update with your Redis instance details)
 redis_client = redis.Redis(
     host=REDIS_HOST,  # Change this if your Redis is hosted remotely

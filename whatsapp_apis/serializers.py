@@ -54,4 +54,17 @@ class WhatsAppTemplateSerializer(serializers.Serializer):
         choices=['MARKETING', 'UTILITY'],
         required=True
     )
-    components = ComponentSerializer(many=True, required=True) 
+    components = ComponentSerializer(many=True, required=True)
+
+class WhatsAppTemplateEditSerializer(serializers.Serializer):
+    category = serializers.ChoiceField(
+        choices=['MARKETING', 'UTILITY'],
+        required=False
+    )
+    components = ComponentSerializer(many=True, required=False)
+    
+    def validate(self, data):
+        # At least one field must be provided
+        if not data.get('category') and not data.get('components'):
+            raise serializers.ValidationError("Either category or components must be provided")
+        return data 

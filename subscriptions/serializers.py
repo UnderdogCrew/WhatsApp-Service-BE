@@ -10,6 +10,16 @@ class RazorpayOrderRequestSerializer(serializers.Serializer):
     currency = serializers.CharField()
     receipt = serializers.CharField()
 
+class PaymentVerificationRequestSerializer(serializers.Serializer):
+    razorpay_payment_id = serializers.CharField()
+    razorpay_order_id = serializers.CharField()
+    razorpay_signature = serializers.CharField()
+
+class PaymentVerificationResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = serializers.DictField(required=False)
+
 class SubscriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subscription
