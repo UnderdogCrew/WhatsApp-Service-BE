@@ -1487,6 +1487,7 @@ class CustomerAPIView(APIView):
 
             # Format response
             for customer in customers:
+                customer['number'] = str(customer['number'])
                 customer['id'] = str(customer['_id'])
                 del customer['_id']
 
