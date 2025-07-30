@@ -211,6 +211,7 @@ def send_message_data(
                 template_text = components['text']
         category = template_data['data'][0]['category']
         language = template_data['data'][0]['language']
+        print(f"template language ==> {language}")
 
         if entry is not None:
             if "name" in entry:
@@ -322,7 +323,6 @@ def send_message_data(
 
         # 3. **escape EVERY newline (CR, LF, CRLF)**
         template_text = template_text.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
-        print("sanitised repr ->\n\n", repr(template_text))   # should show *only* “\\n”
         components = process_components(
             template_components,
             msg_details,
