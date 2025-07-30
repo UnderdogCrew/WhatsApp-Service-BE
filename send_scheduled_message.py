@@ -20,6 +20,12 @@ from utils.whatsapp_message_data import send_message_data
 # Define the target date ranges
 target_days = {0, 1, 2, 3, 10}
 
+target_images = {
+    1: "https://whatsapp-ai.s3.ap-south-1.amazonaws.com/67c1cf4c2763ce36e17d145e/images/1-days.png",
+    10: "https://whatsapp-ai.s3.ap-south-1.amazonaws.com/67c1cf4c2763ce36e17d145e/images/10-days.png",
+    30: "https://whatsapp-ai.s3.ap-south-1.amazonaws.com/67c1cf4c2763ce36e17d145e/images/30-days.png"
+}
+
 
 def fetch_scheduled_messages():
     try:
@@ -87,6 +93,13 @@ def fetch_scheduled_messages():
 
         # Send messages
         for user in filtered_records:
+            image_url = ""
+            template_name="insurance_policy"
+            days_difference = user['date'] - today
+            if days_difference.days in [1, 10, 30]:
+                image_url = target_images[days_difference.days]
+                template_name="insurance_policy_with_image"
+
             reg_number = user.get('reg_number', '')
             model = user.get('model', '')
             policy = f"{reg_number} ({model})" if reg_number and model else model
@@ -99,13 +112,12 @@ def fetch_scheduled_messages():
             }
             send_message_data(
                 number=user['number'],
-                template_name="insurance_policy",
+                template_name=template_name,
                 text=user.get('text', ''),
-                image_url="",
+                image_url=image_url,
                 user_id=user['user_id'],
                 metadata=metadata
             )
-
         print("Message send successfully......!!!!!!!")
         return True
 
