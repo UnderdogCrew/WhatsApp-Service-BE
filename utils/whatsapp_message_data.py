@@ -200,7 +200,12 @@ def send_message_data(
             return False
         
         template_data = template_response.json()
-        template_components = template_data['data'][0]['components']
+        # Get the object with name == "insurance_policy"
+        template_result = next((item for item in template_data['data'] if item["name"] == template_name), None)
+        if template_result is None:
+            template_components = template_data['data'][0]['components']
+        else:
+            template_components = template_result['components']
 
         # Check if there are any BUTTONS in the components
         has_buttons = any(component['type'].upper() == "BUTTONS" for component in template_components)
@@ -209,8 +214,8 @@ def send_message_data(
         for components in template_components:
             if components['type'] == "BODY":
                 template_text = components['text']
-        category = template_data['data'][0]['category']
-        language = template_data['data'][0]['language']
+        category = template_data['data'][0]['category'] if template_result is None else template_result['category']
+        language = template_data['data'][0]['language'] if template_result is None else template_result['language']
         print(f"template language ==> {language}")
 
         if entry is not None:
