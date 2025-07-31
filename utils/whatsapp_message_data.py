@@ -141,7 +141,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                         "text": template_text
                     })
                 else:
-                    for param in range(len(component['example']['body_text'])+1):
+                    for param in range(len(component['example']['body_text'][0])):
                         print(f"param*********************: {param}")
                         value = msg_data.get(str(param+1))
                         # Convert Timestamp to string if necessary
