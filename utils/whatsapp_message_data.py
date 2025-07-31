@@ -141,7 +141,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                     })
                 else:
                     for param in range(len(component['example']['body_text'])):
-                        value = msg_data.get(str(param))
+                        value = msg_data.get(str(param+1))
                         # Convert Timestamp to string if necessary
                         if isinstance(value, pd.Timestamp):  # Assuming you are using pandas
                             value = value.strftime('%Y-%m-%d')  # Format as needed
