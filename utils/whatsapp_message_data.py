@@ -189,18 +189,18 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                     }
                     result_list.append(quick_reply)
                 
-                if buttons['type'] == "PHONE_NUMBER":
-                    quick_reply = {
-                        "type": "button",
-                        "index": str(button_index),
-                        "parameters": [
-                            {
-                                "type": "phone_number",
-                                "phone_number": buttons['phone_number']
-                            }
-                        ]
-                    }
-                    result_list.append(quick_reply)
+                # if buttons['type'] == "PHONE_NUMBER":
+                #     quick_reply = {
+                #         "type": "button",
+                #         "index": str(button_index),
+                #         "parameters": [
+                #             {
+                #                 "type": "phone_number",
+                #                 "phone_number": buttons['phone_number']
+                #             }
+                #         ]
+                #     }
+                #     result_list.append(quick_reply)
                 
                 if buttons['type'] == "COPY_CODE":
                     quick_reply = {
