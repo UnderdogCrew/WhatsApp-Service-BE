@@ -209,7 +209,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                         "index": str(button_index),
                         "parameters": [
                             {
-                                "type": "copy_code",
+                                "type": "coupon_code",
                                 "coupon_code": buttons['example'][0]
                             }
                         ]
