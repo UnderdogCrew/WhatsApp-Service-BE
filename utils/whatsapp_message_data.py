@@ -320,6 +320,17 @@ def send_message_data(
                 # Convert keys to a list in order: 1, 2, 3, ...
                 pass
         
+
+        if original_text != "":
+            original_text = original_text.replace("{{", "{")
+            original_text = original_text.replace("}}", "}")
+            try:
+                for key, val in msg_details.items():
+                    original_text = original_text.replace(f'{{{key}}}', val)
+            except:
+                # Convert keys to a list in order: 1, 2, 3, ...
+                pass
+        
         
         # 1. remove hard TABs
         template_text = template_text.replace("\t", "")
@@ -370,7 +381,7 @@ def send_message_data(
         if response.status_code == 200:
             whatsapp_status_logs = {
                 "number": f"91{number}" if "91" not in number else f"{number}",
-                "message": template_text,
+                "message": original_text,
                 "user_id": user_id,
                 "image_url": image_url,
                 "price": 0.125 if category == "UTILITY" else 0.875,
@@ -393,7 +404,7 @@ def send_message_data(
             print(f"Meta response: {response.json()}")
             whatsapp_status_logs = {
                 "number": f"91{number}" if "91" not in number else f"{number}",
-                "message": template_text,
+                "message": original_text,
                 "user_id": user_id,
                 "price": 0,
                 "id": "",
