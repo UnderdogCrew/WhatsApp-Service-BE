@@ -211,9 +211,11 @@ def send_message_data(
         has_buttons = any(component['type'].upper() == "BUTTONS" for component in template_components)
 
         template_text = ""
+        original_text = ""
         for components in template_components:
             if components['type'] == "BODY":
                 template_text = components['text']
+                original_text = components['text']
         category = template_data['data'][0]['category'] if template_result is None else template_result['category']
         language = template_data['data'][0]['language'] if template_result is None else template_result['language']
         print(f"template language ==> {language}")
@@ -318,6 +320,17 @@ def send_message_data(
                 # Convert keys to a list in order: 1, 2, 3, ...
                 pass
         
+
+        if original_text != "":
+            original_text = original_text.replace("{{", "{")
+            original_text = original_text.replace("}}", "}")
+            try:
+                for key, val in msg_details.items():
+                    original_text = original_text.replace(f'{{{key}}}', val)
+            except:
+                # Convert keys to a list in order: 1, 2, 3, ...
+                pass
+        
         
         # 1. remove hard TABs
         template_text = template_text.replace("\t", "")
@@ -328,6 +341,7 @@ def send_message_data(
 
         # 3. **escape EVERY newline (CR, LF, CRLF)**
         template_text = template_text.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
+        print(original_text)
         components = process_components(
             template_components,
             msg_details,
@@ -364,11 +378,13 @@ def send_message_data(
         
         response = requests.post(url, headers=headers, json=payload)
         print(f"Meta response: {response.status_code}")
+        phone_number = number.split("+")[-1]
         if response.status_code == 200:
             whatsapp_status_logs = {
-                "number": f"91{number}",
-                "message": template_text,
+                "number": f"91{phone_number}" if "91" not in phone_number else f"{phone_number}",
+                "message": original_text,
                 "user_id": user_id,
+                "image_url": image_url,
                 "price": 0.125 if category == "UTILITY" else 0.875,
                 "id": response.json()['messages'][0]["id"],
                 "message_status": response.json()['messages'][0]["message_status"] if "message_status" in response.json()['messages'][0] else "sent",
@@ -388,12 +404,13 @@ def send_message_data(
         else:
             print(f"Meta response: {response.json()}")
             whatsapp_status_logs = {
-                "number": f"91{number}",
-                "message": template_text,
+                "number": f"91{phone_number}" if "91" not in phone_number else f"{phone_number}",
+                "message": original_text,
                 "user_id": user_id,
                 "price": 0,
                 "id": "",
                 "message_status": "error",
+                "image_url": image_url,
                 "created_at": datetime.datetime.now(),
                 "updated_at": datetime.datetime.now(),
                 "template_name": template_name,
