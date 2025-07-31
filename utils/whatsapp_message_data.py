@@ -203,20 +203,20 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                 #     result_list.append(quick_reply)
                 
                 if buttons['type'] == "COPY_CODE":
-                    quick_reply = {
+                    copy_code = {
                         "type": "button",
                         "sub_type": "copy_code",
                         "index": str(button_index),
                         "parameters": [
                             {
                                 "type": "copy_code",
-                                "phone_number": buttons['example'][0]
+                                "code": buttons['example'][0]
                             }
                         ]
                     }
-                    result_list.append(quick_reply)
+                    result_list.append(copy_code)
 
-                if "example" in buttons:
+                if "example" in buttons and len(body_parameters) > 0:
                     body_entry = {
                         "type": "BUTTON",
                         "sub_type": "url",
