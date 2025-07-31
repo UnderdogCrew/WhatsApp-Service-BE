@@ -31,7 +31,7 @@ API_TOKEN = API_KEY
 
 def process_components(components, msg_data, image_url, latitude=None, longitude=None, location_name=None, address=None, template_text=None):
     result_list = []
-
+    print(f"msg_data: {msg_data}")
     for component in components:
         if component['type'].upper() == "HEADER" and component.get('format') == "IMAGE":
             # Process HEADER with type IMAGE
