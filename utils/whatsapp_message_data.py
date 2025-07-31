@@ -157,7 +157,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
             
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
-            for button_index in range(len(component['buttons'])+1):
+            for button_index in range(len(component['buttons'])):
                 # Process BODY with named parameters
                 body_parameters = []
                 buttons = component['buttons'][button_index]
