@@ -202,19 +202,19 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                 #     }
                 #     result_list.append(quick_reply)
                 
-                # if buttons['type'] == "COPY_CODE":
-                #     copy_code = {
-                #         "type": "button",
-                #         "sub_type": "copy_code",
-                #         "index": str(button_index),
-                #         "parameters": [
-                #             {
-                #                 "type": "copy_code",
-                #                 "code": buttons['example'][0]
-                #             }
-                #         ]
-                #     }
-                #     result_list.append(copy_code)
+                if buttons['type'] == "COPY_CODE":
+                    copy_code = {
+                        "type": "button",
+                        "sub_type": "copy_code",
+                        "index": str(button_index),
+                        "parameters": [
+                            {
+                                "type": "copy_code",
+                                "coupon_code": buttons['example'][0]
+                            }
+                        ]
+                    }
+                    result_list.append(copy_code)
 
                 if "example" in buttons and len(body_parameters) > 0:
                     body_entry = {
