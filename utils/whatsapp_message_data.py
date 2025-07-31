@@ -140,7 +140,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                         "text": template_text
                     })
                 else:
-                    for param in range(len(component['example']['body_text'])):
+                    for param in range(len(component['example']['body_text'])+1):
                         value = msg_data.get(str(param+1))
                         # Convert Timestamp to string if necessary
                         if isinstance(value, pd.Timestamp):  # Assuming you are using pandas
@@ -157,7 +157,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
             
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
-            for button_index in range(len(component['buttons'])):
+            for button_index in range(len(component['buttons'])+1):
                 # Process BODY with named parameters
                 body_parameters = []
                 buttons = component['buttons'][button_index]
