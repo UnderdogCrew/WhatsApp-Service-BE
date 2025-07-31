@@ -97,6 +97,18 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                 }
                 result_list.append(header_entry)
 
+        elif component['type'].upper() == "FOOTER":
+            body_entry = {
+                "type": "footer",
+                "parameters": [
+                    {
+                        "type": "text",
+                        "text": component['text']
+                    }
+                ]
+            }
+            result_list.append(body_entry)
+
         elif component['type'].upper() == "BODY":
             # Check for body_text_named_params
             if 'body_text_named_params' in component.get('example', {}):
@@ -135,9 +147,10 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
             
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
-            for buttons in component['buttons']:
+            for button_index in range(component['buttons']):
                 # Process BODY with named parameters
                 body_parameters = []
+                buttons = component['buttons'][button_index]
                 if buttons['type'] == "URL":
                     value = buttons.get("text", "")
                     if "example" in buttons:
@@ -150,6 +163,21 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                             "type": "text",
                             "text": buttons['url']
                         })
+                
+                if buttons['type'] == "QUICK_REPLY":
+                    body_parameters.append(
+                        {
+                            "type": "button",
+                            "sub_type": "quick_reply",
+                            "index": str(button_index),
+                            "parameters": [
+                                {
+                                    "type": "payload",
+                                    "payload": buttons['text']
+                                }
+                            ]
+                        }
+                    )
 
                 if "example" in buttons:
                     body_entry = {
@@ -365,13 +393,11 @@ def send_message_data(
                 "components": components
             }
         }
-        print(f"url: {url}")
-        print(f"API_TOKEN: {API_TOKEN}")
         headers = {
             'Authorization': 'Bearer ' + API_TOKEN,
             'Content-Type': 'application/json'
         }
-        print(f"Sending bulk message payload: {payload}")
+        print(f"Sending bulk message payload: \n {payload}")
         
         if category != "UTILITY":
             time.sleep(7)
