@@ -165,20 +165,18 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                         })
                 
                 if buttons['type'] == "QUICK_REPLY":
-                    body_parameters.append(
-                        {
-                            "type": "button",
-                            "sub_type": "quick_reply",
-                            "index": str(button_index),
-                            "parameters": [
-                                {
-                                    "type": "payload",
-                                    "payload": buttons['text']
-                                }
-                            ]
-                        }
-                    )
-                    result_list.append(body_parameters)
+                    quick_reply = {
+                        "type": "button",
+                        "sub_type": "quick_reply",
+                        "index": str(button_index),
+                        "parameters": [
+                            {
+                                "type": "payload",
+                                "payload": buttons['text']
+                            }
+                        ]
+                    }
+                    result_list.append(quick_reply)
 
                 if "example" in buttons:
                     body_entry = {
