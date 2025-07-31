@@ -142,7 +142,6 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                     })
                 else:
                     for param in range(len(component['example']['body_text'][0])):
-                        print(f"param*********************: {param}")
                         value = msg_data.get(str(param+1))
                         # Convert Timestamp to string if necessary
                         if isinstance(value, pd.Timestamp):  # Assuming you are using pandas
@@ -185,6 +184,35 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                             {
                                 "type": "payload",
                                 "payload": buttons['text']
+                            }
+                        ]
+                    }
+                    result_list.append(quick_reply)
+                
+                if buttons['button'] == "PHONE_NUMBER":
+                    quick_reply = {
+                        "type": "button",
+                        "sub_type": "phone_number",
+                        "index": str(button_index),
+                        "parameters": [
+                            {
+                                "type": "phone_number",
+                                "text": buttons["text"],
+                                "phone_number": buttons['phone_number']
+                            }
+                        ]
+                    }
+                    result_list.append(quick_reply)
+                
+                if buttons['button'] == "COPY_CODE":
+                    quick_reply = {
+                        "type": "button",
+                        "sub_type": "copy_code",
+                        "index": str(button_index),
+                        "parameters": [
+                            {
+                                "type": "copy_code",
+                                "phone_number": buttons['example'][0]
                             }
                         ]
                     }
