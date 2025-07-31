@@ -189,7 +189,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                     }
                     result_list.append(quick_reply)
                 
-                if buttons['button'] == "PHONE_NUMBER":
+                if buttons['type'] == "PHONE_NUMBER":
                     quick_reply = {
                         "type": "button",
                         "sub_type": "phone_number",
@@ -204,7 +204,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                     }
                     result_list.append(quick_reply)
                 
-                if buttons['button'] == "COPY_CODE":
+                if buttons['type'] == "COPY_CODE":
                     quick_reply = {
                         "type": "button",
                         "sub_type": "copy_code",
