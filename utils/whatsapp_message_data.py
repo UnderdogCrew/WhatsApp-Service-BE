@@ -31,7 +31,6 @@ API_TOKEN = API_KEY
 
 def process_components(components, msg_data, image_url, latitude=None, longitude=None, location_name=None, address=None, template_text=None):
     result_list = []
-    print(f"msg_data: {msg_data}")
     for component in components:
         if component['type'].upper() == "HEADER" and component.get('format') == "IMAGE":
             # Process HEADER with type IMAGE
@@ -135,10 +134,21 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
             elif 'body_text' in component.get('example', {}) or "text" in component:
                 # Process BODY
                 body_parameters = []
-                body_parameters.append({
-                    "type": "text",
-                    "text": template_text
-                })
+                if len(msg_data) == 0:
+                    body_parameters.append({
+                        "type": "text",
+                        "text": template_text
+                    })
+                else:
+                    for param in range(len(component['example']['body_text'])):
+                        value = msg_data.get(str(param))
+                        # Convert Timestamp to string if necessary
+                        if isinstance(value, pd.Timestamp):  # Assuming you are using pandas
+                            value = value.strftime('%Y-%m-%d')  # Format as needed
+                        body_parameters.append({
+                            "type": "text",
+                            "text": value
+                        })
                 body_entry = {
                     "type": "body",
                     "parameters": body_parameters
