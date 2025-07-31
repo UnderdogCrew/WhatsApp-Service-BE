@@ -211,9 +211,11 @@ def send_message_data(
         has_buttons = any(component['type'].upper() == "BUTTONS" for component in template_components)
 
         template_text = ""
+        original_text = ""
         for components in template_components:
             if components['type'] == "BODY":
                 template_text = components['text']
+                original_text = components['text']
         category = template_data['data'][0]['category'] if template_result is None else template_result['category']
         language = template_data['data'][0]['language'] if template_result is None else template_result['language']
         print(f"template language ==> {language}")
@@ -328,7 +330,7 @@ def send_message_data(
 
         # 3. **escape EVERY newline (CR, LF, CRLF)**
         template_text = template_text.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
-        print(template_text)
+        print(original_text)
         components = process_components(
             template_components,
             msg_details,
