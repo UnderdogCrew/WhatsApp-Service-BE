@@ -192,7 +192,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                 if buttons['type'] == "PHONE_NUMBER":
                     quick_reply = {
                         "type": "button",
-                        "sub_type": "phone_number",
+                        "sub_type": "voice_call",
                         "index": str(button_index),
                         "parameters": [
                             {
