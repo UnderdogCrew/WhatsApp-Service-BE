@@ -328,6 +328,7 @@ def send_message_data(
 
         # 3. **escape EVERY newline (CR, LF, CRLF)**
         template_text = template_text.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
+        print(template_text)
         components = process_components(
             template_components,
             msg_details,
@@ -366,9 +367,10 @@ def send_message_data(
         print(f"Meta response: {response.status_code}")
         if response.status_code == 200:
             whatsapp_status_logs = {
-                "number": f"91{number}",
+                "number": f"91{number}" if "91" not in number else f"{number}",
                 "message": template_text,
                 "user_id": user_id,
+                "image_url": image_url,
                 "price": 0.125 if category == "UTILITY" else 0.875,
                 "id": response.json()['messages'][0]["id"],
                 "message_status": response.json()['messages'][0]["message_status"] if "message_status" in response.json()['messages'][0] else "sent",
@@ -388,12 +390,13 @@ def send_message_data(
         else:
             print(f"Meta response: {response.json()}")
             whatsapp_status_logs = {
-                "number": f"91{number}",
+                "number": f"91{number}" if "91" not in number else f"{number}",
                 "message": template_text,
                 "user_id": user_id,
                 "price": 0,
                 "id": "",
                 "message_status": "error",
+                "image_url": image_url,
                 "created_at": datetime.datetime.now(),
                 "updated_at": datetime.datetime.now(),
                 "template_name": template_name,
