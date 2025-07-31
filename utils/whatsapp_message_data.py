@@ -178,7 +178,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                             ]
                         }
                     )
-                    result_list.append(body_entry)
+                    result_list.append(body_parameters)
 
                 if "example" in buttons:
                     body_entry = {
