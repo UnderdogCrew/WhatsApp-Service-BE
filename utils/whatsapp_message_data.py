@@ -151,7 +151,6 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                 # Process BODY with named parameters
                 body_parameters = []
                 buttons = component['buttons'][button_index]
-                print(f"buttons: {buttons}")
                 if buttons['type'] == "URL":
                     value = buttons.get("text", "")
                     if "example" in buttons:
@@ -179,6 +178,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                             ]
                         }
                     )
+                    result_list.append(body_entry)
 
                 if "example" in buttons:
                     body_entry = {
