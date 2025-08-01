@@ -185,14 +185,11 @@ class SendMessage(APIView):
             
             template_url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates?name={template_name}"
             API_KEY = api_key
-            
-            print(f"API_KEY: {API_KEY}")
 
             headers = {
                 'Authorization': f'Bearer {API_KEY}'
             }
             template_response = requests.request("GET", template_url, headers=headers)
-            print(template_response.json())
             if template_response.status_code != 200:
                 return JsonResponse({"message": "Template is missing"}, safe=False, status=422)
 

@@ -31,7 +31,7 @@ API_TOKEN = API_KEY
 
 def process_components(components, msg_data, image_url, latitude=None, longitude=None, location_name=None, address=None, template_text=None):
     result_list = []
-
+    print(f"msg_data: {msg_data}")
     for component in components:
         if component['type'].upper() == "HEADER" and component.get('format') == "IMAGE":
             # Process HEADER with type IMAGE
@@ -97,6 +97,18 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                 }
                 result_list.append(header_entry)
 
+        elif component['type'].upper() == "FOOTER":
+            body_entry = {
+                "type": "footer",
+                "parameters": [
+                    {
+                        "type": "text",
+                        "text": component['text']
+                    }
+                ]
+            }
+            result_list.append(body_entry)
+
         elif component['type'].upper() == "BODY":
             # Check for body_text_named_params
             if 'body_text_named_params' in component.get('example', {}):
@@ -123,10 +135,21 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
             elif 'body_text' in component.get('example', {}) or "text" in component:
                 # Process BODY
                 body_parameters = []
-                body_parameters.append({
-                    "type": "text",
-                    "text": template_text
-                })
+                if len(msg_data) == 0:
+                    body_parameters.append({
+                        "type": "text",
+                        "text": template_text
+                    })
+                else:
+                    for param in range(len(component['example']['body_text'][0])):
+                        value = msg_data.get(str(param+1))
+                        # Convert Timestamp to string if necessary
+                        if isinstance(value, pd.Timestamp):  # Assuming you are using pandas
+                            value = value.strftime('%Y-%m-%d')  # Format as needed
+                        body_parameters.append({
+                            "type": "text",
+                            "text": value
+                        })
                 body_entry = {
                     "type": "body",
                     "parameters": body_parameters
@@ -135,9 +158,10 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
             
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
-            for buttons in component['buttons']:
+            for button_index in range(len(component['buttons'])):
                 # Process BODY with named parameters
                 body_parameters = []
+                buttons = component['buttons'][button_index]
                 if buttons['type'] == "URL":
                     value = buttons.get("text", "")
                     if "example" in buttons:
@@ -150,8 +174,49 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                             "type": "text",
                             "text": buttons['url']
                         })
+                
+                if buttons['type'] == "QUICK_REPLY":
+                    quick_reply = {
+                        "type": "button",
+                        "sub_type": "quick_reply",
+                        "index": str(button_index),
+                        "parameters": [
+                            {
+                                "type": "payload",
+                                "payload": buttons['text']
+                            }
+                        ]
+                    }
+                    result_list.append(quick_reply)
+                
+                # if buttons['type'] == "PHONE_NUMBER":
+                #     quick_reply = {
+                #         "type": "button",
+                #         "index": str(button_index),
+                #         "parameters": [
+                #             {
+                #                 "type": "phone_number",
+                #                 "phone_number": buttons['phone_number']
+                #             }
+                #         ]
+                #     }
+                #     result_list.append(quick_reply)
+                
+                if buttons['type'] == "COPY_CODE":
+                    copy_code = {
+                        "type": "button",
+                        "sub_type": "copy_code",
+                        "index": str(button_index),
+                        "parameters": [
+                            {
+                                "type": "coupon_code",
+                                "coupon_code": buttons['example'][0]
+                            }
+                        ]
+                    }
+                    result_list.append(copy_code)
 
-                if "example" in buttons:
+                if "example" in buttons and len(body_parameters) > 0:
                     body_entry = {
                         "type": "BUTTON",
                         "sub_type": "url",
@@ -365,13 +430,11 @@ def send_message_data(
                 "components": components
             }
         }
-        print(f"url: {url}")
-        print(f"API_TOKEN: {API_TOKEN}")
         headers = {
             'Authorization': 'Bearer ' + API_TOKEN,
             'Content-Type': 'application/json'
         }
-        print(f"Sending bulk message payload: {payload}")
+        print(f"Sending bulk message payload: \n {payload}")
         
         if category != "UTILITY":
             time.sleep(7)
