@@ -441,7 +441,10 @@ def send_message_data(
         
         response = requests.post(url, headers=headers, json=payload)
         print(f"Meta response: {response.status_code}")
-        phone_number = number.split("+")[-1]
+        try:
+            phone_number = number.split("+")[-1]
+        except:
+            phone_number = str(number)
         if response.status_code == 200:
             whatsapp_status_logs = {
                 "number": f"91{phone_number}" if "91" not in phone_number else f"{phone_number}",
