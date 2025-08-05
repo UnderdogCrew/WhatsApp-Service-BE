@@ -1579,7 +1579,15 @@ class CustomerCredits(APIView):
                 openapi.IN_QUERY,
                 description="Number of customers",
                 type=openapi.TYPE_INTEGER,
-                required=True
+                required=False
+            ),
+            openapi.Parameter(
+                "is_select_all",
+                openapi.IN_QUERY,
+                description="Need to send messages to all customers",
+                type=openapi.TYPE_BOOLEAN,
+                required=True,
+                default=False
             )
         ],
         responses={
@@ -1632,6 +1640,7 @@ class CustomerCredits(APIView):
             
             ## we need to get the user info from the database
             db = MongoDB()
+            is_select_all = request.query_params.get("is_select_all", False)
             user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
             if user_info is None:
                 return JsonResponse({"message": "User not found"}, status=404)
@@ -1644,8 +1653,25 @@ class CustomerCredits(APIView):
                 return JsonResponse({"message": "Invalid template type"}, status=400)
             
             customer_count = int(request.query_params.get("customer_count", 0))
-            if customer_count is None:
+            if customer_count is None and is_select_all is False:
                 return JsonResponse({"message": "Customer count is required"}, status=400)
+            else:
+                pipeline = [{
+                    "$match": {
+                        "user_id" : user_id
+                    }
+                },
+                {
+                    "$group": {
+                    "_id": "$number"
+                    }
+                },
+                {
+                    "$count": "uniqueCustomerCount"
+                }
+                ]
+                customer_agg_count = db.aggregate_count(collection_name="customers", pipeline=pipeline)
+                customer_count = customer_agg_count['uniqueCustomerCount']
             
             ## we need to get the credits from the database
             user_credits = user_info['default_credit']

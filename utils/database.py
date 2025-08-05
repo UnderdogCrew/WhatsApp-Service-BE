@@ -79,3 +79,8 @@ class MongoDB:
         collection = self.get_collection(collection_name)
         # Convert cursor to list to get actual results
         return list(collection.aggregate(pipeline))
+
+    def aggregate_count(self, collection_name, pipeline):
+        collection = self.get_collection(collection_name)
+        # Convert cursor to list to get actual results
+        return collection.aggregate(pipeline)

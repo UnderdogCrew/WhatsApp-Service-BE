@@ -152,7 +152,6 @@ class MessageTemplates(APIView):
                 'Authorization': f'Bearer {api_key}'
             }
             response = requests.request("GET", url, headers=headers, data={})
-            print(response.text)
             if response.status_code == 200:
                 data = response.json()
                 response_data = {
