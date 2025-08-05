@@ -125,6 +125,7 @@ class SendMessage(APIView):
                 ),
                 "is_select_all": openapi.Schema(
                     type=openapi.TYPE_BOOLEAN,
+                    default=False,
                     description='While need to send the message to all customer value should be True'
                 ),
             },
@@ -215,8 +216,9 @@ class SendMessage(APIView):
                 ]
                 results = db.aggregate(collection_name="customers", pipeline=pipeline)
                 for customer in results:
+                    print(customer)
                     numbers.append(customer['_id'])
-            print(f"numbers: {numbers}")
+            # print(f"numbers: {numbers}")
 
             if message_type == 2 and not numbers:
                 return JsonResponse(
