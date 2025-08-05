@@ -308,6 +308,7 @@ def send_message_data(
                     pass
         
         print(f"number: {number}")
+        print(f"metadata: {metadata}")
         if metadata is not None:
             for key, value in metadata.items():
                 if value == "$Name":
@@ -327,7 +328,7 @@ def send_message_data(
                                 pass
                     metadata[key] = text
 
-        
+        print(f"======metadata========: {metadata}")
         company_name = ""
         if entry is not None:
             if "company_name" in entry:
