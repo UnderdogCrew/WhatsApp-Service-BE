@@ -156,7 +156,6 @@ class SendMessage(APIView):
             # Check if user_info is a dictionary
             if isinstance(user_info, dict) and 'user_id' in user_info:
                 user_id = user_info['user_id']  # Access user_id from the decoded token
-                print(f"user id: {user_id}")
             else:
                 return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
         
@@ -170,7 +169,6 @@ class SendMessage(APIView):
             if template_name == "hotel":
                 template_name = "hello_world"
 
-            print(f"template name: {template_name}")
             # Validate required fields
             if not request_data:
                 return JsonResponse({"message": "Request body is missing"}, safe=False, status=422)
@@ -317,7 +315,6 @@ class SendMessage(APIView):
 
             elif message_type == 2:
                 for number in numbers:
-                    print(f"msg_metadata: {msg_metadata}")
                     send_message_data(
                         number=number,
                         template_name=template_name,
