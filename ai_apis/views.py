@@ -1671,6 +1671,7 @@ class CustomerCredits(APIView):
                 }
                 ]
                 customer_agg_count = db.aggregate_count(collection_name="customers", pipeline=pipeline)
+                print(f"customer_agg_count: {customer_agg_count}")
                 customer_count = customer_agg_count['uniqueCustomerCount']
             
             ## we need to get the credits from the database
