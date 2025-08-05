@@ -264,7 +264,7 @@ class SendMessage(APIView):
                     status=200
                 )
             
-            threading.Thread(target=send_message_data, args=(numbers,
+            threading.Thread(target=send_whatsapp_message, args=(numbers,
                                                              template_name,
                                                              text,
                                                              image_url,
