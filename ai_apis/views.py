@@ -162,7 +162,7 @@ class SendMessage(APIView):
         
             request_data = request.data
             template_name = request_data.get("template_name", None)
-            metadata = request_data.get("metadata", None)
+            msg_metadata = request_data.get("metadata", None)
             latitude = request_data.get("latitude", None)
             longitude = request_data.get("longitude", None)
             location_name = request_data.get("location_name", None)
@@ -324,7 +324,7 @@ class SendMessage(APIView):
                         text=text,
                         image_url=image_url,
                         user_id=user_id,
-                        metadata=metadata,
+                        metadata=msg_metadata,
                         latitude=latitude,
                         longitude=longitude,
                         location_name=location_name,
