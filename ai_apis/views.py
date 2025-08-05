@@ -1672,8 +1672,13 @@ class CustomerCredits(APIView):
                 ]
                 customer_agg_count = db.aggregate_count(collection_name="customers", pipeline=pipeline)
                 print(f"customer_agg_count: {customer_agg_count}")
-                customer_count = customer_agg_count['uniqueCustomerCount']
+                if customer_agg_count:
+                    customer_count = customer_agg_count[0]['uniqueCustomerCount']
+                    print("Unique customers:", customer_count)
             
+            if customer_count is None:
+                return JsonResponse({"message": "Customer count is required"}, status=400)
+
             ## we need to get the credits from the database
             user_credits = user_info['default_credit']
             
