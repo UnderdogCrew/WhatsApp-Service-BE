@@ -317,7 +317,7 @@ class SendMessage(APIView):
 
             elif message_type == 2:
                 for number in numbers:
-                    
+                    print(f"msg_metadata: {msg_metadata}")
                     send_message_data(
                         number=number,
                         template_name=template_name,
