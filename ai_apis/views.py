@@ -216,9 +216,8 @@ class SendMessage(APIView):
                 ]
                 results = db.aggregate(collection_name="customers", pipeline=pipeline)
                 for customer in results:
-                    print(customer)
-                    numbers.append(customer['_id'])
-            # print(f"numbers: {numbers}")
+                    numbers.append(customer['number'])
+            print(f"numbers: {numbers}")
 
             if message_type == 2 and not numbers:
                 return JsonResponse(
