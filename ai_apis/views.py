@@ -1692,12 +1692,12 @@ class CustomerCredits(APIView):
                 return JsonResponse({"message": "Invalid template type"}, status=400)
             
             if user_credits < credits:
-                return JsonResponse({"message": "Insufficient credits"}, status=400)
+                return JsonResponse({"message": "Insufficient credits", "credits_required": credits, "user_credits": user_credits}, status=400)
             
             response = {
                 "message": "Credits fetched successfully",
                 "credits_required": credits,
-                "remaining_credits": user_credits - credits,
+                "remaining_credits": round(user_credits - credits, 2),
                 "user_credits": user_credits
             }
             
