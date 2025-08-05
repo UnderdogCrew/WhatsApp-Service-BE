@@ -77,6 +77,23 @@ def process_components(components, msg_data, image_url):
     return result_list
 
 
+def send_whatsapp_message(numbers, template_name,text, image_url, user_id, msg_metadata, latitude, longitude, location_name, address, params_fallback_value):
+    for number in numbers:
+        send_message_data(
+            number=number,
+            template_name=template_name,
+            text=text,
+            image_url=image_url,
+            user_id=user_id,
+            metadata=msg_metadata,
+            latitude=latitude,
+            longitude=longitude,
+            location_name=location_name,
+            address=address,
+            params_fallback_value=params_fallback_value
+        )
+    return True
+
 class SendMessage(APIView):
     @swagger_auto_schema(
         operation_description="Send a message via WhatsApp",
@@ -247,87 +264,18 @@ class SendMessage(APIView):
                     status=200
                 )
             
-
-            if message_type == 1:
-                # Bulk messaging using the Excel file
-                df = pd.read_excel(file_path)
-                for index, row in df.iterrows():
-                    msg_data = row.to_dict()
-
-                    ## we need to add the numbers and name as a customer
-                    customer_details = {
-                        "number": msg_data['number'],
-                        "name": msg_data['name'],
-                        "insurance_type": msg_data['insurance_type'] if "insurance_type" in msg_data else "",
-                        "model": msg_data['model'] if "model" in msg_data else "",
-                        "reg_number": msg_data['reg_number'] if "reg_number" in msg_data else "",
-                        "policy_type": msg_data['policy_type'] if "policy_type" in msg_data else "",
-                        "company_name": msg_data['company_name'] if "company_name" in msg_data else "",
-                        "date": msg_data['date'] if "date" in msg_data else "",
-                        "status": 1,
-                        "user_id": user_id,
-                        "created_at": datetime.datetime.now()
-                    }
-                    customer_number = msg_data['number']
-                    # try:
-                    if type(customer_number) != int:
-                        customer_number = customer_number.encode('ascii', 'ignore').decode()
-                        customer_number = int(customer_number)
-                    
-                    customer_details['number'] = customer_number
-
-                    # except:
-                    #     pass
-                    customer_query = {
-                        "number": customer_number,
-                        "status": 1,
-                        "user_id": user_id,
-                    }
-                    print(f"customer query: {customer_query}")
-                    customer_data = db.find_document(collection_name='customers', query=customer_query)
-                    if customer_data is not None:
-                        update_data = {
-                            "name": msg_data['name'],
-                            "insurance_type": msg_data['insurance_type'] if "insurance_type" in msg_data else "",
-                            "model": msg_data['model'] if "model" in msg_data else "",
-                            "reg_number": msg_data['reg_number'] if "reg_number" in msg_data else "",
-                            "policy_type": msg_data['policy_type'] if "policy_type" in msg_data else "",
-                            "company_name": msg_data['company_name'] if "company_name" in msg_data else "",
-                            "date": msg_data['date'] if "date" in msg_data else "",
-                        }
-                        db.update_document(collection_name="customers", query={"_id": ObjectId(customer_data['_id'])}, update_data=update_data)
-                    else:
-                        db.create_document('customers', customer_details)
-
-                    send_message_data(
-                        number=msg_data['number'],
-                        template_name=template_name,
-                        text=text,
-                        image_url=image_url,
-                        user_id=user_id,
-                        metadata=msg_data,
-                        latitude=latitude,
-                        longitude=longitude,
-                        location_name=location_name,
-                        address=address,
-                        params_fallback_value=params_fallback_value
-                    )
-
-            elif message_type == 2:
-                for number in numbers:
-                    send_message_data(
-                        number=number,
-                        template_name=template_name,
-                        text=text,
-                        image_url=image_url,
-                        user_id=user_id,
-                        metadata=msg_metadata,
-                        latitude=latitude,
-                        longitude=longitude,
-                        location_name=location_name,
-                        address=address,
-                        params_fallback_value=params_fallback_value
-                    )
+            threading.Thread(target=send_message_data, args=(numbers,
+                                                             template_name,
+                                                             text,
+                                                             image_url,
+                                                             user_id,
+                                                             msg_metadata,
+                                                             latitude,
+                                                             longitude,
+                                                             location_name,
+                                                             address,
+                                                             params_fallback_value,)
+                                                             ).start()
 
             return JsonResponse({"message": "Messages sent successfully"}, safe=False, status=200)
 
