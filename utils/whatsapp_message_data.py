@@ -309,6 +309,7 @@ def send_message_data(
         
         print(f"number: {number}")
         print(f"metadata: {metadata}")
+        send_metadata = {}
         if metadata is not None:
             for key, value in metadata.items():
                 if value == "$Name":
@@ -326,9 +327,9 @@ def send_message_data(
                                 text = params_fallback_value['name']
                             else:
                                 pass
-                    metadata[key] = text
+                    send_metadata[key] = text
 
-        print(f"======metadata========: {metadata}")
+        print(f"======metadata========: {send_metadata}")
         company_name = ""
         if entry is not None:
             if "company_name" in entry:
@@ -371,7 +372,7 @@ def send_message_data(
                 "date": date
             }
         elif metadata is not None:
-            msg_details = metadata   
+            msg_details = send_metadata   
         else: 
             msg_details = {
                 "Name": text
