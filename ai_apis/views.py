@@ -1653,6 +1653,8 @@ class CustomerCredits(APIView):
                 return JsonResponse({"message": "Invalid template type"}, status=400)
             
             customer_count = int(request.query_params.get("customer_count", 0))
+            print(f"customer_count: {customer_count}")
+            print(f"is_select_all: {is_select_all}")
             if customer_count is None and is_select_all is False:
                 return JsonResponse({"message": "Customer count is required"}, status=400)
             else:
