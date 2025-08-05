@@ -1657,7 +1657,7 @@ class CustomerCredits(APIView):
             print(f"is_select_all: {is_select_all}")
             if customer_count is None and is_select_all is False:
                 return JsonResponse({"message": "Customer count is required"}, status=400)
-            else:
+            elif is_select_all is True:
                 pipeline = [{
                     "$match": {
                         "user_id" : user_id
