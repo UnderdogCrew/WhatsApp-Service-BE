@@ -307,6 +307,7 @@ def send_message_data(
                 else:
                     pass
         
+        print(f"number: {number}")
         if metadata is not None:
             for key, value in metadata.items():
                 if value == "$Name":
