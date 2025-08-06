@@ -77,6 +77,23 @@ def process_components(components, msg_data, image_url):
     return result_list
 
 
+def send_whatsapp_message(numbers, template_name,text, image_url, user_id, msg_metadata, latitude, longitude, location_name, address, params_fallback_value):
+    for number in numbers:
+        send_message_data(
+            number=number,
+            template_name=template_name,
+            text=text,
+            image_url=image_url,
+            user_id=user_id,
+            metadata=msg_metadata,
+            latitude=latitude,
+            longitude=longitude,
+            location_name=location_name,
+            address=address,
+            params_fallback_value=params_fallback_value
+        )
+    return True
+
 class SendMessage(APIView):
     @swagger_auto_schema(
         operation_description="Send a message via WhatsApp",
@@ -123,6 +140,11 @@ class SendMessage(APIView):
                     description='Fallback values for template parameters (e.g., {"Name": "Neel"})',
                     additional_properties=openapi.Schema(type=openapi.TYPE_STRING)
                 ),
+                "is_select_all": openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,
+                    default=False,
+                    description='While need to send the message to all customer value should be True'
+                ),
             },
             required=['text', 'message_type', 'template_name']
         ),
@@ -151,13 +173,12 @@ class SendMessage(APIView):
             # Check if user_info is a dictionary
             if isinstance(user_info, dict) and 'user_id' in user_info:
                 user_id = user_info['user_id']  # Access user_id from the decoded token
-                print(f"user id: {user_id}")
             else:
                 return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
         
             request_data = request.data
             template_name = request_data.get("template_name", None)
-            metadata = request_data.get("metadata", None)
+            msg_metadata = request_data.get("metadata", None)
             latitude = request_data.get("latitude", None)
             longitude = request_data.get("longitude", None)
             location_name = request_data.get("location_name", None)
@@ -165,7 +186,6 @@ class SendMessage(APIView):
             if template_name == "hotel":
                 template_name = "hello_world"
 
-            print(f"template name: {template_name}")
             # Validate required fields
             if not request_data:
                 return JsonResponse({"message": "Request body is missing"}, safe=False, status=422)
@@ -200,7 +220,18 @@ class SendMessage(APIView):
 
             image_url = request_data.get('image_url', "")
             numbers = request_data.get('numbers', [])
+            is_select_all = request_data.get('is_select_all', False)
             params_fallback_value = request_data.get("paramsFallbackValue", {})
+
+            if is_select_all is True:
+                pipeline = [
+                    { "$match": { "user_id":user_id } },
+                    { "$group": { "_id": "$number", "customer": { "$first": "$$ROOT" } } },
+                    { "$replaceRoot": { "newRoot": "$customer" } }
+                ]
+                results = db.aggregate(collection_name="customers", pipeline=pipeline)
+                for customer in results:
+                    numbers.append(customer['number'])
 
             if message_type == 2 and not numbers:
                 return JsonResponse(
@@ -233,88 +264,18 @@ class SendMessage(APIView):
                     status=200
                 )
             
-
-            if message_type == 1:
-                # Bulk messaging using the Excel file
-                df = pd.read_excel(file_path)
-                for index, row in df.iterrows():
-                    msg_data = row.to_dict()
-
-                    ## we need to add the numbers and name as a customer
-                    customer_details = {
-                        "number": msg_data['number'],
-                        "name": msg_data['name'],
-                        "insurance_type": msg_data['insurance_type'] if "insurance_type" in msg_data else "",
-                        "model": msg_data['model'] if "model" in msg_data else "",
-                        "reg_number": msg_data['reg_number'] if "reg_number" in msg_data else "",
-                        "policy_type": msg_data['policy_type'] if "policy_type" in msg_data else "",
-                        "company_name": msg_data['company_name'] if "company_name" in msg_data else "",
-                        "date": msg_data['date'] if "date" in msg_data else "",
-                        "status": 1,
-                        "user_id": user_id,
-                        "created_at": datetime.datetime.now()
-                    }
-                    customer_number = msg_data['number']
-                    # try:
-                    if type(customer_number) != int:
-                        customer_number = customer_number.encode('ascii', 'ignore').decode()
-                        customer_number = int(customer_number)
-                    
-                    customer_details['number'] = customer_number
-
-                    # except:
-                    #     pass
-                    customer_query = {
-                        "number": customer_number,
-                        "status": 1,
-                        "user_id": user_id,
-                    }
-                    print(f"customer query: {customer_query}")
-                    customer_data = db.find_document(collection_name='customers', query=customer_query)
-                    if customer_data is not None:
-                        update_data = {
-                            "name": msg_data['name'],
-                            "insurance_type": msg_data['insurance_type'] if "insurance_type" in msg_data else "",
-                            "model": msg_data['model'] if "model" in msg_data else "",
-                            "reg_number": msg_data['reg_number'] if "reg_number" in msg_data else "",
-                            "policy_type": msg_data['policy_type'] if "policy_type" in msg_data else "",
-                            "company_name": msg_data['company_name'] if "company_name" in msg_data else "",
-                            "date": msg_data['date'] if "date" in msg_data else "",
-                        }
-                        db.update_document(collection_name="customers", query={"_id": ObjectId(customer_data['_id'])}, update_data=update_data)
-                    else:
-                        db.create_document('customers', customer_details)
-
-                    send_message_data(
-                        number=msg_data['number'],
-                        template_name=template_name,
-                        text=text,
-                        image_url=image_url,
-                        user_id=user_id,
-                        metadata=msg_data,
-                        latitude=latitude,
-                        longitude=longitude,
-                        location_name=location_name,
-                        address=address,
-                        params_fallback_value=params_fallback_value
-                    )
-
-            elif message_type == 2:
-                for number in numbers:
-                    
-                    send_message_data(
-                        number=number,
-                        template_name=template_name,
-                        text=text,
-                        image_url=image_url,
-                        user_id=user_id,
-                        metadata=metadata,
-                        latitude=latitude,
-                        longitude=longitude,
-                        location_name=location_name,
-                        address=address,
-                        params_fallback_value=params_fallback_value
-                    )
+            threading.Thread(target=send_whatsapp_message, args=(numbers,
+                                                             template_name,
+                                                             text,
+                                                             image_url,
+                                                             user_id,
+                                                             msg_metadata,
+                                                             latitude,
+                                                             longitude,
+                                                             location_name,
+                                                             address,
+                                                             params_fallback_value,)
+                                                             ).start()
 
             return JsonResponse({"message": "Messages sent successfully"}, safe=False, status=200)
 
@@ -1579,7 +1540,15 @@ class CustomerCredits(APIView):
                 openapi.IN_QUERY,
                 description="Number of customers",
                 type=openapi.TYPE_INTEGER,
-                required=True
+                required=False
+            ),
+            openapi.Parameter(
+                "is_select_all",
+                openapi.IN_QUERY,
+                description="Need to send messages to all customers",
+                type=openapi.TYPE_BOOLEAN,
+                required=True,
+                default=False
             )
         ],
         responses={
@@ -1632,6 +1601,7 @@ class CustomerCredits(APIView):
             
             ## we need to get the user info from the database
             db = MongoDB()
+            is_select_all = request.query_params.get("is_select_all", False)
             user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
             if user_info is None:
                 return JsonResponse({"message": "User not found"}, status=404)
@@ -1644,9 +1614,34 @@ class CustomerCredits(APIView):
                 return JsonResponse({"message": "Invalid template type"}, status=400)
             
             customer_count = int(request.query_params.get("customer_count", 0))
+            print(f"customer_count: {customer_count}")
+            print(f"is_select_all: {is_select_all}")
+            if customer_count is None and is_select_all is False:
+                return JsonResponse({"message": "Customer count is required"}, status=400)
+            elif is_select_all is True:
+                pipeline = [{
+                    "$match": {
+                        "user_id" : user_id
+                    }
+                },
+                {
+                    "$group": {
+                    "_id": "$number"
+                    }
+                },
+                {
+                    "$count": "uniqueCustomerCount"
+                }
+                ]
+                customer_agg_count = db.aggregate_count(collection_name="customers", pipeline=pipeline)
+                print(f"customer_agg_count: {customer_agg_count}")
+                if customer_agg_count:
+                    customer_count = customer_agg_count[0]['uniqueCustomerCount']
+                    print("Unique customers:", customer_count)
+            
             if customer_count is None:
                 return JsonResponse({"message": "Customer count is required"}, status=400)
-            
+
             ## we need to get the credits from the database
             user_credits = user_info['default_credit']
             
@@ -1660,12 +1655,12 @@ class CustomerCredits(APIView):
                 return JsonResponse({"message": "Invalid template type"}, status=400)
             
             if user_credits < credits:
-                return JsonResponse({"message": "Insufficient credits"}, status=400)
+                return JsonResponse({"message": "Insufficient credits", "credits_required": credits, "user_credits": user_credits}, status=400)
             
             response = {
                 "message": "Credits fetched successfully",
                 "credits_required": credits,
-                "remaining_credits": user_credits - credits,
+                "remaining_credits": round(user_credits - credits, 2),
                 "user_credits": user_credits
             }
             

@@ -307,6 +307,7 @@ def send_message_data(
                 else:
                     pass
         
+        send_metadata = {}
         if metadata is not None:
             for key, value in metadata.items():
                 if value == "$Name":
@@ -324,9 +325,8 @@ def send_message_data(
                                 text = params_fallback_value['name']
                             else:
                                 pass
-                    metadata[key] = text
+                    send_metadata[key] = text
 
-        
         company_name = ""
         if entry is not None:
             if "company_name" in entry:
@@ -369,7 +369,7 @@ def send_message_data(
                 "date": date
             }
         elif metadata is not None:
-            msg_details = metadata   
+            msg_details = send_metadata   
         else: 
             msg_details = {
                 "Name": text
@@ -468,7 +468,6 @@ def send_message_data(
             )
 
         else:
-            print(f"Meta response: {response.json()}")
             whatsapp_status_logs = {
                 "number": f"91{phone_number}" if "91" not in phone_number else f"{phone_number}",
                 "message": original_text,
