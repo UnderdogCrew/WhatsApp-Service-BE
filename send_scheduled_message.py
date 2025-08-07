@@ -116,7 +116,8 @@ def fetch_scheduled_messages():
                 text=user.get('text', ''),
                 image_url=image_url,
                 user_id=user['user_id'],
-                metadata=metadata
+                metadata=metadata,
+                entry=metadata
             )
         print("Message send successfully......!!!!!!!")
         return True

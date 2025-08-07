@@ -331,7 +331,7 @@ def send_message_data(
         if entry is not None:
             if "company_name" in entry:
                 company_name = entry['company_name']
-        
+        print(f"company_name: {company_name}")
         reg_number = ""
         model = ""
         policy = ""
@@ -359,15 +359,16 @@ def send_message_data(
                 else:
                     date = entry['date']  # Assume it's already a string
         
-
         # Sending messages to specific numbers
-        if text != "" and company_name != "" and policy != "" and date != "":
+        if company_name != "" and policy != "" and date != "":
             msg_details = {
                 "name": text,
                 "company_name": company_name,
                 "policy": policy,
                 "date": date
             }
+        elif entry is not None:
+            msg_details = entry
         elif metadata is not None:
             msg_details = send_metadata   
         else: 
@@ -456,7 +457,8 @@ def send_message_data(
                 "message_status": response.json()['messages'][0]["message_status"] if "message_status" in response.json()['messages'][0] else "sent",
                 "created_at": datetime.datetime.now(),
                 "updated_at": datetime.datetime.now(),
-                "template_name": template_name
+                "template_name": template_name,
+                "metadata": msg_details,
             }
             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
             db.update_document(
@@ -483,6 +485,7 @@ def send_message_data(
                 "title": response.json()['error']['type'],
                 "error_message": response.json()['error']['message'],
                 "error_data": response.json()['error']['message'],
+                "metadata": msg_details,
             }
             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
 
