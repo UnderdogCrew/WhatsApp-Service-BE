@@ -314,16 +314,63 @@ class FacebookWebhook(APIView):
             if len(statuses) == 0:
                 try:
                     user_info = db.find_document("users", query={"business_id": phone_number_id})
-                    print(user_info)
                     if user_info:
                         phone_number_id = phone_number_id #user_info['phone_number_id'] if "phone_number_id" in user_info else ""
                         auto_reply_enabled = user_info['auto_reply_enabled'] if "auto_reply_enabled" in user_info else False
                         display_phone_number =value['metadata']['display_phone_number']
-                        messages = value['messages'][0]['text']['body']
+                        if "text" in value['messages'][0]:
+                            messages = value['messages'][0]['text']['body']
+                        elif "button" in value['messages'][0]:
+                            messages = value['messages'][0]['button']['payload']
+                        else:
+                            messages = ""
+                        
                         from_number = value['messages'][0]['from']
                         messages_type = value['messages'][0]['type']
 
-                        if messages_type == "text":
+                        if str(user_info['_id']) == "67c1cf4c2763ce36e17d145e" or str(user_info['_id']) == "67c1cf532763ce36e17d145f":
+                            last_send_message = db.find_documents(
+                                collection_name="whatsapp_message_logs",
+                                query={
+                                    "number": from_number
+                                },
+                                sort=[('_id', -1)],limit=1
+                            )
+                            if not last_send_message:
+                                pass
+                            else:
+                                phone_number = 9898621300 if str(user_info['_id']) == "67c1cf4c2763ce36e17d145e" else 7405444368
+                                if "metadata" in last_send_message[0]:
+                                    metadata = last_send_message[0]['metadata']
+                                    metadata['user_reply'] = messages
+                                    send_message_data(
+                                        number=phone_number, # do not remove this number as we need to send the replied to Urvish number
+                                        template_name="insurance_policy_replies",
+                                        text="",
+                                        image_url="",
+                                        user_id=str(user_info['_id']),
+                                        metadata=metadata,
+                                        entry=metadata
+                                    )
+                                else:
+                                    metadata = {
+                                        "name": from_number,
+                                        "company_name": "-",
+                                        "policy": "-",
+                                        "date": "-"
+                                    }
+                                    metadata['user_reply'] = messages
+                                    send_message_data(
+                                        number=phone_number, # do not remove this number as we need to send the replied to Urvish number
+                                        template_name="insurance_policy_replies",
+                                        text="",
+                                        image_url="",
+                                        user_id=str(user_info['_id']),
+                                        metadata=metadata,
+                                        entry=metadata
+                                    )
+
+                        if messages_type == "text" or messages_type == "button":
                             whatsapp_status_logs = {
                                 "number": from_number,
                                 "message": messages,
@@ -340,7 +387,7 @@ class FacebookWebhook(APIView):
                                 "error_data": "",
                             }
                             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
-                        print(f"auto_reply_enabled: {auto_reply_enabled}")
+
                         if auto_reply_enabled is True:
                             openai_data = {
                                 "model": "gpt-4o-mini",
