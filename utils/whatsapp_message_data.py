@@ -392,6 +392,7 @@ def send_message_data(
             original_text = original_text.replace("}}", "}")
             try:
                 for key, val in msg_details.items():
+                    print(key)
                     original_text = original_text.replace(f'{{{key}}}', val)
             except:
                 print("Error while passing the value in variable")
