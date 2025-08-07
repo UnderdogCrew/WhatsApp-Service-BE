@@ -394,6 +394,7 @@ def send_message_data(
                 for key, val in msg_details.items():
                     original_text = original_text.replace(f'{{{key}}}', val)
             except:
+                print("Error while passing the value in variable")
                 # Convert keys to a list in order: 1, 2, 3, ...
                 pass
         
