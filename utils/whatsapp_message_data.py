@@ -326,12 +326,13 @@ def send_message_data(
                             else:
                                 pass
                     send_metadata[key] = text
+                else:
+                    send_metadata[key] = value
 
         company_name = ""
         if entry is not None:
             if "company_name" in entry:
                 company_name = entry['company_name']
-        print(f"company_name: {company_name}")
         reg_number = ""
         model = ""
         policy = ""
