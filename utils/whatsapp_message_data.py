@@ -360,7 +360,7 @@ def send_message_data(
                     date = entry['date']  # Assume it's already a string
         
         # Sending messages to specific numbers
-        if company_name != "" and policy != "" and date != "":
+        if text != "" and company_name != "" and policy != "" and date != "":
             msg_details = {
                 "name": text,
                 "company_name": company_name,
