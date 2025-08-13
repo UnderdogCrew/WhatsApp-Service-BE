@@ -95,7 +95,7 @@ class SignupView(APIView):
                 'last_name': validated_data['last_name'],
                 'business_number': validated_data['business_number'],
                 'business_id': validated_data.get('business_id', ''),
-                'default_credit': 1000,
+                'default_credit': 50,
                 'is_email_verified': False,
                 'status': 'active',
                 'is_active': True,
