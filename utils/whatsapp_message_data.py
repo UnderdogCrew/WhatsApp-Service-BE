@@ -445,6 +445,7 @@ def send_message_data(
         
         response = requests.post(url, headers=headers, json=payload)
         print(f"Meta response: {response.status_code}")
+        print(f"Meta response: {response.text}")
         try:
             phone_number = number.split("+")[-1]
         except:
