@@ -163,7 +163,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                         "parameters": [
                             {
                                 "type": "text",
-                                "text": component['text']
+                                "text": template_text
                             }
                         ]
                     }
@@ -423,7 +423,7 @@ def send_message_data(
 
         # 3. **escape EVERY newline (CR, LF, CRLF)**
         template_text = template_text.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
-        print(original_text)
+        print(template_text)
         components = process_components(
             template_components,
             msg_details,
