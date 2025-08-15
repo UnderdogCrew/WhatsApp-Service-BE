@@ -330,6 +330,17 @@ def send_message_data(
                                 "number": number
                             }
                         )
+                    if customer_details is None:
+                        try:
+                            customer_details = db.find_document(
+                                collection_name="customers",
+                                query={
+                                    "number": int(number)
+                                }
+                            )
+                        except:
+                            pass
+
                     if customer_details is not None:
                         text = customer_details['name']
                     else:
