@@ -111,50 +111,51 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
 
         elif component['type'].upper() == "BODY":
             # Check for body_text_named_params
-            if 'body_text_named_params' in component.get('example', {}):
-                # Process BODY with named parameters
-                body_parameters = []
-                for param in component['example']['body_text_named_params']:
-                    value = msg_data.get(param['param_name'], param['example'])
-                    # Convert Timestamp to string if necessary
-                    if isinstance(value, pd.Timestamp):  # Assuming you are using pandas
-                        value = value.strftime('%Y-%m-%d')  # Format as needed
-                    body_parameters.append({
-                        "type": "text",
-                        "parameter_name": param['param_name'],
-                        "text": value
-                    })
-
-                body_entry = {
-                    "type": "body",
-                    "parameters": body_parameters
-                }
-                result_list.append(body_entry)
-
-            # Existing condition for body_text
-            elif 'body_text' in component.get('example', {}) or "text" in component:
-                # Process BODY
-                body_parameters = []
-                if len(msg_data) == 0:
-                    body_parameters.append({
-                        "type": "text",
-                        "text": template_text
-                    })
-                else:
-                    for param in range(len(component['example']['body_text'][0])):
-                        value = msg_data.get(str(param+1))
+            if "example" in component:
+                if 'body_text_named_params' in component.get('example', {}):
+                    # Process BODY with named parameters
+                    body_parameters = []
+                    for param in component['example']['body_text_named_params']:
+                        value = msg_data.get(param['param_name'], param['example'])
                         # Convert Timestamp to string if necessary
                         if isinstance(value, pd.Timestamp):  # Assuming you are using pandas
                             value = value.strftime('%Y-%m-%d')  # Format as needed
                         body_parameters.append({
                             "type": "text",
+                            "parameter_name": param['param_name'],
                             "text": value
                         })
-                body_entry = {
-                    "type": "body",
-                    "parameters": body_parameters
-                }
-                result_list.append(body_entry)
+
+                    body_entry = {
+                        "type": "body",
+                        "parameters": body_parameters
+                    }
+                    result_list.append(body_entry)
+
+                # Existing condition for body_text
+                elif 'body_text' in component.get('example', {}) or "text" in component:
+                    # Process BODY
+                    body_parameters = []
+                    if len(msg_data) == 0:
+                        body_parameters.append({
+                            "type": "text",
+                            "text": template_text
+                        })
+                    else:
+                        for param in range(len(component['example']['body_text'][0])):
+                            value = msg_data.get(str(param+1))
+                            # Convert Timestamp to string if necessary
+                            if isinstance(value, pd.Timestamp):  # Assuming you are using pandas
+                                value = value.strftime('%Y-%m-%d')  # Format as needed
+                            body_parameters.append({
+                                "type": "text",
+                                "text": value
+                            })
+                    body_entry = {
+                        "type": "body",
+                        "parameters": body_parameters
+                    }
+                    result_list.append(body_entry)
             
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params

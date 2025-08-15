@@ -61,18 +61,18 @@ def process_components(components, msg_data, image_url):
         elif component['type'].upper() == "BODY" and 'body_text' in component.get('example', {}):
             # Process BODY
             body_parameters = []
-            print(component['example']['body_text'][0])
-            for i, text in enumerate(component['example']['body_text'][0]):
-                body_parameters.append({
-                    "type": "text",
-                    "text": msg_data.get('Name') if i == 0 else text
-                })
+            if "example" in component:
+                for i, text in enumerate(component['example']['body_text'][0]):
+                    body_parameters.append({
+                        "type": "text",
+                        "text": msg_data.get('Name') if i == 0 else text
+                    })
 
-            body_entry = {
-                "type": "body",
-                "parameters": body_parameters
-            }
-            result_list.append(body_entry)
+                body_entry = {
+                    "type": "body",
+                    "parameters": body_parameters
+                }
+                result_list.append(body_entry)
 
     return result_list
 
