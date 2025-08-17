@@ -20,6 +20,7 @@ from utils.whatsapp_message_data import send_message_data
 from utils.auth import token_required, decode_token
 from bson import ObjectId
 from utils.auth import current_dollar_price
+from utils.send_message_data import TokenBucketLimiter
 
 price_per_million_tokens = 0.15  # Price for 1M tokens
 tokens_per_million = 1_000_000  # 1M tokens
@@ -37,6 +38,26 @@ whatsapp_status = {
 '''
 API_TOKEN = API_KEY
 GLAM_API_KEY = GLAM_API_KEY
+
+
+def utc_today_range():
+    start = datetime.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + datetime.timedelta(days=1) - datetime.timedelta(microseconds=1)
+    return start, end
+
+def count_sent_today(db, user_id):
+    start, end = utc_today_range()
+    return db.find_documents_count(
+        collection_name="whatsapp_message_logs",
+        query={
+            "user_id": ObjectId(user_id),
+            "created_at": {"$gte": start, "$lte": end},
+            "message_status": {"$in": ["sent", "delivered", "read", "ok"]}
+        }
+    )
+
+DAILY_LIMIT = 1000  # your current tier cap
+
 
 
 def process_components(components, msg_data, image_url):
@@ -78,7 +99,9 @@ def process_components(components, msg_data, image_url):
 
 
 def send_whatsapp_message(numbers, template_name,text, image_url, user_id, msg_metadata, latitude, longitude, location_name, address, params_fallback_value):
+    limiter = TokenBucketLimiter(rate_per_sec=60)  # safe headroom under ~80 MPS default
     for number in numbers:
+        limiter.acquire()
         send_message_data(
             number=number,
             template_name=template_name,
@@ -203,6 +226,34 @@ class SendMessage(APIView):
             else:
                 return JsonResponse({"message": "User not found"}, safe=False, status=422)
             
+            # --- DAILY CAP ENFORCEMENT ---
+            already_sent = count_sent_today(db, user_id)
+            remaining = max(0, DAILY_LIMIT - already_sent)
+
+            if remaining <= 0:
+                return JsonResponse({
+                    "message": "Daily limit reached",
+                    "already_sent_today": already_sent,
+                    "allowed_today": DAILY_LIMIT,
+                    "will_send_now": 0,
+                    "skipped_due_to_cap": len(request_data.get('numbers', []))
+                }, status=422)
+            
+            # check if remaining messages is less than numbers count
+            if remaining < len(request_data.get('numbers', [])):
+                return JsonResponse({
+                    "message": "Daily limit reached",
+                    "already_sent_today": already_sent,
+                    "allowed_today": DAILY_LIMIT,
+                    "will_send_now": remaining,
+                    "skipped_due_to_cap": len(request_data.get('numbers', []))
+                }, status=422)
+            
+            # limit to remaining quota
+            numbers_to_send = request_data.get('numbers', [])[:remaining]
+            skipped = max(0, len(request_data.get('numbers', [])) - len(numbers_to_send))
+            
+            
             template_url = f"https://graph.facebook.com/v21.0/{waba_id}/message_templates?name={template_name}"
             API_KEY = api_key
 
@@ -277,7 +328,12 @@ class SendMessage(APIView):
                                                              params_fallback_value,)
                                                              ).start()
 
-            return JsonResponse({"message": "Messages sent successfully"}, safe=False, status=200)
+            return JsonResponse({"message": "Messages sent successfully", 
+            "skipped": skipped, 
+            "will_send_now": remaining,
+            "allowed_today": DAILY_LIMIT,
+            "already_sent_today": already_sent,
+            "numbers_to_send": numbers_to_send}, safe=False, status=200)
 
         except Exception as ex:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)

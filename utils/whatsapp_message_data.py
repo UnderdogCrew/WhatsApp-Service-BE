@@ -463,10 +463,6 @@ def send_message_data(
             'Content-Type': 'application/json'
         }
         print(f"Sending bulk message payload: \n {payload}")
-        
-        if category != "UTILITY":
-            time.sleep(10)
-        
         response = requests.post(url, headers=headers, json=payload)
         print(f"Meta response: {response.status_code}")
         print(f"Meta response: {response.text}")
