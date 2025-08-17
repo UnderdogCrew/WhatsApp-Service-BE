@@ -156,18 +156,18 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                         "parameters": body_parameters
                     }
                     result_list.append(body_entry)
-            else:
-                if "text" in component:
-                    body_entry = {
-                        "type": "body",
-                        "parameters": [
-                            {
-                                "type": "text",
-                                "text": template_text
-                            }
-                        ]
-                    }
-                    result_list.append(body_entry)
+            # else:
+            #     if "text" in component:
+            #         body_entry = {
+            #             "type": "body",
+            #             "parameters": [
+            #                 {
+            #                     "type": "text",
+            #                     "text": template_text
+            #                 }
+            #             ]
+            #         }
+            #         result_list.append(body_entry)
 
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
@@ -463,10 +463,6 @@ def send_message_data(
             'Content-Type': 'application/json'
         }
         print(f"Sending bulk message payload: \n {payload}")
-        
-        if category != "UTILITY":
-            time.sleep(10)
-        
         response = requests.post(url, headers=headers, json=payload)
         print(f"Meta response: {response.status_code}")
         print(f"Meta response: {response.text}")
