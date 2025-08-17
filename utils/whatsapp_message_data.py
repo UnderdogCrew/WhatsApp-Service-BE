@@ -156,18 +156,18 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                         "parameters": body_parameters
                     }
                     result_list.append(body_entry)
-            else:
-                if "text" in component:
-                    body_entry = {
-                        "type": "body",
-                        "parameters": [
-                            {
-                                "type": "text",
-                                "text": template_text
-                            }
-                        ]
-                    }
-                    result_list.append(body_entry)
+            # else:
+            #     if "text" in component:
+            #         body_entry = {
+            #             "type": "body",
+            #             "parameters": [
+            #                 {
+            #                     "type": "text",
+            #                     "text": template_text
+            #                 }
+            #             ]
+            #         }
+            #         result_list.append(body_entry)
 
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
