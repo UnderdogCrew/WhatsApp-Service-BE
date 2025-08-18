@@ -389,7 +389,8 @@ class FacebookWebhook(APIView):
                                 collection_name="whatsapp_message_logs",
                                 query={
                                     "number": from_number,
-                                    "status": {"$ne": "received"}
+                                    "status": {"$ne": "received"},
+                                    "template_name" : {"$in": ["insurance_policy", "insurance_policy_with_image"]}
                                 },
                                 sort=[('_id', -1)],limit=1
                             )
