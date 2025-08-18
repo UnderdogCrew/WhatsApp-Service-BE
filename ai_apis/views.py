@@ -401,7 +401,7 @@ class FacebookWebhook(APIView):
                                     metadata['user_reply'] = messages
                                     send_message_data(
                                         number=phone_number, # do not remove this number as we need to send the replied to Urvish number
-                                        template_name="insurance_policy_replies",
+                                        template_name="insurance_reply",
                                         text="",
                                         image_url="",
                                         user_id=str(user_info['_id']),
@@ -418,7 +418,7 @@ class FacebookWebhook(APIView):
                                     metadata['user_reply'] = messages
                                     send_message_data(
                                         number=phone_number, # do not remove this number as we need to send the replied to Urvish number
-                                        template_name="insurance_policy_replies",
+                                        template_name="insurance_reply",
                                         text="",
                                         image_url="",
                                         user_id=str(user_info['_id']),
