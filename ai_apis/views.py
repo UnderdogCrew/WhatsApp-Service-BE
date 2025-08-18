@@ -388,7 +388,8 @@ class FacebookWebhook(APIView):
                             last_send_message = db.find_documents(
                                 collection_name="whatsapp_message_logs",
                                 query={
-                                    "number": from_number
+                                    "number": from_number,
+                                    "status": {"$ne": "received"}
                                 },
                                 sort=[('_id', -1)],limit=1
                             )
@@ -398,6 +399,15 @@ class FacebookWebhook(APIView):
                                 phone_number = 9898621300 if str(user_info['_id']) == "67c1cf4c2763ce36e17d145e" else 7405444368
                                 if "metadata" in last_send_message[0]:
                                     metadata = last_send_message[0]['metadata']
+                                    if "policy" in metadata:
+                                        pass
+                                    else:
+                                        metadata = {
+                                            "name": from_number,
+                                            "company_name": "-",
+                                            "policy": "-",
+                                            "date": "-"
+                                        }
                                     metadata['user_reply'] = messages
                                     send_message_data(
                                         number=phone_number, # do not remove this number as we need to send the replied to Urvish number
