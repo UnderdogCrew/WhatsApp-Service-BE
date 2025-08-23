@@ -228,6 +228,27 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                         ]
                     }
                     result_list.append(copy_code)
+                
+
+                if buttons['type'] == "FLOW":
+                    flow_json = {
+                        "type": "button",
+                        "sub_type": "flow",
+                        "index": str(button_index),
+                        "parameters": [
+                            {
+                                "type": "flow",
+                                "action": {
+                                    "flow_token": "unused",
+                                    "flow_message_version": "3",
+                                    "flow_id": buttons['flow_id'],
+                                    "flow_action": buttons['flow_action'],
+                                    "navigate_screen": buttons['navigate_screen']
+                                }
+                            }
+                        ]
+                    }
+                    result_list.append(flow_json)
 
                 if "example" in buttons and len(body_parameters) > 0:
                     body_entry = {
