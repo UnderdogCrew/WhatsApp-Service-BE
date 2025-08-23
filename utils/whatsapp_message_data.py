@@ -238,9 +238,12 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                         "parameters": [
                             {
                                 "type": "ACTION",
-                                "flow_id": buttons['flow_id'],
-                                "flow_action": buttons['flow_action'],
-                                "navigate_screen": buttons['navigate_screen']
+                                "action": {
+                                    "flow_token": "unused",
+                                    # "flow_id": buttons['flow_id'],
+                                    # "flow_action": buttons['flow_action'],
+                                    # "navigate_screen": buttons['navigate_screen']
+                                }
                             }
                         ]
                     }
