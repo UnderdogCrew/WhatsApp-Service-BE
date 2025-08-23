@@ -384,7 +384,7 @@ class FacebookWebhook(APIView):
                         from_number = value['messages'][0]['from']
                         messages_type = value['messages'][0]['type']
 
-                        if str(user_info['_id']) == "67c1cf4c2763ce36e17d145e" or str(user_info['_id']) == "67c1cf532763ce36e17d145f":
+                        if str(user_info['_id']) == "67c1cf4c2763ce36e17d145e":
                             last_send_message = db.find_documents(
                                 collection_name="whatsapp_message_logs",
                                 query={
@@ -397,7 +397,7 @@ class FacebookWebhook(APIView):
                             if not last_send_message:
                                 pass
                             else:
-                                phone_number = 9898621300 if str(user_info['_id']) == "67c1cf4c2763ce36e17d145e" else 7405444368
+                                phone_number = 9898621300
                                 if "metadata" in last_send_message[0]:
                                     metadata = last_send_message[0]['metadata']
                                     if "policy" in metadata:
@@ -454,6 +454,27 @@ class FacebookWebhook(APIView):
                                 "error_data": "",
                             }
                             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+                        
+                        if messages_type == "interactive":
+                            interactive = value['messages'][0]['interactive']['nfm_reply'] if "nfm_reply" in value['messages'][0]['interactive'] else None
+                            if interactive:
+                                whatsapp_status_logs = {
+                                    "number": from_number,
+                                    "message": interactive,
+                                    "user_id": str(user_info['_id']),
+                                    "price": 0,
+                                    "id": value['messages'][0]['id'],
+                                    "message_status": "received",
+                                    "created_at": datetime.datetime.now(),
+                                    "updated_at": datetime.datetime.now(),
+                                    "template_name": "interactive",
+                                    "code": 0,
+                                    "title": "",
+                                    "error_message": "",
+                                    "error_data": "",
+                                }
+                                db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+
 
                         if auto_reply_enabled is True:
                             openai_data = {
