@@ -237,7 +237,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                         "index": str(button_index),
                         "parameters": [
                             {
-                                "type": "flow",
+                                "type": "ACTION",
                                 "action": {
                                     "flow_token": "unused",
                                     "flow_message_version": "3",
