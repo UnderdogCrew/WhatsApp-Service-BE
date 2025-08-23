@@ -440,7 +440,7 @@ class FacebookWebhook(APIView):
                         if messages_type == "text" or messages_type == "button":
                             whatsapp_status_logs = {
                                 "number": from_number,
-                                "message": messages,
+                                "message": messages['response_json'],
                                 "user_id": str(user_info['_id']),
                                 "price": 0,
                                 "id": value['messages'][0]['id'],
@@ -452,6 +452,9 @@ class FacebookWebhook(APIView):
                                 "title": "",
                                 "error_message": "",
                                 "error_data": "",
+                                "sent_at" : int(value['messages'][0]['timestamp']),
+                                "delivered_at" : int(value['messages'][0]['timestamp']),
+                                "read_at" : int(value['messages'][0]['timestamp'])
                             }
                             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
                         
@@ -472,6 +475,9 @@ class FacebookWebhook(APIView):
                                     "title": "",
                                     "error_message": "",
                                     "error_data": "",
+                                    "sent_at" : int(value['messages'][0]['timestamp']),
+                                    "delivered_at" : int(value['messages'][0]['timestamp']),
+                                    "read_at" : int(value['messages'][0]['timestamp'])
                                 }
                                 db.create_document('whatsapp_message_logs', whatsapp_status_logs)
 
