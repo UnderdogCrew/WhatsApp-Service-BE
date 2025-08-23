@@ -240,7 +240,6 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                                 "type": "ACTION",
                                 "action": {
                                     "flow_token": "unused",
-                                    "flow_message_version": "3",
                                     "flow_id": buttons['flow_id'],
                                     "flow_action": buttons['flow_action'],
                                     "navigate_screen": buttons['navigate_screen']
