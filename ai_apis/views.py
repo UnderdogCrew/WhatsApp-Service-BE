@@ -440,7 +440,7 @@ class FacebookWebhook(APIView):
                         if messages_type == "text" or messages_type == "button":
                             whatsapp_status_logs = {
                                 "number": from_number,
-                                "message": messages['response_json'],
+                                "message": messages,
                                 "user_id": str(user_info['_id']),
                                 "price": 0,
                                 "id": value['messages'][0]['id'],
@@ -462,7 +462,7 @@ class FacebookWebhook(APIView):
                             interactive = value['messages'][0]['interactive']['nfm_reply'] if "nfm_reply" in value['messages'][0]['interactive'] else None
                             if interactive:
                                 whatsapp_status_logs = {
-                                    "number": from_number,
+                                    "number": from_number['response_json'],
                                     "message": interactive,
                                     "user_id": str(user_info['_id']),
                                     "price": 0,
