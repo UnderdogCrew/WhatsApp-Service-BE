@@ -3,7 +3,10 @@ name: Whatsapp service Deploy
 on:
   push:
     branches:
-      - develop  # or master, depending on your default branch name
+      - develop
+      
+env:
+  NEW_RELIC_ENVIRONMENT: 'development'
 
 jobs:
   deploy:
@@ -26,6 +29,7 @@ jobs:
       - name: Deploy to server
         run: |
           ssh ubuntu@${{ secrets.SERVER_IP }} '
+            export NEW_RELIC_ENVIRONMENT=${{ env.NEW_RELIC_ENVIRONMENT }}
             sudo su - <<EOF
             cd ${{ secrets.PROJECT_PATH }} &&
             source enve/bin/activate &&
