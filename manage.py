@@ -4,7 +4,7 @@ import os
 import sys
 import newrelic.agent
 
-newrelic.agent.initialize('./newrelic.ini', 'production')
+newrelic.agent.initialize('./newrelic.ini')
 
 def main():
     """Run administrative tasks."""
