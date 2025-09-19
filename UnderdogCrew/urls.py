@@ -71,6 +71,7 @@ urlpatterns = [
     path('subscriptions/plans', subscription_views.PlansView.as_view(), name='plans'),
     path('subscriptions/webhook', subscription_views.WebhookView.as_view(), name='webhook'),
     path('whatsapp-templates/', whatsapp_apis.WhatsAppTemplateView.as_view(), name='whatsapp-templates'),
+    path('whatsapp-template-by-id/', whatsapp_apis.WhatsAppTemplateByIdView.as_view(), name='whatsapp-template-by-id'),
     path('customers', whatsapp_apis.CustomersView.as_view(), name='customers'),
     path('contacts/import', whatsapp_apis.ContactImportView.as_view(), name='contact-import'),
     path('contacts/export', whatsapp_apis.ContactExportView.as_view(), name='contact-export'),

@@ -350,6 +350,8 @@ class WhatsAppTemplateView(APIView):
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+
     @swagger_auto_schema(
         operation_description="Delete a WhatsApp message template by ID",
         manual_parameters=[
@@ -579,6 +581,104 @@ class WhatsAppTemplateView(APIView):
                 'template_id': template_id
             }, status=status.HTTP_200_OK)
 
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class WhatsAppTemplateByIdView(APIView):
+    @swagger_auto_schema(
+        operation_description="Get a specific WhatsApp template by ID from Facebook Graph API",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                'template_id',
+                openapi.IN_QUERY,
+                description="Facebook Graph API template ID",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(type=openapi.TYPE_OBJECT),
+                }
+            )),
+            400: 'Bad Request',
+            401: 'Unauthorized',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def get(self, request, current_user_id, current_user_email):
+        try:
+            template_id = request.query_params.get('template_id')
+            if not template_id:
+                return JsonResponse({
+                    'message': 'Template ID is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            db = MongoDB()
+            
+            # Get user's API credentials
+            user = db.find_document('users', {'_id': ObjectId(current_user_id)})
+            if not user:
+                return JsonResponse({
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            api_key = user.get('api_key')
+            if not api_key:
+                return JsonResponse({
+                    'message': 'WhatsApp Business API key not found. Please complete your business setup.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Make request to Facebook Graph API
+            url = f"https://graph.facebook.com/v23.0/{template_id}"
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
+
+            response = requests.get(url, headers=headers, timeout=30)
+            
+            if response.status_code == 200:
+                template_data = response.json()
+                
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'Template retrieved successfully',
+                    'data': template_data
+                }, status=status.HTTP_200_OK)
+            elif response.status_code == 404:
+                return JsonResponse({
+                    'message': 'Template not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            else:
+                error_data = response.json() if response.content else {}
+                error_message = error_data.get("error", {}).get("message", "Unknown error")
+                
+                return JsonResponse({
+                    'message': f'Failed to retrieve template: {error_message}',
+                    'facebook_error': error_data
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        except requests.exceptions.RequestException as e:
+            return JsonResponse({
+                'message': f'Network error while fetching template: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
             return JsonResponse({
                 'message': str(e)
