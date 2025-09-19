@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+env:
+  NEW_RELIC_ENVIRONMENT: 'production'
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -26,6 +29,7 @@ jobs:
       - name: Deploy to server
         run: |
           ssh ubuntu@${{ secrets.PROD_SERVER_IP }} '
+            export NEW_RELIC_ENVIRONMENT=${{ env.NEW_RELIC_ENVIRONMENT }}
             sudo su - <<EOF
             cd ${{ secrets.PROD_PROJECT_PATH }} &&
             source .enve/bin/activate &&
