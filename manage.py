@@ -2,7 +2,9 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+import newrelic.agent
 
+newrelic.agent.initialize('./newrelic.ini', 'production')
 
 def main():
     """Run administrative tasks."""
