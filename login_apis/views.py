@@ -891,9 +891,9 @@ class VerifyBusinessDetailsView(APIView):
                     update_data["about"] = profile_data['about']
                     update_data['description'] = profile_data['description']
                     update_data['email'] = profile_data['email']
-                    update_data['profile_picture_url'] = profile_data['profile_picture_url']
-                    update_data['websites'] = profile_data['websites']
-                    update_data["vertical"] = profile_data["vertical"]
+                    update_data['profile_picture_url'] = profile_data['profile_picture_url'] if "profile_picture_url" in profile_data else ""
+                    update_data['websites'] = profile_data['websites'] if "websites" in profile_data else []
+                    update_data["vertical"] = profile_data["vertical"] if "vertical" in profile_data else ""
 
             if waba_id:
                 update_data["waba_id"] = waba_id
