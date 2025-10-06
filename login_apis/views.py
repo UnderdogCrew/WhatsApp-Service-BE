@@ -875,7 +875,7 @@ class VerifyBusinessDetailsView(APIView):
 
                 phone_number_url = f"https://graph.facebook.com/v23.0/{phone_number_id}"
                 phoner_number_header = {
-                    "Authorization": api_key
+                    "Authorization": f"Bearer {api_key}"
                 }
                 phone_number_response = requests.get(url=phone_number_url, headers=phoner_number_header)
                 if phone_number_response.status_code == 200:
