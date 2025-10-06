@@ -885,6 +885,7 @@ class VerifyBusinessDetailsView(APIView):
 
                 profile_details_url = f"https://graph.facebook.com/v23.0/{phone_number_id}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical"
                 profile_details_response = requests.get(url=profile_details_url, headers=phoner_number_header)
+                print(f"profile_details_response: {profile_details_response.status_code}")
                 if profile_details_response.status_code == 200:
                     profile_data = profile_details_response.json()['data'][0]
                     update_data["about"] = profile_data['about']
