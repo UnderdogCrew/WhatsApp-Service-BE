@@ -1635,19 +1635,22 @@ class UserDashboardData(APIView):
             response = requests.get(api_url, headers=headers)
             if response.status_code == 200:
                 if "analytics" in response.json():
-                    analytics_data = response.json()['analytics']['data_points']
-                    for data in analytics_data:
-                        sent_count += data['sent'] if 'sent' in data else 0
-                        delivered_count += data['delivered'] if 'delivered' in data else 0
-                        read_count += data['read'] if 'read' in data else 0
-                    return JsonResponse(
-                        {
-                            "sent_count": sent_count,
-                            "delivered_count": delivered_count,
-                            "read_count": read_count,
-                            "message": "Analytics data fetched successfully",
-                            "data": analytics_data
-                        }, status=status.HTTP_200_OK)
+                    if "data_points" in response.json()['analytics']:
+                        analytics_data = response.json()['analytics']['data_points']
+                        for data in analytics_data:
+                            sent_count += data['sent'] if 'sent' in data else 0
+                            delivered_count += data['delivered'] if 'delivered' in data else 0
+                            read_count += data['read'] if 'read' in data else 0
+                        return JsonResponse(
+                            {
+                                "sent_count": sent_count,
+                                "delivered_count": delivered_count,
+                                "read_count": read_count,
+                                "message": "Analytics data fetched successfully",
+                                "data": analytics_data
+                            }, status=status.HTTP_200_OK)
+                    else:
+                        return JsonResponse({"message": "No analytics data found"}, status=404)
                 else:
                     return JsonResponse({"message": "No analytics data found"}, status=404)
             else:
