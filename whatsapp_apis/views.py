@@ -1039,7 +1039,7 @@ class UniqueChatList(APIView):
             # Get current time in Asia/Kolkata timezone
             kolkata_tz = pytz.timezone('Asia/Kolkata')
             current_time = datetime.now(kolkata_tz)
-            twenty_four_hours_ago = current_time - timedelta(hours=96)
+            twenty_four_hours_ago = current_time - timedelta(hours=24)
 
             print(f"twenty_four_hours_ago: {twenty_four_hours_ago}")
             print(f"current_time: {current_time}")
