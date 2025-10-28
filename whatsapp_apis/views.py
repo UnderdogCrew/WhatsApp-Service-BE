@@ -11,7 +11,7 @@ from UnderdogCrew.settings import API_KEY, FACEBOOK_APP_ID, WABA_ID
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from bson.objectid import ObjectId
 import pytz
 import csv
@@ -1035,11 +1035,22 @@ class UniqueChatList(APIView):
 
             user_id = user_info['user_id']
             print(f"user_id: {user_id}")
+            
+            # Get current time in Asia/Kolkata timezone
+            kolkata_tz = pytz.timezone('Asia/Kolkata')
+            current_time = datetime.now(kolkata_tz)
+            twenty_four_hours_ago = current_time - timedelta(hours=24)
+
+            print(f"twenty_four_hours_ago: {twenty_four_hours_ago}")
+            print(f"current_time: {current_time}")
 
             match_query = {
                 "user_id": user_id,
                 "$expr": {
                     "$eq": [{"$strLenCP": "$number"}, 12]
+                },
+                "updated_at": {
+                    "$gte": twenty_four_hours_ago
                 }
             }
 
