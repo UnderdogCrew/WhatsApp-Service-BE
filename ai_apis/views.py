@@ -366,15 +366,13 @@ class FacebookWebhook(APIView):
             statuses = value['statuses'] if "statuses" in value else []
             hub_challenge = "EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT"
 
-            logging.info(f"statuses: {len(statuses)}")
-            print(f"phone_number_id: {phone_number_id}")
             if len(statuses) == 0:
                 try:
-                    print("type of phone_number_id: ", type(phone_number_id))
-                    user_info = db.find_document("users", query={"business_id": phone_number_id})
-                    print(f"user_info: {user_info}")
+                    user_info = db.find_document("users", query={"phone_number_id": phone_number_id})
+                    if user_info is None:
+                        user_info = db.find_document("users", query={"business_id": phone_number_id})
                     if user_info:
-                        logging.info("user_info found")
+                        print("user_info found")
                         phone_number_id = phone_number_id #user_info['phone_number_id'] if "phone_number_id" in user_info else ""
                         auto_reply_enabled = user_info['auto_reply_enabled'] if "auto_reply_enabled" in user_info else False
                         display_phone_number =value['metadata']['display_phone_number']
