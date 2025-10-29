@@ -524,7 +524,7 @@ class FacebookWebhook(APIView):
                                     s3_helper = S3Helper()
                                     attachment_url = s3_helper.upload_media_file(
                                         file_obj=video_file,
-                                        folder_name=f"{user_info['_id']}/whatsapp_videos",  # or whatever folder you prefer
+                                        folder_name=f"{user_info['_id']}/whatsapp_media",  # or whatever folder you prefer
                                         file_extension=extension,
                                         content_type=mime_type,
                                         file_name=f"{attachment}.{extension}"
