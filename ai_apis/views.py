@@ -370,7 +370,9 @@ class FacebookWebhook(APIView):
             if len(statuses) == 0:
                 try:
                     user_info = db.find_document("users", query={"business_id": phone_number_id})
+                    print(f"user_info: {user_info}")
                     if user_info:
+                        print("user_info found")
                         phone_number_id = phone_number_id #user_info['phone_number_id'] if "phone_number_id" in user_info else ""
                         auto_reply_enabled = user_info['auto_reply_enabled'] if "auto_reply_enabled" in user_info else False
                         display_phone_number =value['metadata']['display_phone_number']
