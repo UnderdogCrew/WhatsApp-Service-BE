@@ -947,6 +947,8 @@ class CustomersChatLogs(APIView):
                     {
                         "number": _customer['number'],
                         "message": _customer['message'],
+                        "attachment": _customer['attachment'] if "attachment" in _customer else False,
+                        "attachment_url": _customer['attachment_url'] if "attachment_url" in _customer else None,
                         "created_at": convert_to_ist(_customer.get('created_at')),
                         "updated_at": convert_to_ist(_customer.get('updated_at')),
                         "sent_at": convert_to_ist(_customer.get('sent_at')),
