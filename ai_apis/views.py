@@ -22,6 +22,9 @@ from bson import ObjectId
 from utils.auth import current_dollar_price
 from utils.send_message_data import TokenBucketLimiter
 import logging
+from utils.s3_helper import S3Helper
+from io import BytesIO
+
 
 price_per_million_tokens = 0.15  # Price for 1M tokens
 tokens_per_million = 1_000_000  # 1M tokens
@@ -453,6 +456,8 @@ class FacebookWebhook(APIView):
                                 "code": 0,
                                 "title": "",
                                 "error_message": "",
+                                "attachment": False,
+                                "attachment_url": "",
                                 "error_data": "",
                                 "sent_at" : int(value['messages'][0]['timestamp']),
                                 "delivered_at" : int(value['messages'][0]['timestamp']),
@@ -477,13 +482,77 @@ class FacebookWebhook(APIView):
                                     "code": 0,
                                     "title": "",
                                     "error_message": "",
+                                    "attachment": False,
+                                    "attachment_url": "",
                                     "error_data": "",
                                     "sent_at" : int(value['messages'][0]['timestamp']),
                                     "delivered_at" : int(value['messages'][0]['timestamp']),
                                     "read_at" : int(value['messages'][0]['timestamp'])
                                 }
                                 db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+                        
+                        if messages_type in ["video", "image", "audio", "document"]:
+                            attachment_url = ""
+                            attachment = value['messages'][0][messages_type]['id']
 
+                            url = f"https://graph.facebook.com/v19.0/{attachment}?phone_number_id={phone_number_id}"
+
+                            payload = {}
+                            headers = {
+                                'Authorization': f'Bearer {API_TOKEN}',
+                            }
+
+                            response = requests.request("GET", url, headers=headers, data=payload)
+
+                            if response.status_code == 200:
+                                attachment_id = response.json()['url']
+                                mime_type = response.json()['mime_type']
+                                extension = mime_type.split("/")[-1]
+                                # payload = {}
+                                headers = {
+                                  'Authorization': f'Bearer {API_TOKEN}'
+                                }
+
+                                attachment_response = requests.request("GET", attachment_id, headers=headers, data=payload)
+                                if attachment_response.status_code == 200:
+                                    content = attachment_response.content
+                                    # Create a file-like object from the content
+                                    video_file = BytesIO(content)
+                                    video_file.name = f"{attachment}.{extension}"
+                                    
+                                    # Upload to S3
+                                    s3_helper = S3Helper()
+                                    attachment_url = s3_helper.upload_media_file(
+                                        file_obj=video_file,
+                                        folder_name=f"{user_info['_id']}/whatsapp_videos",  # or whatever folder you prefer
+                                        file_extension=extension,
+                                        content_type=mime_type,
+                                        file_name=f"{attachment}.{extension}"
+                                    )
+                                else:
+                                    attachment_url = ""
+                            if attachment_url is not None and attachment_url != "":
+                                whatsapp_status_logs = {
+                                    "number": from_number,
+                                    "message": "",
+                                    "user_id": str(user_info['_id']),
+                                    "price": 0,
+                                    "id": value['messages'][0]['id'],
+                                    "message_status": "received",
+                                    "created_at": datetime.datetime.now(),
+                                    "updated_at": datetime.datetime.now(),
+                                    "template_name": messages_type,
+                                    "code": 0,
+                                    "title": "",
+                                    "error_message": "",
+                                    "attachment": True,
+                                    "attachment_url": attachment_url,
+                                    "error_data": "",
+                                    "sent_at" : int(value['messages'][0]['timestamp']),
+                                    "delivered_at" : int(value['messages'][0]['timestamp']),
+                                    "read_at" : int(value['messages'][0]['timestamp'])
+                                }
+                                db.create_document('whatsapp_message_logs', whatsapp_status_logs)
 
                         if auto_reply_enabled is True:
                             openai_data = {
