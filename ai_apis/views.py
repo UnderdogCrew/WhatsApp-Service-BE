@@ -367,7 +367,7 @@ class FacebookWebhook(APIView):
             hub_challenge = "EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT"
 
             logging.info(f"statuses: {len(statuses)}")
-            logging.info(f"phone_number_id: {phone_number_id}")
+            print(f"phone_number_id: {phone_number_id}")
             if len(statuses) == 0:
                 try:
                     user_info = db.find_document("users", query={"business_id": phone_number_id})
