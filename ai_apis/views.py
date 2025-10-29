@@ -21,6 +21,7 @@ from utils.auth import token_required, decode_token
 from bson import ObjectId
 from utils.auth import current_dollar_price
 from utils.send_message_data import TokenBucketLimiter
+import logging
 
 price_per_million_tokens = 0.15  # Price for 1M tokens
 tokens_per_million = 1_000_000  # 1M tokens
@@ -365,14 +366,14 @@ class FacebookWebhook(APIView):
             statuses = value['statuses'] if "statuses" in value else []
             hub_challenge = "EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT"
 
-            print(f"statuses: {len(statuses)}")
-
+            logging.info(f"statuses: {len(statuses)}")
+            logging.info(f"phone_number_id: {phone_number_id}")
             if len(statuses) == 0:
                 try:
                     user_info = db.find_document("users", query={"business_id": phone_number_id})
-                    print(f"user_info: {user_info}")
+                    logging.info(f"user_info: {user_info}")
                     if user_info:
-                        print("user_info found")
+                        logging.info("user_info found")
                         phone_number_id = phone_number_id #user_info['phone_number_id'] if "phone_number_id" in user_info else ""
                         auto_reply_enabled = user_info['auto_reply_enabled'] if "auto_reply_enabled" in user_info else False
                         display_phone_number =value['metadata']['display_phone_number']
@@ -438,7 +439,7 @@ class FacebookWebhook(APIView):
                                         metadata=metadata,
                                         entry=metadata
                                     )
-                        print(f"messages_type: {messages_type}")
+                        logging.info(f"messages_type: {messages_type}")
                         if messages_type == "text" or messages_type == "button":
                             whatsapp_status_logs = {
                                 "number": from_number,
@@ -459,7 +460,7 @@ class FacebookWebhook(APIView):
                                 "read_at" : int(value['messages'][0]['timestamp'])
                             }
                             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
-                            print("Replied Saved in database")
+                            logging.info("Replied Saved in database")
                         
                         if messages_type == "interactive":
                             interactive = value['messages'][0]['interactive']['nfm_reply'] if "nfm_reply" in value['messages'][0]['interactive'] else None
@@ -501,7 +502,7 @@ class FacebookWebhook(APIView):
                             }
 
                             openai_response = requests.post("https://api.openai.com/v1/chat/completions", json=openai_data, headers=openai_headers)
-                            print(f"Open AI response: {openai_response.json()}")
+                            logging.info(f"Open AI response: {openai_response.json()}")
                             uses = openai_response.json()['usage']
                             total_tokens = uses['total_tokens']
                             prompt_tokens = uses['prompt_tokens']
@@ -519,7 +520,7 @@ class FacebookWebhook(APIView):
                                     }
                                 }
                             )
-                            print("from_number", from_number)
+                            logging.info("from_number", from_number)
                             headers = {
                                 'Authorization': 'Bearer ' + API_TOKEN,
                                 'Content-Type': 'application/json',
@@ -527,12 +528,12 @@ class FacebookWebhook(APIView):
                             }
                             url = f"https://graph.facebook.com/v19.0/{phone_number_id}/messages"
                             response = requests.request("POST", url, headers=headers, data=payload)
-                            print(f"message: {response.json()}")
+                            logging.info(f"message: {response.json()}")
                             if response.status_code == 200:
                                 # Calculate the price and ensure it's stored as a float
                                 price = float((total_tokens / tokens_per_million) * price_per_million_tokens)
                                 # Print the result
-                                print(f"Price for {total_tokens} tokens: ${price}")
+                                logging.info(f"Price for {total_tokens} tokens: ${price}")
                                 whatsapp_status_logs = {
                                     "number": from_number,
                                     "message": response_text,
@@ -551,7 +552,7 @@ class FacebookWebhook(APIView):
                                 db.create_document('whatsapp_message_logs', whatsapp_status_logs)
 
                 except Exception as error:
-                    print(f"Error coming: {str(error)}")
+                    logging.error(f"Error coming: {str(error)}")
                 
                 return HttpResponse(hub_challenge)
 
@@ -594,8 +595,8 @@ class FacebookWebhook(APIView):
                 from_number = ""
                 msg_type = ""
             
-            print(f"msg_type: {msg_type}")
-            print(f"messages: {messages}")
+            logging.info(f"msg_type: {msg_type}")
+            logging.info(f"messages: {messages}")
             
             if msg_type == "text":
                 ## need to send message back
@@ -611,7 +612,7 @@ class FacebookWebhook(APIView):
                         }
                     }
                 )
-                print("from_number", from_number)
+                logging.info("from_number", from_number)
                 headers = {
                     'Authorization': 'Bearer ' + API_TOKEN,
                     'Content-Type': 'application/json',
@@ -619,14 +620,14 @@ class FacebookWebhook(APIView):
                 }
                 url = "https://graph.facebook.com/v19.0/450885871446042/messages"
                 response = requests.request("POST", url, headers=headers, data=payload)
-                print(response.json())
+                logging.info(response.json())
 
             response_data = {
                 "message": "Message send successfully",
             }
             return HttpResponse(hub_challenge)
         except Exception as ex:
-            print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
+            logging.error("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
             error = {
                 "message": "something went wrong",
                 "token": "EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT"
@@ -646,7 +647,7 @@ class FacebookWebhook(APIView):
             data = request.GET.get("hub.verify_token")
             challenge = request.GET.get("hub.challenge")
             hub_challenge = data
-            print(f"challenge {challenge}")
+            logging.info(f"challenge {challenge}")
             return HttpResponse(challenge, content_type="text/plain", status=200)
         except Exception as ex:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
