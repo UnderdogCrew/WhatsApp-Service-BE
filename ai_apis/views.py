@@ -436,7 +436,7 @@ class FacebookWebhook(APIView):
                                         metadata=metadata,
                                         entry=metadata
                                     )
-
+                        print(f"messages_type: {messages_type}")
                         if messages_type == "text" or messages_type == "button":
                             whatsapp_status_logs = {
                                 "number": from_number,
@@ -457,6 +457,7 @@ class FacebookWebhook(APIView):
                                 "read_at" : int(value['messages'][0]['timestamp'])
                             }
                             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+                            print("Replied Saved in database")
                         
                         if messages_type == "interactive":
                             interactive = value['messages'][0]['interactive']['nfm_reply'] if "nfm_reply" in value['messages'][0]['interactive'] else None
