@@ -38,7 +38,6 @@ class MongoDB:
 
     def find_document(self, collection_name, query, projection=None):
         collection = self.get_collection(collection_name)
-        print("collection: ", collection_name, "query: ", query)
         return collection.find_one(query, projection)
 
     def find_documents(self, collection_name, query, sort=None, skip=None, limit=None, projection=None):
