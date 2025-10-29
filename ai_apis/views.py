@@ -494,6 +494,7 @@ class FacebookWebhook(APIView):
                         if messages_type in ["video", "image", "audio", "document"]:
                             attachment_url = ""
                             attachment = value['messages'][0][messages_type]['id']
+                            caption = value['messages'][0][messages_type]['caption'] if "caption" in value['messages'][0][messages_type] else ""
 
                             url = f"https://graph.facebook.com/v19.0/{attachment}?phone_number_id={phone_number_id}"
 
@@ -524,7 +525,7 @@ class FacebookWebhook(APIView):
                                     s3_helper = S3Helper()
                                     attachment_url = s3_helper.upload_media_file(
                                         file_obj=video_file,
-                                        folder_name=f"{user_info['_id']}/whatsapp_videos",  # or whatever folder you prefer
+                                        folder_name=f"{user_info['_id']}/whatsapp_media",  # or whatever folder you prefer
                                         file_extension=extension,
                                         content_type=mime_type,
                                         file_name=f"{attachment}.{extension}"
@@ -534,7 +535,7 @@ class FacebookWebhook(APIView):
                             if attachment_url is not None and attachment_url != "":
                                 whatsapp_status_logs = {
                                     "number": from_number,
-                                    "message": "",
+                                    "message": caption,
                                     "user_id": str(user_info['_id']),
                                     "price": 0,
                                     "id": value['messages'][0]['id'],
