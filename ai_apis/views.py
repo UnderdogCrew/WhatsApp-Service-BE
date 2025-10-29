@@ -370,8 +370,9 @@ class FacebookWebhook(APIView):
             print(f"phone_number_id: {phone_number_id}")
             if len(statuses) == 0:
                 try:
+                    print("type of phone_number_id: ", type(phone_number_id))
                     user_info = db.find_document("users", query={"business_id": phone_number_id})
-                    logging.info(f"user_info: {user_info}")
+                    print(f"user_info: {user_info}")
                     if user_info:
                         logging.info("user_info found")
                         phone_number_id = phone_number_id #user_info['phone_number_id'] if "phone_number_id" in user_info else ""
