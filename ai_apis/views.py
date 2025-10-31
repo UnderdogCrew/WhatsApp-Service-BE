@@ -1532,7 +1532,7 @@ class WhatsAppMessage(APIView):
             user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
 
             if user_info is not None:
-                business_id = user_info['business_id']
+                business_id = user_info['phone_number_id']
             else:
                 business_id = "450885871446042"
 
