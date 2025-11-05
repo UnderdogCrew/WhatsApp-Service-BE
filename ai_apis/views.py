@@ -1936,13 +1936,13 @@ class UserWebhookDetails(APIView):
             reply_webhook_url = user_info.get('reply_webhook_url', "")
             reply_webhook_payload = user_info.get('reply_webhook_payload', "")
             status_webhook_url = user_info.get('status_webhook_url', "")
-            api_key = user_info.get('api_key', "")
+            api_key = user_info.get('webhook_api_key', "")
             response = {
                 "message": "Webhook details fetched successfully",
                 "reply_webhook_url": reply_webhook_url,
                 "reply_webhook_payload": reply_webhook_payload,
                 "status_webhook_url": status_webhook_url,
-                "api_key": api_key,
+                "webhook_api_key": api_key,
             }
             return JsonResponse(response, status=200)
         except Exception as ex:
