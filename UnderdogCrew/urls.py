@@ -85,4 +85,5 @@ urlpatterns = [
     path('dashboard/data', views.UserDashboardData.as_view(), name='dashboard-data'),
     path('credits', views.CustomerCredits.as_view(), name='customer-credits'),
     path('user/webhook/details', views.UserWebhookDetails.as_view(), name='user-webhook-details'),
+    path('api-key/regenerate', login_service.RegenerateAPIKeyView.as_view(), name='regenerate-api-key'),
 ]

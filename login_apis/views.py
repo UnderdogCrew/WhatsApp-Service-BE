@@ -6,7 +6,7 @@ from drf_yasg import openapi
 from bson import ObjectId
 from drf_yasg.utils import swagger_auto_schema
 from utils.database import MongoDB
-from utils.auth import generate_tokens, token_required, decode_token, current_dollar_price
+from utils.auth import generate_tokens, token_required, decode_token, current_dollar_price, generate_webhook_api_key
 from .serializers import SignupSerializer, LoginSerializer, FileUploadSerializer, FileUploadResponseSerializer, BusinessDetailsSerializer, CustomerSerializer, CustomerUpdateSerializer
 from utils.s3_helper import S3Helper
 from .utils import get_file_extension, validate_file
@@ -103,6 +103,13 @@ class SignupView(APIView):
             }
 
             user_id = db.create_document('users', user_data)
+            
+            # Generate webhook API key with actual user_id
+            webhook_api_key = generate_webhook_api_key(user_id, validated_data['email'])
+            
+            # Update user document with webhook_api_key
+            db.update_document('users', {'_id': ObjectId(user_id)}, {'webhook_api_key': webhook_api_key})
+            
             access_token, refresh_token = generate_tokens(user_id, validated_data['email'])
 
             # Check if WhatsApp business details exist
@@ -1589,6 +1596,69 @@ class CustomerDetailAPIView(APIView):
                 'data': customer
             }, status=status.HTTP_200_OK)
 
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class RegenerateAPIKeyView(APIView):
+    @swagger_auto_schema(
+        operation_description="Regenerate webhook API key for the authenticated user",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'data': openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'webhook_api_key': openapi.Schema(type=openapi.TYPE_STRING),
+                        }
+                    ),
+                }
+            )),
+            401: 'Unauthorized',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def post(self, request, current_user_id, current_user_email):
+        try:
+            db = MongoDB()
+            
+            # Get user to verify existence
+            user = db.find_document('users', {'_id': ObjectId(current_user_id)})
+            if not user:
+                return JsonResponse({
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Generate new webhook API key
+            webhook_api_key = generate_webhook_api_key(current_user_id, current_user_email)
+            
+            # Update user document with new webhook_api_key
+            db.update_document('users', {'_id': ObjectId(current_user_id)}, {'webhook_api_key': webhook_api_key})
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': 'API key regenerated successfully',
+                'data': {
+                    'webhook_api_key': webhook_api_key
+                }
+            }, status=status.HTTP_200_OK)
+            
         except Exception as e:
             return JsonResponse({
                 'message': str(e)
