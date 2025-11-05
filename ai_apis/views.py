@@ -1951,6 +1951,15 @@ class UserWebhookDetails(APIView):
     
     @swagger_auto_schema(
         operation_description="Update user webhook details",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
