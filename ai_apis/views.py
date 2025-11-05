@@ -1936,13 +1936,11 @@ class UserWebhookDetails(APIView):
             reply_webhook_url = user_info.get('reply_webhook_url', "")
             reply_webhook_payload = user_info.get('reply_webhook_payload', "")
             status_webhook_url = user_info.get('status_webhook_url', "")
-            status_webhook_payload = user_info.get('status_webhook_payload', "")
             response = {
                 "message": "Webhook details fetched successfully",
                 "reply_webhook_url": reply_webhook_url,
                 "reply_webhook_payload": reply_webhook_payload,
                 "status_webhook_url": status_webhook_url,
-                "status_webhook_payload": status_webhook_payload
             }
             return JsonResponse(response, status=200)
         except Exception as ex:
@@ -1966,9 +1964,8 @@ class UserWebhookDetails(APIView):
                 'reply_webhook_url': openapi.Schema(type=openapi.TYPE_STRING, description="Reply webhook URL"),
                 'reply_webhook_payload': openapi.Schema(type=openapi.TYPE_STRING, description="Reply webhook payload"),
                 'status_webhook_url': openapi.Schema(type=openapi.TYPE_STRING, description="Status webhook URL"),
-                'status_webhook_payload': openapi.Schema(type=openapi.TYPE_STRING, description="Status webhook payload"),
             },
-            required=['reply_webhook_url', 'reply_webhook_payload', 'status_webhook_url', 'status_webhook_payload']
+            required=['reply_webhook_url', 'reply_webhook_payload', 'status_webhook_url']
         ),
         responses={
             200: openapi.Response('Success', openapi.Schema(
@@ -2005,12 +2002,10 @@ class UserWebhookDetails(APIView):
             reply_webhook_url = request.data.get('reply_webhook_url', "")
             reply_webhook_payload = request.data.get('reply_webhook_payload', "")
             status_webhook_url = request.data.get('status_webhook_url', "")
-            status_webhook_payload = request.data.get('status_webhook_payload', "")
             result = db.update_document(collection_name="users", query={"_id": ObjectId(user_id)}, update={
                 "reply_webhook_url": reply_webhook_url,
                 "reply_webhook_payload": reply_webhook_payload,
                 "status_webhook_url": status_webhook_url,
-                "status_webhook_payload": status_webhook_payload
             })
             if result.modified_count == 0:
                 return JsonResponse({"message": "Failed to update webhook details"}, status=400)
@@ -2019,7 +2014,6 @@ class UserWebhookDetails(APIView):
                 "reply_webhook_url": reply_webhook_url,
                 "reply_webhook_payload": reply_webhook_payload,
                 "status_webhook_url": status_webhook_url,
-                "status_webhook_payload": status_webhook_payload
             }
             return JsonResponse(response, status=200)
         except Exception as ex:
