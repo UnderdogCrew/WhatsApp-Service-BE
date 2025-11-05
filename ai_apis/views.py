@@ -2002,7 +2002,7 @@ class UserWebhookDetails(APIView):
             reply_webhook_url = request.data.get('reply_webhook_url', "")
             reply_webhook_payload = request.data.get('reply_webhook_payload', "")
             status_webhook_url = request.data.get('status_webhook_url', "")
-            result = db.update_document(collection_name="users", query={"_id": ObjectId(user_id)}, update={
+            result = db.update_document(collection_name="users", query={"_id": ObjectId(user_id)}, update_data={
                 "reply_webhook_url": reply_webhook_url,
                 "reply_webhook_payload": reply_webhook_payload,
                 "status_webhook_url": status_webhook_url,
