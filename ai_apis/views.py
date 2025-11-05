@@ -1934,13 +1934,11 @@ class UserWebhookDetails(APIView):
             
             ## we need to get the webhook details from the database
             reply_webhook_url = user_info.get('reply_webhook_url', "")
-            reply_webhook_payload = user_info.get('reply_webhook_payload', "")
             status_webhook_url = user_info.get('status_webhook_url', "")
             api_key = user_info.get('webhook_api_key', "")
             response = {
                 "message": "Webhook details fetched successfully",
                 "reply_webhook_url": reply_webhook_url,
-                "reply_webhook_payload": reply_webhook_payload,
                 "status_webhook_url": status_webhook_url,
                 "webhook_api_key": api_key,
             }
@@ -1964,10 +1962,9 @@ class UserWebhookDetails(APIView):
             type=openapi.TYPE_OBJECT,
             properties={
                 'reply_webhook_url': openapi.Schema(type=openapi.TYPE_STRING, description="Reply webhook URL"),
-                'reply_webhook_payload': openapi.Schema(type=openapi.TYPE_STRING, description="Reply webhook payload"),
                 'status_webhook_url': openapi.Schema(type=openapi.TYPE_STRING, description="Status webhook URL"),
             },
-            required=['reply_webhook_url', 'reply_webhook_payload', 'status_webhook_url']
+            required=['reply_webhook_url', 'status_webhook_url', 'webhook_api_key']
         ),
         responses={
             200: openapi.Response('Success', openapi.Schema(
@@ -2002,11 +1999,9 @@ class UserWebhookDetails(APIView):
             
             ## we need to update the webhook details in the database
             reply_webhook_url = request.data.get('reply_webhook_url', "")
-            reply_webhook_payload = request.data.get('reply_webhook_payload', "")
             status_webhook_url = request.data.get('status_webhook_url', "")
             result = db.update_document(collection_name="users", query={"_id": ObjectId(user_id)}, update_data={
                 "reply_webhook_url": reply_webhook_url,
-                "reply_webhook_payload": reply_webhook_payload,
                 "status_webhook_url": status_webhook_url,
             })
             if result.modified_count == 0:
@@ -2014,7 +2009,6 @@ class UserWebhookDetails(APIView):
             response = {
                 "message": "Webhook details updated successfully",
                 "reply_webhook_url": reply_webhook_url,
-                "reply_webhook_payload": reply_webhook_payload,
                 "status_webhook_url": status_webhook_url,
             }
             return JsonResponse(response, status=200)
