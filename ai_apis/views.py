@@ -1886,3 +1886,133 @@ class CustomerCredits(APIView):
         except Exception as ex:
             print(f"Error: {ex}")
             return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class UserWebhookDetails(APIView):
+    @swagger_auto_schema(
+        operation_description="Fetch user webhook details",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            422: 'Unprocessable Entity',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required  # Ensure the user is authenticated
+    def get(self, request):  # Accept additional parameters
+        try:
+            token = request.headers.get('Authorization')  # Extract the token from the Authorization header
+            if token is None or not token.startswith('Bearer '):
+                return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+            token = token.split(' ')[1]  # Get the actual token part
+            user_info = decode_token(token)  # Decode the token to get user information
+            if isinstance(user_info, dict) and 'user_id' in user_info:
+                user_id = user_info['user_id']  # Access user_id from the decoded token
+            else:
+                return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+            
+            ## we need to get the user info from the database
+            db = MongoDB()
+            user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
+            if user_info is None:
+                return JsonResponse({"message": "User not found"}, status=404)
+            
+            ## we need to get the webhook details from the database
+            reply_webhook_url = user_info.get('reply_webhook_url', "")
+            reply_webhook_payload = user_info.get('reply_webhook_payload', "")
+            status_webhook_url = user_info.get('status_webhook_url', "")
+            status_webhook_payload = user_info.get('status_webhook_payload', "")
+            response = {
+                "message": "Webhook details fetched successfully",
+                "reply_webhook_url": reply_webhook_url,
+                "reply_webhook_payload": reply_webhook_payload,
+                "status_webhook_url": status_webhook_url,
+                "status_webhook_payload": status_webhook_payload
+            }
+            return JsonResponse(response, status=200)
+        except Exception as ex:
+            print(f"Error: {ex}")
+            return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @swagger_auto_schema(
+        operation_description="Update user webhook details",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'reply_webhook_url': openapi.Schema(type=openapi.TYPE_STRING, description="Reply webhook URL"),
+                'reply_webhook_payload': openapi.Schema(type=openapi.TYPE_STRING, description="Reply webhook payload"),
+                'status_webhook_url': openapi.Schema(type=openapi.TYPE_STRING, description="Status webhook URL"),
+                'status_webhook_payload': openapi.Schema(type=openapi.TYPE_STRING, description="Status webhook payload"),
+            },
+            required=['reply_webhook_url', 'reply_webhook_payload', 'status_webhook_url', 'status_webhook_payload']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            422: 'Unprocessable Entity',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required  # Ensure the user is authenticated
+    def post(self, request):
+        try:
+            token = request.headers.get('Authorization')  # Extract the token from the Authorization header
+            if token is None or not token.startswith('Bearer '):
+                return JsonResponse({"message": "Authorization token is missing or invalid"}, status=401)
+
+            token = token.split(' ')[1]  # Get the actual token part
+            user_info = decode_token(token)  # Decode the token to get user information
+            if isinstance(user_info, dict) and 'user_id' in user_info:
+                user_id = user_info['user_id']  # Access user_id from the decoded token
+            else:
+                return JsonResponse({"message": "Invalid token or user information could not be retrieved"}, status=401)
+            
+            ## we need to get the user info from the database
+            db = MongoDB()
+            user_info = db.find_document(collection_name="users", query={"_id": ObjectId(user_id)})
+            if user_info is None:
+                return JsonResponse({"message": "User not found"}, status=404)
+            
+            ## we need to update the webhook details in the database
+            reply_webhook_url = request.data.get('reply_webhook_url', "")
+            reply_webhook_payload = request.data.get('reply_webhook_payload', "")
+            status_webhook_url = request.data.get('status_webhook_url', "")
+            status_webhook_payload = request.data.get('status_webhook_payload', "")
+            result = db.update_document(collection_name="users", query={"_id": ObjectId(user_id)}, update={
+                "reply_webhook_url": reply_webhook_url,
+                "reply_webhook_payload": reply_webhook_payload,
+                "status_webhook_url": status_webhook_url,
+                "status_webhook_payload": status_webhook_payload
+            })
+            if result.modified_count == 0:
+                return JsonResponse({"message": "Failed to update webhook details"}, status=400)
+            response = {
+                "message": "Webhook details updated successfully",
+                "reply_webhook_url": reply_webhook_url,
+                "reply_webhook_payload": reply_webhook_payload,
+                "status_webhook_url": status_webhook_url,
+                "status_webhook_payload": status_webhook_payload
+            }
+            return JsonResponse(response, status=200)
+        except Exception as ex:
+            print(f"Error: {ex}")
+            return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
