@@ -1913,7 +1913,7 @@ class UserWebhookDetails(APIView):
         }
     )
     @token_required  # Ensure the user is authenticated
-    def get(self, request):  # Accept additional parameters
+    def get(self, request, current_user_id=None, current_user_email=None):  # Accept additional parameters
         try:
             token = request.headers.get('Authorization')  # Extract the token from the Authorization header
             if token is None or not token.startswith('Bearer '):
@@ -1973,7 +1973,7 @@ class UserWebhookDetails(APIView):
         }
     )
     @token_required  # Ensure the user is authenticated
-    def post(self, request):
+    def post(self, request, current_user_id=None, current_user_email=None):
         try:
             token = request.headers.get('Authorization')  # Extract the token from the Authorization header
             if token is None or not token.startswith('Bearer '):
