@@ -364,20 +364,28 @@ class FacebookWebhook(APIView):
             print(f"data: {data}")
             entry = data['entry']
             changes = entry[0]['changes']
+            guid = entry[0]['id']
             value = changes[0]['value']
             phone_number_id = value['metadata']['phone_number_id']
             statuses = value['statuses'] if "statuses" in value else []
             hub_challenge = "EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT"
+            user_info = db.find_document("users", query={"phone_number_id": phone_number_id})
+            if user_info is None:
+                user_info = db.find_document("users", query={"business_id": phone_number_id})
 
             if len(statuses) == 0:
                 try:
-                    user_info = db.find_document("users", query={"phone_number_id": phone_number_id})
-                    if user_info is None:
-                        user_info = db.find_document("users", query={"business_id": phone_number_id})
                     if user_info:
                         print("user_info found")
                         phone_number_id = phone_number_id #user_info['phone_number_id'] if "phone_number_id" in user_info else ""
                         auto_reply_enabled = user_info['auto_reply_enabled'] if "auto_reply_enabled" in user_info else False
+                        reply_webhook_url = user_info.get('reply_webhook_url', "")
+                        status_webhook_url = user_info.get('status_webhook_url', "")
+
+                        reply_payload = {
+                            "created_at": datetime.datetime.now()
+                        }
+
                         display_phone_number =value['metadata']['display_phone_number']
                         if "text" in value['messages'][0]:
                             messages = value['messages'][0]['text']['body']
@@ -388,6 +396,10 @@ class FacebookWebhook(APIView):
                         
                         from_number = value['messages'][0]['from']
                         messages_type = value['messages'][0]['type']
+                        reply_payload['To'] = phone_number_id
+                        reply_payload['From'] = from_number
+                        reply_payload['content_type'] = messages_type
+                        reply_payload['guid'] = value['messages'][0]['id']
 
                         if str(user_info['_id']) == "67c1cf4c2763ce36e17d145e":
                             last_send_message = db.find_documents(
@@ -443,6 +455,7 @@ class FacebookWebhook(APIView):
                                     )
                         logging.info(f"messages_type: {messages_type}")
                         if messages_type == "text" or messages_type == "button":
+                            reply_payload['message'] = messages
                             whatsapp_status_logs = {
                                 "number": from_number,
                                 "message": messages,
@@ -469,6 +482,7 @@ class FacebookWebhook(APIView):
                         if messages_type == "interactive":
                             interactive = value['messages'][0]['interactive']['nfm_reply'] if "nfm_reply" in value['messages'][0]['interactive'] else None
                             if interactive:
+                                reply_payload['message'] = interactive
                                 whatsapp_status_logs = {
                                     "number": from_number,
                                     "message": interactive['response_json'],
@@ -533,6 +547,9 @@ class FacebookWebhook(APIView):
                                 else:
                                     attachment_url = ""
                             if attachment_url is not None and attachment_url != "":
+                                reply_payload['media_url'] = attachment_url
+                                reply_payload['content_type'] = messages_type
+                                reply_payload['guid'] = value['messages'][0]['id']
                                 whatsapp_status_logs = {
                                     "number": from_number,
                                     "message": caption,
@@ -554,7 +571,16 @@ class FacebookWebhook(APIView):
                                     "read_at" : int(value['messages'][0]['timestamp'])
                                 }
                                 db.create_document('whatsapp_message_logs', whatsapp_status_logs)
-
+                        
+                        if reply_webhook_url is not None and reply_webhook_url != "":
+                            reply_webhook_response = reply_payload
+                            reply_webhook_response = requests.post(reply_webhook_url, json=reply_webhook_response)
+                            logging.info(f"Reply webhook response: {reply_webhook_response.json()}")
+                            if reply_webhook_response.status_code == 200:
+                                logging.info(f"Reply webhook sent successfully")
+                            else:
+                                logging.error(f"Failed to send reply webhook")
+                        
                         if auto_reply_enabled is True:
                             openai_data = {
                                 "model": "gpt-4o-mini",
@@ -632,14 +658,23 @@ class FacebookWebhook(APIView):
                 title = ""
                 message = ""
                 error_data = ""
+                recipient_id = ""
                 try:
                     errors = statuses[0]['errors'][0]
+                    recipient_id = statuses[0]['recipient_id']
+                    status_id = statuses[0]['id']
                     code = errors['code']
                     title = errors['title']
                     message = errors['message']
                     error_data = errors['error_data']['details']
                 except:
                     pass
+
+                if status_webhook_url is not None and status_webhook_url != "":
+                    ## we need to send the status webhook to the url
+                    status_webhook_response = f"?To={recipient_id}&From={user['number']}&REASON_CODE=200&GUID={status_id}&MSG_STATUS={statuses[0]['status']}&DELIVERED_DATE={statuses[0]['timestamp']}&SUBMIT_DATE={statuses[0]['timestamp']}"
+                    status_webhook_response = requests.get(status_webhook_url + status_webhook_response)
+                    logging.info(f"Status webhook response: {status_webhook_response.json()}")
 
                 db.update_document(
                     'whatsapp_message_logs',
