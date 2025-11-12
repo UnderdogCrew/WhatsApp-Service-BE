@@ -1,5 +1,5 @@
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from django.conf import settings
 from django.http import JsonResponse
@@ -69,6 +69,26 @@ def decode_token(token):
         return {'message': 'Token has expired'}
     except jwt.InvalidTokenError as e:
         return {'message': str(e)}
+
+
+def generate_webhook_api_key(user_id, user_email):
+    """
+    Generate a JWT token for webhook API key without expiry.
+    This token includes metadata for send_message API.
+    """
+    now = datetime.now(timezone.utc)
+    webhook_api_key = jwt.encode({
+        'user_id': str(user_id),
+        'user_email': user_email,
+        'type': 'webhook_api_key',
+        "timeStamp": int(now.timestamp()),
+        'metadata': {
+            'api': 'send_message'
+        }
+        # No 'exp' field - token never expires
+    }, settings.SECRET_KEY, algorithm='HS256')
+    
+    return webhook_api_key
 
 
 def current_dollar_price():
