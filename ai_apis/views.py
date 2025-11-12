@@ -372,15 +372,16 @@ class FacebookWebhook(APIView):
             user_info = db.find_document("users", query={"phone_number_id": phone_number_id})
             if user_info is None:
                 user_info = db.find_document("users", query={"business_id": phone_number_id})
+            
+            auto_reply_enabled = user_info['auto_reply_enabled'] if "auto_reply_enabled" in user_info else False
+            reply_webhook_url = user_info.get('reply_webhook_url', "")
+            status_webhook_url = user_info.get('status_webhook_url', "")
 
             if len(statuses) == 0:
                 try:
                     if user_info:
                         print("user_info found")
                         phone_number_id = phone_number_id #user_info['phone_number_id'] if "phone_number_id" in user_info else ""
-                        auto_reply_enabled = user_info['auto_reply_enabled'] if "auto_reply_enabled" in user_info else False
-                        reply_webhook_url = user_info.get('reply_webhook_url', "")
-                        status_webhook_url = user_info.get('status_webhook_url', "")
 
                         reply_payload = {
                             "created_at": datetime.datetime.now()
