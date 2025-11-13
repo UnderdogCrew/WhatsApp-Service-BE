@@ -197,6 +197,8 @@ class LoginView(APIView):
                         business_verified = 1  # Business details present but not verified
                 else:
                     business_verified = 0  # No business details
+                
+                db.update_document('users', {'_id': ObjectId(user['_id'])}, {'last_login': timezone.now()})
 
                 return JsonResponse({
                     'status': 'success',
