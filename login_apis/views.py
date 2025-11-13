@@ -801,7 +801,7 @@ class GetAllUsersView(APIView):
             'base_encoded_password': 0 
         }
 
-        users = db.find_documents('users', query, skip=skip, limit=limit,projection=projection)
+        users = db.find_documents('users', query, skip=skip, limit=limit,projection=projection, sort=[('_id', -1)])
         if not users:
             return JsonResponse({
                 'message': 'User not found'
