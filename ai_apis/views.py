@@ -1692,11 +1692,11 @@ class UserDashboardData(APIView):
                 return JsonResponse({"message": "User not found"}, status=404)
             
             ## we need to get the phone number id from the database
-            waba_id = user_info['waba_id']
-            meta_business_number = user_info['meta_business_number']
+            waba_id = user_info['waba_id'] if 'waba_id' in user_info else ""
+            meta_business_number = user_info['meta_business_number'] if 'meta_business_number' in user_info else ""
             meta_business_number = meta_business_number.replace("+", "")
             meta_business_number = meta_business_number.replace(" ", "")
-            api_key = user_info['api_key']
+            api_key = user_info['api_key'] if 'api_key' in user_info else ""
                         
             # Parse optional query parameters
             start_date = request.query_params.get("start_date", None)
