@@ -27,9 +27,11 @@ from .settings import SWAGGER_URL
 
 schema_view = get_schema_view(
    openapi.Info(
-      title="Whatsapp-Service-API",
+      title="WhatsApp Service API",
       default_version='v1',
-      description="API documentation",
+      description="Comprehensive API documentation for WhatsApp Business Platform integration. "
+                  "This API provides endpoints for managing WhatsApp Flows, message templates, "
+                  "customer interactions, and business account management.",
       terms_of_service="https://privacy-policy.theunderdogcrew.com/",
       contact=openapi.Contact(email="hello@theunderdogcrew.com"),
       license=openapi.License(name="BSD License"),

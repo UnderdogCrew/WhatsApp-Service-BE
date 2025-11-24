@@ -52,7 +52,7 @@ REDIS_DATABASE = os.getenv("REDIS_DATABASE")
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 REDIS_USER = os.getenv("REDIS_USER")
 WABA_ID = os.getenv("WABA_ID")
-SWAGGER_URL = os.getenv("SWAGGER_URL")
+SWAGGER_URL = os.getenv("SWAGGER_URL") or "https://whatsapp-api.theunderdogcrew.com"
 
 # Webhook settings
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
