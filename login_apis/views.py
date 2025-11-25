@@ -432,8 +432,11 @@ class OTPVerify(APIView):
                 }, status=status.HTTP_404_NOT_FOUND)
         
             # Check if OTP is expired (5 minutes validity)
+            print(datetime.now(timezone.utc))
+            print(otp_record[0]['created_at'].astimezone(timezone.utc))
+            print("time_diff",datetime.now(timezone.utc) - otp_record[0]['created_at'].astimezone(timezone.utc))
             time_diff = datetime.now(timezone.utc) - otp_record[0]['created_at'].astimezone(timezone.utc)
-            print("time_diff",time_diff.total_seconds())
+            
             if time_diff.total_seconds() > 300:  # 5 minutes
                 return JsonResponse({
                     'message': 'OTP has expired'
