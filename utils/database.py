@@ -30,9 +30,9 @@ class MongoDB:
     def create_document(self, collection_name, document):
         collection = self.get_collection(collection_name)
         if 'created_at' not in document:
-            document['created_at'] = datetime.utcnow()
+            document['created_at'] = datetime.now()
         if 'updated_at' not in document:
-            document['updated_at'] = datetime.utcnow()
+            document['updated_at'] = datetime.now()
         result = collection.insert_one(document)
         return str(result.inserted_id)
 
@@ -58,7 +58,7 @@ class MongoDB:
     
     def update_document(self, collection_name, query, update_data):
         collection = self.get_collection(collection_name)
-        update_data['updated_at'] = datetime.utcnow()
+        update_data['updated_at'] = datetime.now()
         return collection.update_one(query, {'$set': update_data})
 
     def delete_document(self, collection_name, query):

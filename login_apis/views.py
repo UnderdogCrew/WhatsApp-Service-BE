@@ -357,7 +357,7 @@ class OTPGenerate(APIView):
             otp_data = {
                 'phone_number': phone_number,
                 'otp': otp,
-                'created_at': datetime.now(timezone.utc),
+                'created_at': datetime.now(),
                 'is_verified': False
             }
             # Send OTP via Twilio
