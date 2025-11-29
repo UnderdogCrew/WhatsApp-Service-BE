@@ -921,7 +921,7 @@ class VerifyBusinessDetailsView(APIView):
 
             # Update user details
             result = db.update_document('users', 
-                {'_id': ObjectId(user['_id'])}, update_data
+                {'_id': ObjectId(user_id)}, update_data
             )
 
             if result.modified_count == 0:
