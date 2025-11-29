@@ -859,7 +859,7 @@ class VerifyBusinessDetailsView(APIView):
             verified_name = request.data.get("verified_name", "")
             phone_number_id = request.data.get("phone_number_id", "")
             waba_id = request.data.get("waba_id", "")
-            auto_reply_enabled = request.data.get("auto_reply_enabled", False)
+            auto_reply_enabled = request.data.get("auto_reply_enabled")
             meta_business_number = request.data.get("meta_business_number", "")
             api_key = request.data.get("api_key", "")
 
@@ -911,7 +911,7 @@ class VerifyBusinessDetailsView(APIView):
 
             if waba_id:
                 update_data["waba_id"] = waba_id
-            if auto_reply_enabled:
+            if "auto_reply_enabled" in request.data:
                 update_data["auto_reply_enabled"] = auto_reply_enabled
             if meta_business_number:
                 update_data['meta_business_number'] = meta_business_number
