@@ -853,6 +853,7 @@ class VerifyBusinessDetailsView(APIView):
     )
     def patch(self, request):
         try:
+            print(f"request: {request.data}")
             user_id = request.data.get('user_id')
             business_id = request.data.get('business_id')
             verified_name = request.data.get("verified_name", "")
