@@ -29,7 +29,7 @@ db = MongoDB()
 API_TOKEN = API_KEY
 
 
-def process_components(components, msg_data, image_url, latitude=None, longitude=None, location_name=None, address=None, template_text=None):
+def process_components(components, msg_data, image_url, latitude=None, longitude=None, location_name=None, address=None, template_text=None, button_value=None):
     result_list = []
     print(f"msg_data: {msg_data}")
     for component in components:
@@ -156,18 +156,6 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                         "parameters": body_parameters
                     }
                     result_list.append(body_entry)
-            # else:
-            #     if "text" in component:
-            #         body_entry = {
-            #             "type": "body",
-            #             "parameters": [
-            #                 {
-            #                     "type": "text",
-            #                     "text": template_text
-            #                 }
-            #             ]
-            #         }
-            #         result_list.append(body_entry)
 
         elif component['type'].upper() == "BUTTONS":
             # Check for body_text_named_params
@@ -180,7 +168,7 @@ def process_components(components, msg_data, image_url, latitude=None, longitude
                     if "example" in buttons:
                         body_parameters.append({
                             "type": "text",
-                            "text": "/billing"
+                            "text": button_value if button_value is not None else "/billing"
                         })
                     else:
                         body_parameters.append({
@@ -272,7 +260,8 @@ def send_message_data(
         longitude=None,
         location_name=None,
         address=None,
-        params_fallback_value=None
+        params_fallback_value=None,
+        button_value=None
     ):
     try:
         
@@ -463,7 +452,8 @@ def send_message_data(
             longitude=longitude,
             location_name=location_name,
             address=address,
-            template_text=template_text
+            template_text=template_text,
+            button_value=button_value
         )
         payload = {
             "messaging_product": "whatsapp",

@@ -102,7 +102,7 @@ def process_components(components, msg_data, image_url):
     return result_list
 
 
-def send_whatsapp_message(numbers, template_name,text, image_url, user_id, msg_metadata, latitude, longitude, location_name, address, params_fallback_value):
+def send_whatsapp_message(numbers, template_name,text, image_url, user_id, msg_metadata, latitude, longitude, location_name, address, params_fallback_value, button_value=None):
     limiter = TokenBucketLimiter(rate_per_sec=60)  # safe headroom under ~80 MPS default
     for number in numbers:
         limiter.acquire()
@@ -117,7 +117,8 @@ def send_whatsapp_message(numbers, template_name,text, image_url, user_id, msg_m
             longitude=longitude,
             location_name=location_name,
             address=address,
-            params_fallback_value=params_fallback_value
+            params_fallback_value=params_fallback_value,
+            button_value=button_value
         )
     return True
 
@@ -210,6 +211,7 @@ class SendMessage(APIView):
             longitude = request_data.get("longitude", None)
             location_name = request_data.get("location_name", None)
             address = request_data.get("address", None)
+            button_value = request_data.get("button_value", None)
             if template_name == "hotel":
                 template_name = "hello_world"
 
@@ -329,7 +331,8 @@ class SendMessage(APIView):
                                                              longitude,
                                                              location_name,
                                                              address,
-                                                             params_fallback_value,)
+                                                             params_fallback_value,
+                                                             button_value,)
                                                              ).start()
 
             return JsonResponse({"message": "Messages sent successfully", 
