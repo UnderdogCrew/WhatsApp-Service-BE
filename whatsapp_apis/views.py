@@ -1762,8 +1762,8 @@ class GenerateAITemplateView(APIView):
             "- Each variant must be different in hook and CTA.\n"
             "- Use placeholders only when needed, max 5: {{1}}, {{2}}, {{3}}, {{4}}, {{5}}.\n"
             "- If missing details (coupon, link, expiry, CTA label), use placeholders instead of guessing.\n"
-            "- MARKETING: keep message short (1–7 lines, max ~450 chars). Include a CTA line when appropriate.\n"
-            "- UTILITY: keep clear and concise (1–6 lines, max ~600 chars).\n"
+            "- MARKETING: keep message short (1–7 lines, max ~5000 chars). Include a CTA line when appropriate.\n"
+            "- UTILITY: keep clear and concise (1–6 lines, max ~6000 chars).\n"
             "- If includeEmojis=true, use 1–4 relevant emojis; if false, use none.\n"
         )
 
@@ -1835,61 +1835,13 @@ class GenerateAITemplateView(APIView):
             except Exception:
                 full_text = ""
 
-            print(f"full_text: {full_text}")
-
-            # Fallback: extract from response structure (older/newer client variations).
-            if not full_text and hasattr(resp, "output"):
-                try:
-                    for item in resp.output or []:
-                        if getattr(item, "type", None) != "message":
-                            continue
-                        for c in getattr(item, "content", []) or []:
-                            if getattr(c, "type", None) == "output_text":
-                                full_text += getattr(c, "text", "") or ""
-                except Exception:
-                    full_text = ""
-
-            parsed = None
-            try:
-                parsed = json.loads(full_text) if full_text else None
-            except Exception:
-                parsed = None
-
-            # Best-effort fallback if model returned extra text around JSON.
-            if parsed is None and full_text:
-                try:
-                    start = full_text.find("[")
-                    end = full_text.rfind("]")
-                    if start != -1 and end != -1 and end > start:
-                        parsed = json.loads(full_text[start : end + 1])
-                except Exception:
-                    parsed = None
-
-            if not isinstance(parsed, list):
-                parsed = []
-
-            # Normalize to exactly 3 items with indices 0..2
-            by_index = {}
-            for item in parsed:
-                if not isinstance(item, dict):
-                    continue
-                idx = item.get("index")
-                if idx in (0, 1, 2) and idx not in by_index:
-                    by_index[idx] = item
-
-            normalized = []
-            for i in range(3):
-                obj = by_index.get(i) or {}
-                normalized.append(
-                    {
-                        "index": i,
-                        "name": str(obj.get("name") or f"variant_{i+1}"),
-                        "message": str(obj.get("message") or ""),
-                        "button": obj.get("button") if isinstance(obj.get("button"), list) else [],
-                        "template_header": "Text",
-                    }
-                )
-
-            return JsonResponse(normalized, safe=False, status=status.HTTP_200_OK)
+            # Directly use the sample response from OpenAI as the normalized output
+            normalized = json.loads(full_text)
+            response_data = {
+                'status': 'success',
+                'message': 'WhatsApp template generated successfully',
+                'data': normalized
+            }
+            return JsonResponse(response_data, safe=False, status=status.HTTP_200_OK)
         except Exception as e:
             return JsonResponse({"message": str(e)}, safe=False, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
