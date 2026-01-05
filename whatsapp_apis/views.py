@@ -1784,7 +1784,7 @@ class GenerateAITemplateView(APIView):
                     "format": {
                         "type": "json_schema",
                         "name": "whatsapp_template_variants",
-                        "strict": True,
+                        "strict": False,
                         "schema": {
                             "type": "object",
                             "properties": {
@@ -1834,6 +1834,8 @@ class GenerateAITemplateView(APIView):
                 full_text = resp.output_text or ""
             except Exception:
                 full_text = ""
+
+            print(f"full_text: {full_text}")
 
             # Fallback: extract from response structure (older/newer client variations).
             if not full_text and hasattr(resp, "output"):
