@@ -1738,8 +1738,8 @@ class GenerateAITemplateView(APIView):
                 'message': 'payload is missing'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        customers = db.find_document('customers', {
-            'user_id': current_user_id,
+        customers = db.find_document('users', {
+            '_id': ObjectId(current_user_id),
             'status': 1
         })
 
@@ -1851,7 +1851,7 @@ class GenerateAITemplateView(APIView):
                 'data': normalized
             }
             db.update_document(
-                collection_name="customers",
+                collection_name="users",
                 query={"_id": ObjectId(current_user_id)},
                 update_data={
                     "default_credit": int(customers.get("default_credit", 0)) - 10
