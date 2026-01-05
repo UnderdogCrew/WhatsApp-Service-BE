@@ -1762,8 +1762,8 @@ class GenerateAITemplateView(APIView):
             "- Each variant must be different in hook and CTA.\n"
             "- Use placeholders only when needed, max 5: {{1}}, {{2}}, {{3}}, {{4}}, {{5}}.\n"
             "- If missing details (coupon, link, expiry, CTA label), use placeholders instead of guessing.\n"
-            "- MARKETING: keep message short (1–7 lines, max ~5000 chars). Include a CTA line when appropriate.\n"
-            "- UTILITY: keep clear and concise (1–6 lines, max ~6000 chars).\n"
+            "- MARKETING: keep message short (1–7 lines). Include a CTA line when appropriate.\n"
+            "- UTILITY: keep clear and concise (1–6 lines).\n"
             "- If includeEmojis=true, use 1–4 relevant emojis; if false, use none.\n"
         )
 
