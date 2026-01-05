@@ -1752,10 +1752,10 @@ class GenerateAITemplateView(APIView):
 
         print(f"customers: {customers}")
 
-        if int(customers.get("default_credit", 0)) < 10:
+        if float(customers.get("default_credit", 0)) < 10:
             return JsonResponse({
                 'message': 'Insufficient credits',
-                'credits': int(customers.get("default_credit", 0))
+                'credits': float(customers.get("default_credit", 0))
             }, status=status.HTTP_400_BAD_REQUEST)
 
         system_prompt = (
@@ -1767,6 +1767,7 @@ class GenerateAITemplateView(APIView):
             '- "message": generated WhatsApp message text\n'
             '- "button": array of 0-2 CTA button labels (strings)\n'
             '- "template_header": always the string "Text"\n\n'
+            '- "variables": array of 0-5 variables (strings)\n'
             "Rules:\n"
             "- Output ONLY JSON.\n"
             "- Each variant must be different in hook and CTA.\n"
@@ -1856,7 +1857,7 @@ class GenerateAITemplateView(APIView):
                 collection_name="users",
                 query={"_id": ObjectId(current_user_id)},
                 update_data={
-                    "default_credit": int(customers.get("default_credit", 0)) - 10
+                    "default_credit": float(customers.get("default_credit", 0)) - 10
                 }
             )
             return JsonResponse(response_data, safe=False, status=status.HTTP_200_OK)
