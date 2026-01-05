@@ -1776,6 +1776,7 @@ class GenerateAITemplateView(APIView):
             "- MARKETING: keep message short (1–7 lines). Include a CTA line when appropriate.\n"
             "- UTILITY: keep clear and concise (1–6 lines).\n"
             "- If includeEmojis=true, use 1–4 relevant emojis; if false, use none.\n"
+            "- Do not use any variables in button text."
         )
 
         user_prompt = (
