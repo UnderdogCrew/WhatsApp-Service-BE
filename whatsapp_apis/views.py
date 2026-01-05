@@ -16,6 +16,18 @@ from bson.objectid import ObjectId
 import pytz
 import csv
 import io
+import json
+from django.http import StreamingHttpResponse, JsonResponse
+from openai import OpenAI
+from UnderdogCrew.settings import OPEN_AI_KEY
+
+client = OpenAI(api_key=OPEN_AI_KEY)
+
+DELIM = "\n===VARIANT===\n"
+
+def sse_event(obj: dict) -> str:
+    # SSE requires each message as: data: <json>\n\n
+    return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
 
 
 
@@ -1673,3 +1685,191 @@ class ContactExportView(APIView):
             return JsonResponse({
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GenerateAITemplateView(APIView):
+    @swagger_auto_schema(
+        operation_description="Generate a WhatsApp template using AI",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+            openapi.Parameter(
+                'templateCategory',
+                openapi.IN_QUERY,
+                description="Category of the template (default: MARKETING)",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                'templateLanguage',
+                openapi.IN_QUERY,
+                description="Language of the template (default: English)",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                'optimizationChoice',
+                openapi.IN_QUERY,
+                description="Optimization choice (default: Click Rate)",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                'includeEmojis',
+                openapi.IN_QUERY,
+                description="Include emojis in template (default: True)",
+                type=openapi.TYPE_BOOLEAN,
+                required=False
+            ),
+            openapi.Parameter(
+                'mood',
+                openapi.IN_QUERY,
+                description="Mood of the template (default: None)",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                'style',
+                openapi.IN_QUERY,
+                description="Style of the template (default: None)",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                'prompt',
+                openapi.IN_QUERY,
+                description="User instruction or prompt (default: empty string)",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+        ],
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def post(self, request, current_user_id=None, current_user_email=None):
+        db = MongoDB()
+        try:
+            payload = request.data
+            print(f"payload: {payload}")
+        except Exception:
+            payload = {}
+
+        if len(payload) == 0:
+            return JsonResponse({
+                'message': 'payload is missing'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        customers = db.find_documents('customers', {
+                'user_id': current_user_id,
+                'status': 1
+        })
+
+        if not customers:
+            return JsonResponse({
+                'message': 'No customers found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        system_prompt = (
+            "You are a WhatsApp Business template generator.\n\n"
+            "Return EXACTLY 3 variants, each as plain text, separated by this delimiter line:\n\n"
+            "===VARIANT===\n\n"
+            "Rules:\n"
+            "- Output ONLY the 3 variants text with the delimiter between them.\n"
+            "- No numbering, no JSON, no markdown.\n"
+            "- Each variant must be different in hook and CTA.\n"
+            "- Use placeholders only when needed, max 5: {{1}}, {{2}}, {{3}}, {{4}}, {{5}}.\n"
+            "- If missing details (coupon, link, expiry, CTA label), use placeholders instead of guessing.\n"
+            "- MARKETING: keep each variant short (1–7 lines, max ~450 chars). Include a CTA line when appropriate.\n"
+            "- UTILITY: keep clear and concise (1–6 lines, max ~600 chars).\n"
+            "- If includeEmojis=true, use 1–4 relevant emojis; if false, use none.\n"
+        )
+
+        user_prompt = (
+            f"templateCategory: {payload.get('templateCategory','MARKETING')}\n"
+            f"templateLanguage: {payload.get('templateLanguage','English')}\n"
+            f"optimizationChoice: {payload.get('optimizationChoice','Click Rate')}\n"
+            f"includeEmojis: {payload.get('includeEmojis', True)}\n"
+            f"mood: {payload.get('mood','None')}\n"
+            f"style: {payload.get('style','None')}\n"
+            f"userPrompt: {payload.get('prompt','')}\n"
+        )
+
+        def stream():
+            """
+            Streams SSE events with chunk routing to index 0/1/2 based on delimiter.
+            """
+            buffer = ""
+            current_index = 0
+            emitted_any = [False, False, False]  # helps avoid empty variants
+
+            try:
+                resp = client.responses.stream(
+                    model="gpt-5-mini",
+                    input=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                )
+
+                with resp as r:
+                    for event in r:
+                        if event.type != "response.output_text.delta":
+                            continue
+
+                        delta = event.delta
+                        buffer += delta
+
+                        # Route completed segments when delimiter appears
+                        while True:
+                            pos = buffer.find(DELIM)
+                            if pos == -1:
+                                break
+                            segment = buffer[:pos]
+                            if segment:
+                                emitted_any[current_index] = True
+                                yield sse_event({"output": segment, "index": current_index, "isChunk": True})
+                            buffer = buffer[pos + len(DELIM):]
+                            current_index = min(current_index + 1, 2)
+
+                        # Stream partial buffer sometimes (keeps UI live)
+                        # Tune threshold if you want smaller chunks.
+                        if len(buffer) >= 60:
+                            emitted_any[current_index] = True
+                            yield sse_event({"output": buffer, "index": current_index, "isChunk": True})
+                            buffer = ""
+
+                    # Flush leftover
+                    if buffer.strip():
+                        emitted_any[current_index] = True
+                        yield sse_event({"output": buffer, "index": current_index, "isChunk": True})
+
+                # Ensure 3 variants exist (if model under-produced, send empty placeholders)
+                for i in range(3):
+                    if not emitted_any[i]:
+                        yield sse_event({"output": "", "index": i, "isChunk": True})
+
+                yield sse_event({"done": True})
+
+            except Exception as e:
+                yield sse_event({"error": str(e), "done": True})
+
+        resp = StreamingHttpResponse(stream(), content_type="text/event-stream; charset=utf-8")
+        resp["Cache-Control"] = "no-cache"
+        resp["X-Accel-Buffering"] = "no"  # important if you're behind nginx
+
+        return resp
