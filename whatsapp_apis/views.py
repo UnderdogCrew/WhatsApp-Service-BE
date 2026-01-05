@@ -1742,7 +1742,7 @@ class GenerateAITemplateView(APIView):
 
         customers = db.find_document('users', {
             '_id': ObjectId(current_user_id),
-            'status': 1
+            "status" : "active"
         })
 
         if not customers:
