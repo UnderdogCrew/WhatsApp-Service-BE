@@ -1738,8 +1738,6 @@ class GenerateAITemplateView(APIView):
                 'message': 'payload is missing'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        print(f"current_user_id: {current_user_id}")
-
         customers = db.find_document('users', {
             '_id': ObjectId(current_user_id),
             "status" : "active"
@@ -1749,8 +1747,6 @@ class GenerateAITemplateView(APIView):
             return JsonResponse({
                 'message': 'No customers found'
             }, status=status.HTTP_404_NOT_FOUND)
-
-        print(f"customers: {customers}")
 
         if float(customers.get("default_credit", 0)) < 10:
             return JsonResponse({
