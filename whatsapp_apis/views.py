@@ -1748,6 +1748,8 @@ class GenerateAITemplateView(APIView):
                 'message': 'No customers found'
             }, status=status.HTTP_404_NOT_FOUND)
 
+        print(f"customers: {customers}")
+
         if int(customers.get("default_credit", 0)) < 10:
             return JsonResponse({
                 'message': 'Insufficient credits',
