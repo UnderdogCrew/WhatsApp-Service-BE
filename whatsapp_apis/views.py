@@ -1779,9 +1779,10 @@ class GenerateAITemplateView(APIView):
         try:
             resp = client.responses.create(
                 model="gpt-5-mini",
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {
+                reasoning={"summary": "auto"},
+                text={
+                    "format": {
+                        "type": "json_schema",
                         "name": "whatsapp_template_variants",
                         "strict": True,
                         "schema": {
