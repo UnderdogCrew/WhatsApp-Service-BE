@@ -1748,10 +1748,10 @@ class GenerateAITemplateView(APIView):
                 'message': 'No customers found'
             }, status=status.HTTP_404_NOT_FOUND)
 
-        if int(customers.get("credits", 0)) < 10:
+        if int(customers.get("default_credit", 0)) < 10:
             return JsonResponse({
                 'message': 'Insufficient credits',
-                'credits': int(customers.get("credits", 0))
+                'credits': int(customers.get("default_credit", 0))
             }, status=status.HTTP_400_BAD_REQUEST)
 
         system_prompt = (
@@ -1852,7 +1852,7 @@ class GenerateAITemplateView(APIView):
                 collection_name="customers",
                 query={"_id": ObjectId(current_user_id)},
                 update_data={
-                    "credits": int(customers.get("credits", 0)) - 10
+                    "default_credit": int(customers.get("default_credit", 0)) - 10
                 }
             )
             return JsonResponse(response_data, safe=False, status=status.HTTP_200_OK)
