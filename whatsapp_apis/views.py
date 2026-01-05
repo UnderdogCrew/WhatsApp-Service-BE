@@ -1698,56 +1698,20 @@ class GenerateAITemplateView(APIView):
                 type=openapi.TYPE_STRING,
                 required=True
             ),
-            openapi.Parameter(
-                'templateCategory',
-                openapi.IN_QUERY,
-                description="Category of the template (default: MARKETING)",
-                type=openapi.TYPE_STRING,
-                required=False
-            ),
-            openapi.Parameter(
-                'templateLanguage',
-                openapi.IN_QUERY,
-                description="Language of the template (default: English)",
-                type=openapi.TYPE_STRING,
-                required=False
-            ),
-            openapi.Parameter(
-                'optimizationChoice',
-                openapi.IN_QUERY,
-                description="Optimization choice (default: Click Rate)",
-                type=openapi.TYPE_STRING,
-                required=False
-            ),
-            openapi.Parameter(
-                'includeEmojis',
-                openapi.IN_QUERY,
-                description="Include emojis in template (default: True)",
-                type=openapi.TYPE_BOOLEAN,
-                required=False
-            ),
-            openapi.Parameter(
-                'mood',
-                openapi.IN_QUERY,
-                description="Mood of the template (default: None)",
-                type=openapi.TYPE_STRING,
-                required=False
-            ),
-            openapi.Parameter(
-                'style',
-                openapi.IN_QUERY,
-                description="Style of the template (default: None)",
-                type=openapi.TYPE_STRING,
-                required=False
-            ),
-            openapi.Parameter(
-                'prompt',
-                openapi.IN_QUERY,
-                description="User instruction or prompt (default: empty string)",
-                type=openapi.TYPE_STRING,
-                required=False
-            ),
         ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'templateCategory': openapi.Schema(type=openapi.TYPE_STRING),
+                'templateLanguage': openapi.Schema(type=openapi.TYPE_STRING),
+                'optimizationChoice': openapi.Schema(type=openapi.TYPE_STRING),
+                'includeEmojis': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                'mood': openapi.Schema(type=openapi.TYPE_STRING),
+                'style': openapi.Schema(type=openapi.TYPE_STRING),
+                'prompt': openapi.Schema(type=openapi.TYPE_STRING),
+            },
+            required=['templateCategory', 'templateLanguage', 'optimizationChoice', 'includeEmojis', 'mood', 'style', 'prompt']
+        ),
         responses={
             200: openapi.Response('Success', openapi.Schema(
                 type=openapi.TYPE_OBJECT,
