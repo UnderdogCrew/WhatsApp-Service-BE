@@ -1750,15 +1750,19 @@ class GenerateAITemplateView(APIView):
 
         system_prompt = (
             "You are a WhatsApp Business template generator.\n\n"
-            "Return EXACTLY 3 variants, each as plain text, separated by this delimiter line:\n\n"
-            "===VARIANT===\n\n"
+            "Return EXACTLY 3 variants as VALID JSON (no markdown, no extra text).\n\n"
+            "Output format must be a JSON array of 3 objects. Each object MUST have:\n"
+            '- "index": 0, 1, 2\n'
+            '- "name": short template name string\n'
+            '- "message": generated WhatsApp message text\n'
+            '- "button": array of 0-2 CTA button labels (strings)\n'
+            '- "template_header": always the string "Text"\n\n'
             "Rules:\n"
-            "- Output ONLY the 3 variants text with the delimiter between them.\n"
-            "- No numbering, no JSON, no markdown.\n"
+            "- Output ONLY JSON.\n"
             "- Each variant must be different in hook and CTA.\n"
             "- Use placeholders only when needed, max 5: {{1}}, {{2}}, {{3}}, {{4}}, {{5}}.\n"
             "- If missing details (coupon, link, expiry, CTA label), use placeholders instead of guessing.\n"
-            "- MARKETING: keep each variant short (1–7 lines, max ~450 chars). Include a CTA line when appropriate.\n"
+            "- MARKETING: keep message short (1–7 lines, max ~450 chars). Include a CTA line when appropriate.\n"
             "- UTILITY: keep clear and concise (1–6 lines, max ~600 chars).\n"
             "- If includeEmojis=true, use 1–4 relevant emojis; if false, use none.\n"
         )
@@ -1772,68 +1776,110 @@ class GenerateAITemplateView(APIView):
             f"style: {payload.get('style','None')}\n"
             f"userPrompt: {payload.get('prompt','')}\n"
         )
+        try:
+            resp = client.responses.create(
+                model="gpt-5-mini",
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "whatsapp_template_variants",
+                        "strict": True,
+                        "schema": {
+                            "type": "array",
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "required": ["index", "name", "message", "button", "template_header", "variables"],
+                                "properties": {
+                                    "index": {"type": "integer", "minimum": 0, "maximum": 2},
+                                    "name": {"type": "string"},
+                                    "message": {"type": "string"},
+                                    "button": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "minItems": 0,
+                                        "maxItems": 2,
+                                    },
+                                    "template_header": {"type": "string", "enum": ["Text"]},
+                                    "variables": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "minItems": 0,
+                                        "maxItems": 5,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                input=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
 
-        def stream():
-            """
-            Streams SSE events with chunk routing to index 0/1/2 based on delimiter.
-            """
-            buffer = ""
-            current_index = 0
-            emitted_any = [False, False, False]  # helps avoid empty variants
-
+            # Prefer the convenience accessor when available.
+            full_text = ""
             try:
-                resp = client.responses.stream(
-                    model="gpt-5-mini",
-                    input=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
+                full_text = resp.output_text or ""
+            except Exception:
+                full_text = ""
+
+            # Fallback: extract from response structure (older/newer client variations).
+            if not full_text and hasattr(resp, "output"):
+                try:
+                    for item in resp.output or []:
+                        if getattr(item, "type", None) != "message":
+                            continue
+                        for c in getattr(item, "content", []) or []:
+                            if getattr(c, "type", None) == "output_text":
+                                full_text += getattr(c, "text", "") or ""
+                except Exception:
+                    full_text = ""
+
+            parsed = None
+            try:
+                parsed = json.loads(full_text) if full_text else None
+            except Exception:
+                parsed = None
+
+            # Best-effort fallback if model returned extra text around JSON.
+            if parsed is None and full_text:
+                try:
+                    start = full_text.find("[")
+                    end = full_text.rfind("]")
+                    if start != -1 and end != -1 and end > start:
+                        parsed = json.loads(full_text[start : end + 1])
+                except Exception:
+                    parsed = None
+
+            if not isinstance(parsed, list):
+                parsed = []
+
+            # Normalize to exactly 3 items with indices 0..2
+            by_index = {}
+            for item in parsed:
+                if not isinstance(item, dict):
+                    continue
+                idx = item.get("index")
+                if idx in (0, 1, 2) and idx not in by_index:
+                    by_index[idx] = item
+
+            normalized = []
+            for i in range(3):
+                obj = by_index.get(i) or {}
+                normalized.append(
+                    {
+                        "index": i,
+                        "name": str(obj.get("name") or f"variant_{i+1}"),
+                        "message": str(obj.get("message") or ""),
+                        "button": obj.get("button") if isinstance(obj.get("button"), list) else [],
+                        "template_header": "Text",
+                    }
                 )
 
-                with resp as r:
-                    for event in r:
-                        if event.type != "response.output_text.delta":
-                            continue
-
-                        delta = event.delta
-                        buffer += delta
-
-                        # Route completed segments when delimiter appears
-                        while True:
-                            pos = buffer.find(DELIM)
-                            if pos == -1:
-                                break
-                            segment = buffer[:pos]
-                            if segment:
-                                emitted_any[current_index] = True
-                                yield sse_event({"output": segment, "index": current_index, "isChunk": True})
-                            buffer = buffer[pos + len(DELIM):]
-                            current_index = min(current_index + 1, 2)
-
-                        # Stream partial buffer sometimes (keeps UI live)
-                        # Tune threshold if you want smaller chunks.
-                        if len(buffer) >= 60:
-                            emitted_any[current_index] = True
-                            yield sse_event({"output": buffer, "index": current_index, "isChunk": True})
-                            buffer = ""
-
-                    # Flush leftover
-                    if buffer.strip():
-                        emitted_any[current_index] = True
-                        yield sse_event({"output": buffer, "index": current_index, "isChunk": True})
-
-                # Ensure 3 variants exist (if model under-produced, send empty placeholders)
-                for i in range(3):
-                    if not emitted_any[i]:
-                        yield sse_event({"output": "", "index": i, "isChunk": True})
-
-                yield sse_event({"done": True})
-
-            except Exception as e:
-                yield sse_event({"error": str(e), "done": True})
-
-        resp = StreamingHttpResponse(stream(), content_type="text/event-stream; charset=utf-8")
-        resp["Cache-Control"] = "no-cache"
-        resp["X-Accel-Buffering"] = "no"  # important if you're behind nginx
-
-        return resp
+            return JsonResponse(normalized, safe=False, status=status.HTTP_200_OK)
+        except Exception as e:
+            return JsonResponse({"message": str(e)}, safe=False, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
