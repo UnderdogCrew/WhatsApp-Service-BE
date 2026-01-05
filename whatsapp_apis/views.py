@@ -1738,6 +1738,8 @@ class GenerateAITemplateView(APIView):
                 'message': 'payload is missing'
             }, status=status.HTTP_400_BAD_REQUEST)
 
+        print(f"current_user_id: {current_user_id}")
+
         customers = db.find_document('users', {
             '_id': ObjectId(current_user_id),
             'status': 1
