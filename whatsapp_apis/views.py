@@ -1748,6 +1748,11 @@ class GenerateAITemplateView(APIView):
                 'message': 'No customers found'
             }, status=status.HTTP_404_NOT_FOUND)
 
+        if customers.get("credits") < 1:
+            return JsonResponse({
+                'message': 'Insufficient credits'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         system_prompt = (
             "You are a WhatsApp Business template generator.\n\n"
             "Return EXACTLY 3 variants as VALID JSON (no markdown, no extra text).\n\n"
@@ -1842,6 +1847,13 @@ class GenerateAITemplateView(APIView):
                 'message': 'WhatsApp template generated successfully',
                 'data': normalized
             }
+            db.update_document(
+                collection_name="customers",
+                query={"_id": ObjectId(current_user_id)},
+                update_data={
+                    "credits": int(customers.get("credits")) - 10
+                }
+            )
             return JsonResponse(response_data, safe=False, status=status.HTTP_200_OK)
         except Exception as e:
             return JsonResponse({"message": str(e)}, safe=False, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
