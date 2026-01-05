@@ -1786,32 +1786,39 @@ class GenerateAITemplateView(APIView):
                         "name": "whatsapp_template_variants",
                         "strict": True,
                         "schema": {
-                            "type": "array",
-                            "minItems": 3,
-                            "maxItems": 3,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "required": ["index", "name", "message", "button", "template_header", "variables"],
-                                "properties": {
-                                    "index": {"type": "integer", "minimum": 0, "maximum": 2},
-                                    "name": {"type": "string"},
-                                    "message": {"type": "string"},
-                                    "button": {
-                                        "type": "array",
-                                        "items": {"type": "string"},
-                                        "minItems": 0,
-                                        "maxItems": 2,
+                            "type": "object",
+                            "properties": {
+                                "variants": {
+                                    "type": "array",
+                                    "minItems": 3,
+                                    "maxItems": 3,
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": False,
+                                        "required": ["index", "name", "message", "button", "template_header", "variables"],
+                                        "properties": {
+                                            "index": {"type": "integer", "minimum": 0, "maximum": 2},
+                                            "name": {"type": "string"},
+                                            "message": {"type": "string"},
+                                            "button": {
+                                                "type": "array",
+                                                "items": {"type": "string"},
+                                                "minItems": 0,
+                                                "maxItems": 2,
+                                            },
+                                            "template_header": {"type": "string", "enum": ["Text"]},
+                                            "variables": {
+                                                "type": "array",
+                                                "items": {"type": "string"},
+                                                "minItems": 0,
+                                                "maxItems": 5,
+                                            },
+                                        },
                                     },
-                                    "template_header": {"type": "string", "enum": ["Text"]},
-                                    "variables": {
-                                        "type": "array",
-                                        "items": {"type": "string"},
-                                        "minItems": 0,
-                                        "maxItems": 5,
-                                    },
-                                },
+                                }
                             },
+                            "required": ["variants"],
+                            "additionalProperties": False,
                         },
                     },
                 },
