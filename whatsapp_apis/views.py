@@ -1738,9 +1738,9 @@ class GenerateAITemplateView(APIView):
                 'message': 'payload is missing'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        customers = db.find_documents('customers', {
-                'user_id': current_user_id,
-                'status': 1
+        customers = db.find_document('customers', {
+            'user_id': current_user_id,
+            'status': 1
         })
 
         if not customers:
@@ -1748,9 +1748,10 @@ class GenerateAITemplateView(APIView):
                 'message': 'No customers found'
             }, status=status.HTTP_404_NOT_FOUND)
 
-        if customers.get("credits") < 1:
+        if int(customers.get("credits", 0)) < 10:
             return JsonResponse({
-                'message': 'Insufficient credits'
+                'message': 'Insufficient credits',
+                'credits': int(customers.get("credits", 0))
             }, status=status.HTTP_400_BAD_REQUEST)
 
         system_prompt = (
@@ -1851,7 +1852,7 @@ class GenerateAITemplateView(APIView):
                 collection_name="customers",
                 query={"_id": ObjectId(current_user_id)},
                 update_data={
-                    "credits": int(customers.get("credits")) - 10
+                    "credits": int(customers.get("credits", 0)) - 10
                 }
             )
             return JsonResponse(response_data, safe=False, status=status.HTTP_200_OK)
