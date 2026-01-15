@@ -486,7 +486,7 @@ def send_message_data(
                 "message": original_text,
                 "user_id": user_id,
                 "image_url": image_url,
-                "price": 0.125 if category == "UTILITY" else 0.875,
+                "price": 0.145 if category == "UTILITY" else 1.09,
                 "id": response.json()['messages'][0]["id"],
                 "message_status": response.json()['messages'][0]["message_status"] if "message_status" in response.json()['messages'][0] else "sent",
                 "created_at": datetime.datetime.now(),
@@ -499,7 +499,7 @@ def send_message_data(
                 collection_name="users",
                 query={"_id": ObjectId(user_id)},
                 update_data={
-                    "default_credit": user_credit - 0.125 if category == "UTILITY" else user_credit - 0.875
+                    "default_credit": user_credit - 0.145 if category == "UTILITY" else user_credit - 1.09
                 }
             )
 

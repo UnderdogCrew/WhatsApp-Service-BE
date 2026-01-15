@@ -637,7 +637,7 @@ class FacebookWebhook(APIView):
                                     "number": from_number,
                                     "message": response_text,
                                     "user_id": str(user_info['_id']),
-                                    "price": price*0.875,
+                                    "price": price*1.09,
                                     "id": response.json()['messages'][0]["id"],
                                     "message_status": response.json()['messages'][0]["message_status"] if "message_status" in response.json()['messages'][0] else "sent",
                                     "created_at": datetime.datetime.now(),
@@ -1902,11 +1902,11 @@ class CustomerCredits(APIView):
             user_credits = user_info['default_credit']
             
             if template_type == 1:
-                credits = round(customer_count * 0.875, 2)
+                credits = round(customer_count * 1.09, 2)
             elif template_type == 2:
-                credits = round(customer_count * 0.125, 2)
+                credits = round(customer_count * 0.145, 2)
             elif template_type == 3:
-                credits = round(customer_count * 0.125, 2)
+                credits = round(customer_count * 0.145, 2)
             else:
                 return JsonResponse({"message": "Invalid template type"}, status=400)
             
