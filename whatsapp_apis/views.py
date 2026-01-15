@@ -16,6 +16,18 @@ from bson.objectid import ObjectId
 import pytz
 import csv
 import io
+import json
+from django.http import StreamingHttpResponse, JsonResponse
+from openai import OpenAI
+from UnderdogCrew.settings import OPEN_AI_KEY
+
+client = OpenAI(api_key=OPEN_AI_KEY)
+
+DELIM = "\n===VARIANT===\n"
+
+def sse_event(obj: dict) -> str:
+    # SSE requires each message as: data: <json>\n\n
+    return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
 
 
 
@@ -1673,3 +1685,178 @@ class ContactExportView(APIView):
             return JsonResponse({
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GenerateAITemplateView(APIView):
+    @swagger_auto_schema(
+        operation_description="Generate a WhatsApp template using AI",
+        manual_parameters=[
+            openapi.Parameter(
+                'Authorization',
+                openapi.IN_HEADER,
+                description="Bearer token",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'templateCategory': openapi.Schema(type=openapi.TYPE_STRING),
+                'templateLanguage': openapi.Schema(type=openapi.TYPE_STRING),
+                'optimizationChoice': openapi.Schema(type=openapi.TYPE_STRING),
+                'includeEmojis': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                'mood': openapi.Schema(type=openapi.TYPE_STRING),
+                'style': openapi.Schema(type=openapi.TYPE_STRING),
+                'prompt': openapi.Schema(type=openapi.TYPE_STRING),
+            },
+            required=['templateCategory', 'templateLanguage', 'optimizationChoice', 'includeEmojis', 'mood', 'style', 'prompt']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    @token_required
+    def post(self, request, current_user_id=None, current_user_email=None):
+        db = MongoDB()
+        try:
+            payload = request.data
+            print(f"payload: {payload}")
+        except Exception:
+            payload = {}
+
+        if len(payload) == 0:
+            return JsonResponse({
+                'message': 'payload is missing'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        customers = db.find_document('users', {
+            '_id': ObjectId(current_user_id),
+            "status" : "active"
+        })
+
+        if not customers:
+            return JsonResponse({
+                'message': 'No customers found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        if float(customers.get("default_credit", 0)) < 10:
+            return JsonResponse({
+                'message': 'Insufficient credits',
+                'credits': float(customers.get("default_credit", 0))
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        system_prompt = (
+            "You are a WhatsApp Business template generator.\n\n"
+            "Return EXACTLY 3 variants as VALID JSON (no markdown, no extra text).\n\n"
+            "Output format must be a JSON array of 3 objects. Each object MUST have:\n"
+            '- "index": 0, 1, 2\n'
+            '- "name": short template name string\n'
+            '- "message": generated WhatsApp message text\n'
+            '- "button": array of 0-2 CTA button labels (strings)\n'
+            '- "template_header": always the string "Text"\n\n'
+            '- "variables": array of 0-5 variables (strings)\n'
+            "Rules:\n"
+            "- Output ONLY JSON.\n"
+            "- Each variant must be different in hook and CTA.\n"
+            "- Use placeholders only when needed, max 5: {{1}}, {{2}}, {{3}}, {{4}}, {{5}}.\n"
+            "- If missing details (coupon, link, expiry, CTA label), use placeholders instead of guessing.\n"
+            "- MARKETING: keep message short (1–7 lines). Include a CTA line when appropriate.\n"
+            "- UTILITY: keep clear and concise (1–6 lines).\n"
+            "- If includeEmojis=true, use 1–4 relevant emojis; if false, use none.\n"
+            "- Do not use any variables in button text."
+        )
+
+        user_prompt = (
+            f"templateCategory: {payload.get('templateCategory','MARKETING')}\n"
+            f"templateLanguage: {payload.get('templateLanguage','English')}\n"
+            f"optimizationChoice: {payload.get('optimizationChoice','Click Rate')}\n"
+            f"includeEmojis: {payload.get('includeEmojis', True)}\n"
+            f"mood: {payload.get('mood','None')}\n"
+            f"style: {payload.get('style','None')}\n"
+            f"userPrompt: {payload.get('prompt','')}\n"
+        )
+        try:
+            resp = client.responses.create(
+                model="gpt-5-mini",
+                reasoning={"summary": "auto"},
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": "whatsapp_template_variants",
+                        "strict": False,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "variants": {
+                                    "type": "array",
+                                    "minItems": 3,
+                                    "maxItems": 3,
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": False,
+                                        "required": ["index", "name", "message", "button", "template_header", "variables"],
+                                        "properties": {
+                                            "index": {"type": "integer", "minimum": 0, "maximum": 2},
+                                            "name": {"type": "string"},
+                                            "message": {"type": "string"},
+                                            "button": {
+                                                "type": "array",
+                                                "items": {"type": "string"},
+                                                "minItems": 0,
+                                                "maxItems": 2,
+                                            },
+                                            "template_header": {"type": "string", "enum": ["Text"]},
+                                            "variables": {
+                                                "type": "array",
+                                                "items": {"type": "string"},
+                                                "minItems": 0,
+                                                "maxItems": 5,
+                                            },
+                                        },
+                                    },
+                                }
+                            },
+                            "required": ["variants"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                input=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+
+            # Prefer the convenience accessor when available.
+            full_text = ""
+            try:
+                full_text = resp.output_text or ""
+            except Exception:
+                full_text = ""
+
+            # Directly use the sample response from OpenAI as the normalized output
+            normalized = json.loads(full_text)
+            response_data = {
+                'status': 'success',
+                'message': 'WhatsApp template generated successfully',
+                'data': normalized
+            }
+            db.update_document(
+                collection_name="users",
+                query={"_id": ObjectId(current_user_id)},
+                update_data={
+                    "default_credit": float(customers.get("default_credit", 0)) - 10
+                }
+            )
+            return JsonResponse(response_data, safe=False, status=status.HTTP_200_OK)
+        except Exception as e:
+            return JsonResponse({"message": str(e)}, safe=False, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

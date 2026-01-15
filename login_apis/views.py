@@ -110,6 +110,18 @@ class SignupView(APIView):
             # Update user document with webhook_api_key
             db.update_document('users', {'_id': ObjectId(user_id)}, {'webhook_api_key': webhook_api_key})
             
+            # Create customer record for the user
+            customer_name = f"{validated_data['first_name']} {validated_data['last_name']}".strip()
+            customer_data = {
+                'number': validated_data['business_number'],
+                'name': customer_name,
+                'status': 1,
+                'user_id': user_id,
+                'source': 'signup',
+                'created_at': datetime.now()
+            }
+            db.create_document('customers', customer_data)
+            
             access_token, refresh_token = generate_tokens(user_id, validated_data['email'])
 
             # Check if WhatsApp business details exist
