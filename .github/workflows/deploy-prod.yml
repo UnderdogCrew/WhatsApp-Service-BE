@@ -19,7 +19,7 @@ jobs:
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.PROD_SSH_SECRET_KEY }}
 
       - name: Add known hosts
         run: |
