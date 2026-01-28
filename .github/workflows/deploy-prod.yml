@@ -26,16 +26,15 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.PROD_SERVER_IP }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to server
+      - name: Deploy to production server
         run: |
-          ssh ubuntu@${{ secrets.PROD_SERVER_IP }} '
-            export NEW_RELIC_ENVIRONMENT=${{ env.NEW_RELIC_ENVIRONMENT }}
-            sudo su - <<EOF
+          ssh ubuntu@${{ secrets.PROD_SERVER_IP }} "
+            export NEW_RELIC_ENVIRONMENT=${{ env.NEW_RELIC_ENVIRONMENT }};
             cd ${{ secrets.PROD_PROJECT_PATH }} &&
             source enve/bin/activate &&
             cd WhatsApp-Service-BE &&
-            git config --global --add safe.directory $PWD &&
+            git config --global --add safe.directory \$PWD &&
             git pull origin main &&
             pip install -r req.txt &&
-            pm2 restart whatsapp-service
-          '
+            sudo pm2 restart whatsapp-service
+          "
