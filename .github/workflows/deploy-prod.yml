@@ -32,7 +32,7 @@ jobs:
             export NEW_RELIC_ENVIRONMENT=${{ env.NEW_RELIC_ENVIRONMENT }}
             sudo su - <<EOF
             cd ${{ secrets.PROD_PROJECT_PATH }} &&
-            source .enve/bin/activate &&
+            source enve/bin/activate &&
             cd WhatsApp-Service-BE &&
             git config --global --add safe.directory $PWD &&
             git pull origin main &&
