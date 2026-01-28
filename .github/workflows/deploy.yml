@@ -30,12 +30,13 @@ jobs:
         run: |
           ssh ubuntu@${{ secrets.SERVER_IP }} '
             export NEW_RELIC_ENVIRONMENT=${{ env.NEW_RELIC_ENVIRONMENT }}
-            sudo su - <<EOF
-            cd ${{ secrets.PROJECT_PATH }} &&
-            source enve/bin/activate &&
-            cd WhatsApp-Service-BE &&
-            git config --global --add safe.directory $PWD &&
-            git pull origin develop &&
-            pip install -r req.txt &&
-            pm2 restart whatsapp-service
+            sudo su - -c "
+              cd ${{ secrets.PROJECT_PATH }} &&
+              source enve/bin/activate &&
+              cd WhatsApp-Service-BE &&
+              git config --global --add safe.directory $PWD &&
+              git pull origin develop &&
+              pip install -r req.txt &&
+              pm2 restart whatsapp-service
+            "
           '
