@@ -33,7 +33,7 @@ jobs:
             cd ${{ secrets.PROD_PROJECT_PATH }} &&
             source enve/bin/activate &&
             cd WhatsApp-Service-BE &&
-            git config --global --add safe.directory \$PWD &&
+            git config --global --add safe.directory $PWD &&
             git pull origin main &&
             pip install -r req.txt &&
             sudo pm2 restart whatsapp-service
