@@ -953,7 +953,7 @@ class CustomersChatLogs(APIView):
                     elif isinstance(timestamp, datetime) and timestamp.tzinfo is None:
                         timestamp = pytz.UTC.localize(timestamp)
                     # Convert to IST
-                    return timestamp #.astimezone(pytz.timezone('Asia/Kolkata'))
+                    return timestamp.astimezone(pytz.timezone('Asia/Kolkata'))
 
                 customer_chat_details.append(
                     {
