@@ -695,6 +695,7 @@ class FacebookWebhook(APIView):
                 )
         
                 if statuses[0]['status'] == "failed":
+                    print(f"creating the logs for the failed message and adding back the credit to the user account: {user_info['default_credit'] + user['price']}")
                     db.update_document(
                         'users',
                         {'_id': ObjectId(user_info['_id'])},
@@ -702,8 +703,6 @@ class FacebookWebhook(APIView):
                             'default_credit': user_info['default_credit'] + user['price']
                         }
                     )
-
-
             try:
                 messages = value['messages'][0]['text']['body']
                 from_number = value['messages'][0]['from']
