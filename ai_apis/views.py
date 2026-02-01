@@ -693,6 +693,16 @@ class FacebookWebhook(APIView):
                         "error_data": error_data,
                     }
                 )
+        
+                if statuses[0]['status'] == "failed":
+                    db.update_document(
+                        'users',
+                        {'_id': ObjectId(user_info['_id'])},
+                        {
+                            'default_credit': user_info['default_credit'] + user['price']
+                        }
+                    )
+
 
             try:
                 messages = value['messages'][0]['text']['body']
