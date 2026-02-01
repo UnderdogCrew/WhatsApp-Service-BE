@@ -364,7 +364,7 @@ class FacebookWebhook(APIView):
         try:
             db = MongoDB()
             data = request.data
-            print(f"data: {data}")
+            logging.info(f"data: {data}")
             entry = data['entry']
             changes = entry[0]['changes']
             guid = entry[0]['id']
@@ -695,7 +695,7 @@ class FacebookWebhook(APIView):
                 )
         
                 if statuses[0]['status'] == "failed":
-                    print(f"creating the logs for the failed message and adding back the credit to the user account: {user_info['default_credit'] + user['price']}")
+                    logging.info(f"creating the logs for the failed message and adding back the credit to the user account: {user_info['default_credit'] + user['price']}")
                     db.update_document(
                         'users',
                         {'_id': ObjectId(user_info['_id'])},
