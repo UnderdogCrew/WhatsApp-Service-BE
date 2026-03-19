@@ -499,7 +499,7 @@ def send_message_data(
                 collection_name="users",
                 query={"_id": ObjectId(user_id)},
                 update_data={
-                    "default_credit": user_credit - 0.145 if category == "UTILITY" else user_credit - 1.09
+                    "default_credit": round(user_credit - 0.145, 2) if category == "UTILITY" else round(user_credit - 1.09, 2)
                 }
             )
 
