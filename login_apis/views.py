@@ -1088,7 +1088,7 @@ class ProfileView(APIView):
                 'business_number': user.get('business_number', ''),
                 'business_id': user.get('business_id', ''),
                 'is_email_verified': user.get('is_email_verified', False),
-                'default_credit': user.get('default_credit', 0),
+                'default_credit': round(user.get('default_credit', 0), 2),
                 'account_id': user.get('account_id', ''),
                 'phone_number_id': user.get('phone_number_id', ''),
                 'waba_id': user.get('waba_id', ''),
