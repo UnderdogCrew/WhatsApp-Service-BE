@@ -45,7 +45,7 @@ def token_required(f):
 
         try:
             data = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-            print(f"data: {data}")
+            print(f"data: {data['type']}")
             if data.get('type') != 'access' or data.get('type') != 'webhook_api_key':
                 raise jwt.InvalidTokenError('Invalid token type')
             current_user_id = data['user_id']
