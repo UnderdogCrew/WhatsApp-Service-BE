@@ -132,9 +132,9 @@ def generate_medical_news_report(
     model: str = DEFAULT_MODEL,
     output_file: str = "medical_news_report.md",
 ) -> str:
-    if not os.getenv("OPENAI_API_KEY"):
+    if not os.getenv("OPEN_AI_KEY"):
         raise RuntimeError(
-            "OPENAI_API_KEY is missing. Add it to your .env file or export it in your terminal."
+            "OPEN_AI_KEY is missing. Add it to your .env file or export it in your terminal."
         )
 
     client = OpenAI()
