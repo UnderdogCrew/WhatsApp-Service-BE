@@ -51,79 +51,73 @@ def build_user_prompt(days: int) -> str:
     start_date = today - timedelta(days=days)
 
     return f"""
-Find and summarize the most important recent developments in the medical field worldwide.
+Generate a WhatsApp-ready medical news update.
 
 Date window:
-- Prioritize: {start_date.isoformat()} to {today.isoformat()}
-- You may include slightly older items only if they are highly clinically important.
+{start_date.isoformat()} to {today.isoformat()}
 
-Special emphasis:
-Dermatology / skin.
+Output only the news content. No intro, no explanation, no disclaimer, no extra text.
 
-Organize the findings into these sections:
+Use this exact structure:
 
-1. Top Global Medical News
-   - Major breakthroughs
-   - Public health updates
-   - Regulatory approvals/safety updates
-   - Important developments across all specialties
+*Top Global Medical News*
 
-2. Dermatology / Skin Focus
+1. *[Headline] – [Date]*
+Summary: [2 short sentences]
+Why it matters: [1 sentence]
+Status: [Approved / Peer-reviewed / Trial-stage / Preliminary / Preclinical / Company-reported]
+Source: [Source name] - [URL]
 
-   A. Research & studies
-      - Eczema / atopic dermatitis
-      - Psoriasis
-      - Acne
-      - Melanoma and other skin cancers
-      - Autoimmune skin diseases
-      - Rosacea, vitiligo, hidradenitis suppurativa, alopecia, urticaria, etc.
+2. *[Headline] – [Date]*
+Summary: [2 short sentences]
+Why it matters: [1 sentence]
+Status: [Approved / Peer-reviewed / Trial-stage / Preliminary / Preclinical / Company-reported]
+Source: [Source name] - [URL]
 
-   B. New treatments & medicines
-      - Recently approved drugs
-      - Trial-stage drugs
-      - Biologics
-      - JAK inhibitors
-      - Topical therapies
-      - Sunscreen / photoprotection updates
+*Dermatology / Skin Focus*
 
-   C. Technology & procedures
-      - AI skin-cancer detection
-      - Imaging
-      - Diagnostic tools
-      - Devices
-      - Lasers/procedures
-      - Digital health
+*Research & Studies*
 
-   D. Clinical & practice updates
-      - Guidelines
-      - Recommendations
-      - Safety warnings
-      - Changes in standard of care
+1. *[Headline] – [Date]*
+Summary: [2 short sentences]
+Why it matters: [1 sentence]
+Status: [Peer-reviewed / Preliminary / Not yet peer-reviewed]
+Source: [Source name] - [URL]
 
-For each item, use this exact format:
+*New Treatments & Medicines*
 
-### [One-line headline] — [Date]
+1. *[Headline] – [Date]*
+Summary: [2 short sentences]
+Why it matters: [1 sentence]
+Status: [Approved / Trial-stage / Preclinical / Company-reported]
+Source: [Source name] - [URL]
 
-**Summary:** 2–3 sentence plain-language summary.
+*Technology & Procedures*
 
-**Why it matters clinically:** Explain the real-world clinical importance.
+1. *[Headline] – [Date]*
+Summary: [2 short sentences]
+Why it matters: [1 sentence]
+Status: [Peer-reviewed / Trial-stage / Preliminary / Preclinical]
+Source: [Source name] - [URL]
 
-**Status / evidence level:** Say whether it is peer-reviewed, regulatory-approved, trial-stage,
-preclinical, company-reported, preliminary, or not yet peer-reviewed.
+*Clinical & Practice Updates*
 
-**Source:** Source name + link.
+1. *[Headline] – [Date]*
+Summary: [2 short sentences]
+Why it matters: [1 sentence]
+Status: [Guideline / Regulatory update / Practice update]
+Source: [Source name] - [URL]
 
-End with:
-
-## What to watch next
-
-Give a short bullet list of emerging topics to monitor.
-
-Important:
-- Prefer credible and primary sources.
-- Include source dates.
-- Cite URLs directly in markdown links.
-- If there are fewer strong dermatology updates in the last {days} days, say that clearly instead of filling with weak news.
+Rules:
+- Prioritize the last {days} days.
+- Include only important and credible medical news.
+- Dermatology/skin should have the strongest focus.
+- Do not include "What to watch next".
+- Do not include greetings.
+- Do not include thank you.
+- Do not include medical advice disclaimer.
+- Do not include markdown headings using ### or ##.
+- Use WhatsApp formatting with *bold* text only.
 """
 
 
