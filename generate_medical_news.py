@@ -137,7 +137,7 @@ def generate_medical_news_report(
             "OPEN_AI_KEY is missing. Add it to your .env file or export it in your terminal."
         )
 
-    client = OpenAI()
+    client = OpenAI(api_key=os.getenv("OPEN_AI_KEY"))
 
     response = client.responses.create(
         model=model,
