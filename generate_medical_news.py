@@ -17,7 +17,7 @@ sys.path.append(base_path)  # Adjust this path accordingly
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'UnderdogCrew.settings')
 django.setup()
 
-load_dotenv(path=base_path+"/env")
+load_dotenv()
 
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.5")
 
