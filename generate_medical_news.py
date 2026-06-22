@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import sys
 import django
+import requests
 
 current_path = os.path.abspath(os.getcwd())
 base_path = os.path.dirname(current_path)  # This will give you /opt/whatsapp_service/WhatsApp-Service-BE
@@ -25,24 +26,27 @@ DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.5")
 SYSTEM_PROMPT = """
 You are a medical news researcher.
 
-Your job is to find and summarize the most important recent developments
-in the medical field worldwide, with a special emphasis on dermatology/skin.
+Generate ONLY the medical news content.
+
+Important output rules:
+- Do not write any intro like "Here is the report".
+- Do not write any explanation about how you searched.
+- Do not write any disclaimer.
+- Do not write closing text like "Hope this helps".
+- Do not include code, notes, or instructions.
+- Output only the final news message.
+- Keep the content ready to send directly on WhatsApp Business.
+- Use short, clean, plain-language formatting.
+- Include dates and sources.
+- Flag preliminary, preclinical, trial-stage, company-reported, or not-yet-peer-reviewed items clearly.
 
 Use current, credible sources only:
-- Peer-reviewed journals: NEJM, JAMA, The Lancet, BMJ, Nature Medicine, JAAD, JAMA Dermatology, British Journal of Dermatology, etc.
-- Major medical institutions: WHO, CDC, NIH, NHS, Mayo Clinic, Cleveland Clinic, major universities/hospitals.
-- Regulatory bodies: FDA, EMA, MHRA, Health Canada, TGA, etc.
-- Reputable medical news outlets: MedPage Today, STAT, Reuters Health, Dermatology Times, Healio, etc.
+- Peer-reviewed journals
+- WHO, CDC, NIH, FDA, EMA, MHRA, Health Canada, TGA
+- Major hospitals and medical institutions
+- Reputable medical news outlets
 
-Rules:
-- Prioritize news from the last 30 days.
-- Clearly note the date of each item.
-- Flag anything preliminary, trial-stage, preclinical, company-reported, or not yet peer-reviewed.
-- Avoid hype. Be clinically practical.
-- Do not present trial-stage drugs as approved.
-- Include source links.
-- Use plain language suitable for clinicians, health writers, and non-specialist readers.
-- Do not give personal medical advice.
+Focus especially on dermatology and skin health.
 """
 
 
@@ -121,17 +125,22 @@ Rules:
 """
 
 
+def get_report_period_label(days: int) -> str:
+    today = datetime.now(timezone.utc).date()
+
+    # Example: Last 30 Days – June 2026
+    return f"Last {days} Days – {month_name[today.month]} {today.year}"
+
+
 def generate_medical_news_report(
-    days: int = 7,
+    days: int = 30,
     model: str = DEFAULT_MODEL,
     output_file: str = "medical_news_report.md",
 ) -> str:
-    if not os.getenv("OPEN_AI_KEY"):
-        raise RuntimeError(
-            "OPEN_AI_KEY is missing. Add it to your .env file or export it in your terminal."
-        )
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY is missing.")
 
-    client = OpenAI(api_key=os.getenv("OPEN_AI_KEY"))
+    client = OpenAI()
 
     response = client.responses.create(
         model=model,
@@ -153,39 +162,83 @@ def generate_medical_news_report(
         ],
     )
 
-    report = response.output_text
+    report = response.output_text.strip()
 
-    output_path = Path(output_file)
-    output_path.write_text(report, encoding="utf-8")
+    Path(output_file).write_text(report, encoding="utf-8")
 
     return report
 
 
+def send_wapnexus_message(
+    generated_report: str,
+    days: int = 30,
+    numbers: list[str] | None = None,
+) -> dict:
+    token = os.getenv("WAPNEXUS_TOKEN")
+    if not token:
+        raise RuntimeError("WAPNEXUS_TOKEN is missing.")
+
+    template_name = os.getenv("WAPNEXUS_TEMPLATE_NAME", "medical_news_full_report")
+
+    if numbers is None:
+        numbers_env = os.getenv("WAPNEXUS_NUMBERS", "")
+        numbers = [num.strip() for num in numbers_env.split(",") if num.strip()]
+
+    if not numbers:
+        raise RuntimeError("No WhatsApp numbers found. Add WAPNEXUS_NUMBERS in .env")
+
+    report_period = get_report_period_label(days)
+
+    url = "https://api.wapnexus.com/send/message"
+
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "authorization": f"Bearer {token}",
+        "content-type": "application/json",
+        "origin": "https://app.wapnexus.com",
+        "referer": "https://app.wapnexus.com/",
+    }
+
+    payload = {
+        "text": "",
+        "template_name": template_name,
+        "message_type": 2,
+        "is_select_all": False,
+        "numbers": numbers,
+        "metadata": {
+            "1": report_period,
+            "2": generated_report,
+        },
+        "paramsFallbackValue": {
+            "1": report_period,
+            "2": "N/A",
+        },
+    }
+
+    response = requests.post(url, headers=headers, json=payload, timeout=60)
+
+    try:
+        response_data = response.json()
+    except ValueError:
+        response_data = {"raw_response": response.text}
+
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"WapNexus API failed. Status: {response.status_code}, Response: {response_data}"
+        )
+
+    return response_data
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate recent global medical news report with dermatology focus."
+        description="Generate medical news report and send it on WhatsApp Business."
     )
 
-    parser.add_argument(
-        "--days",
-        type=int,
-        default=30,
-        help="Number of recent days to prioritize. Default: 30",
-    )
-
-    parser.add_argument(
-        "--model",
-        type=str,
-        default=DEFAULT_MODEL,
-        help=f"OpenAI model to use. Default: {DEFAULT_MODEL}",
-    )
-
-    parser.add_argument(
-        "--output",
-        type=str,
-        default="medical_news_report.md",
-        help="Output markdown file name. Default: medical_news_report.md",
-    )
+    parser.add_argument("--days", type=int, default=30)
+    parser.add_argument("--model", type=str, default=DEFAULT_MODEL)
+    parser.add_argument("--output", type=str, default="medical_news_report.md")
+    parser.add_argument("--send", action="store_true", help="Send report to WhatsApp after generation.")
 
     args = parser.parse_args()
 
@@ -196,7 +249,17 @@ def main():
     )
 
     print(report)
-    print(f"\n\nSaved report to: {args.output}")
+    print(f"\nSaved report to: {args.output}")
+
+    if args.send:
+        result = send_wapnexus_message(
+            generated_report=report,
+            days=args.days,
+            numbers=["+916353426351", "+917405444368"]
+        )
+
+        print("\nWhatsApp message sent successfully.")
+        print(result)
 
 
 if __name__ == "__main__":

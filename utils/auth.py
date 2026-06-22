@@ -45,6 +45,7 @@ def token_required(f):
 
         try:
             data = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            print(f"data: {data}")
             if data.get('type') != 'access':
                 raise jwt.InvalidTokenError('Invalid token type')
             current_user_id = data['user_id']
