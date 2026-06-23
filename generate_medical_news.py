@@ -28,6 +28,13 @@ You are a medical news researcher.
 
 Generate ONLY the medical news content.
 
+Meta WhatsApp Business template rules (mandatory):
+- Output must be ONE single continuous line of text.
+- Do NOT use newline characters (\\n), carriage returns (\\r), or tab characters (\\t).
+- Do NOT use more than 4 consecutive spaces anywhere.
+- Use " | " to separate major sections and news items.
+- Use " · " to separate fields within one news item (Summary, Why it matters, Status, Source).
+
 Important output rules:
 - Do not write any intro like "Here is the report".
 - Do not write any explanation about how you searched.
@@ -35,7 +42,7 @@ Important output rules:
 - Do not write closing text like "Hope this helps".
 - Do not include code, notes, or instructions.
 - Output only the final news message.
-- Keep the content ready to send directly on WhatsApp Business.
+- Keep the content ready to send directly as a Meta Business template body parameter.
 - Use short, clean, plain-language formatting.
 - Include dates and sources.
 - Flag preliminary, preclinical, trial-stage, company-reported, or not-yet-peer-reviewed items clearly.
@@ -55,62 +62,22 @@ def build_user_prompt(days: int) -> str:
     start_date = today - timedelta(days=days)
 
     return f"""
-Generate a WhatsApp-ready medical news update.
+Generate a WhatsApp-ready medical news update for a Meta Business template body parameter.
 
-Date window:
-{start_date.isoformat()} to {today.isoformat()}
+Date window: {start_date.isoformat()} to {today.isoformat()}
 
 Output only the news content. No intro, no explanation, no disclaimer, no extra text.
 
-Use this exact structure:
+Meta template formatting (mandatory):
+- Return ONE single line only. No line breaks. No tabs.
+- Never use more than 4 consecutive spaces.
+- Separate sections and items with " | ".
+- Separate fields inside an item with " · ".
+- Use WhatsApp formatting with *bold* text only. No ### or ## headings.
 
-*Top Global Medical News*
+Use this exact single-line structure (all on one line, no breaks):
 
-1. *[Headline] – [Date]*
-Summary: [2 short sentences]
-Why it matters: [1 sentence]
-Status: [Approved / Peer-reviewed / Trial-stage / Preliminary / Preclinical / Company-reported]
-Source: [Source name] - [URL]
-
-2. *[Headline] – [Date]*
-Summary: [2 short sentences]
-Why it matters: [1 sentence]
-Status: [Approved / Peer-reviewed / Trial-stage / Preliminary / Preclinical / Company-reported]
-Source: [Source name] - [URL]
-
-*Dermatology / Skin Focus*
-
-*Research & Studies*
-
-1. *[Headline] – [Date]*
-Summary: [2 short sentences]
-Why it matters: [1 sentence]
-Status: [Peer-reviewed / Preliminary / Not yet peer-reviewed]
-Source: [Source name] - [URL]
-
-*New Treatments & Medicines*
-
-1. *[Headline] – [Date]*
-Summary: [2 short sentences]
-Why it matters: [1 sentence]
-Status: [Approved / Trial-stage / Preclinical / Company-reported]
-Source: [Source name] - [URL]
-
-*Technology & Procedures*
-
-1. *[Headline] – [Date]*
-Summary: [2 short sentences]
-Why it matters: [1 sentence]
-Status: [Peer-reviewed / Trial-stage / Preliminary / Preclinical]
-Source: [Source name] - [URL]
-
-*Clinical & Practice Updates*
-
-1. *[Headline] – [Date]*
-Summary: [2 short sentences]
-Why it matters: [1 sentence]
-Status: [Guideline / Regulatory update / Practice update]
-Source: [Source name] - [URL]
+*Top Global Medical News* | 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Approved / Peer-reviewed / Trial-stage / Preliminary / Preclinical / Company-reported] · Source: [Source name] - [URL] | 2. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Approved / Peer-reviewed / Trial-stage / Preliminary / Preclinical / Company-reported] · Source: [Source name] - [URL] | *Dermatology / Skin Focus* | *Research & Studies* | 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Peer-reviewed / Preliminary / Not yet peer-reviewed] · Source: [Source name] - [URL] | *New Treatments & Medicines* | 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Approved / Trial-stage / Preclinical / Company-reported] · Source: [Source name] - [URL] | *Technology & Procedures* | 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Peer-reviewed / Trial-stage / Preliminary / Preclinical] · Source: [Source name] - [URL] | *Clinical & Practice Updates* | 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Guideline / Regulatory update / Practice update] · Source: [Source name] - [URL]
 
 Rules:
 - Prioritize the last {days} days.
@@ -120,8 +87,7 @@ Rules:
 - Do not include greetings.
 - Do not include thank you.
 - Do not include medical advice disclaimer.
-- Do not include markdown headings using ### or ##.
-- Use WhatsApp formatting with *bold* text only.
+- Before finishing, verify the full output is one line with no \\n, \\r, or \\t characters and no run of 5+ spaces.
 """
 
 
