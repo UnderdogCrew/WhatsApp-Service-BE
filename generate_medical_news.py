@@ -251,15 +251,14 @@ def main():
     print(report)
     print(f"\nSaved report to: {args.output}")
 
-    if args.send:
-        result = send_wapnexus_message(
-            generated_report=report,
-            days=args.days,
-            numbers=["+916353426351", "+917405444368"]
-        )
+    # if args.send:
+    send_wapnexus_message(
+        generated_report=report,
+        days=args.days,
+        numbers=["+916353426351", "+917405444368"]
+    )
 
-        print("\nWhatsApp message sent successfully.")
-        print(result)
+    print("\nWhatsApp message sent successfully.")
 
 
 if __name__ == "__main__":
