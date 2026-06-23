@@ -1,4 +1,5 @@
 import os
+import re
 import argparse
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
@@ -29,10 +30,11 @@ You are a medical news researcher.
 Generate ONLY the medical news content.
 
 Meta WhatsApp Business template rules (mandatory):
-- Output must be ONE single continuous line of text.
-- Do NOT use newline characters (\\n), carriage returns (\\r), or tab characters (\\t).
+- Do NOT press Enter or use real newline, carriage-return, or tab characters in the output.
+- Use the literal two-character sequence \\n (backslash + n) wherever a line break is needed.
+- WhatsApp will render \\n as a visible line break in the message.
 - Do NOT use more than 4 consecutive spaces anywhere.
-- Use " | " to separate major sections and news items.
+- Put \\n before every section header, subsection header, and each numbered news item.
 - Use " · " to separate fields within one news item (Summary, Why it matters, Status, Source).
 
 Important output rules:
@@ -69,15 +71,29 @@ Date window: {start_date.isoformat()} to {today.isoformat()}
 Output only the news content. No intro, no explanation, no disclaimer, no extra text.
 
 Meta template formatting (mandatory):
-- Return ONE single line only. No line breaks. No tabs.
+- Do NOT use real line breaks or tabs in the output.
+- Use the literal two-character sequence \\n (backslash + n) between sections and items.
 - Never use more than 4 consecutive spaces.
-- Separate sections and items with " | ".
-- Separate fields inside an item with " · ".
+- Use " · " between fields inside one news item.
 - Use WhatsApp formatting with *bold* text only. No ### or ## headings.
 
-Use this exact single-line structure (all on one line, no breaks):
+Use this structure. Join every line below with \\n (no real line breaks in output):
 
-*Top Global Medical News* | 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Approved / Peer-reviewed / Trial-stage / Preliminary / Preclinical / Company-reported] · Source: [Source name] - [URL] | 2. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Approved / Peer-reviewed / Trial-stage / Preliminary / Preclinical / Company-reported] · Source: [Source name] - [URL] | *Dermatology / Skin Focus* | *Research & Studies* | 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Peer-reviewed / Preliminary / Not yet peer-reviewed] · Source: [Source name] - [URL] | *New Treatments & Medicines* | 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Approved / Trial-stage / Preclinical / Company-reported] · Source: [Source name] - [URL] | *Technology & Procedures* | 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Peer-reviewed / Trial-stage / Preliminary / Preclinical] · Source: [Source name] - [URL] | *Clinical & Practice Updates* | 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Guideline / Regulatory update / Practice update] · Source: [Source name] - [URL]
+Line 1: *Top Global Medical News*
+Line 2: 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Approved / Peer-reviewed / Trial-stage / Preliminary / Preclinical / Company-reported] · Source: [Source name] - [URL]
+Line 3: 2. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Approved / Peer-reviewed / Trial-stage / Preliminary / Preclinical / Company-reported] · Source: [Source name] - [URL]
+Line 4: *Dermatology / Skin Focus*
+Line 5: *Research & Studies*
+Line 6: 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Peer-reviewed / Preliminary / Not yet peer-reviewed] · Source: [Source name] - [URL]
+Line 7: *New Treatments & Medicines*
+Line 8: 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Approved / Trial-stage / Preclinical / Company-reported] · Source: [Source name] - [URL]
+Line 9: *Technology & Procedures*
+Line 10: 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Peer-reviewed / Trial-stage / Preliminary / Preclinical] · Source: [Source name] - [URL]
+Line 11: *Clinical & Practice Updates*
+Line 12: 1. *[Headline] – [Date]* · Summary: [2 short sentences] · Why it matters: [1 sentence] · Status: [Guideline / Regulatory update / Practice update] · Source: [Source name] - [URL]
+
+Example start of output:
+*Top Global Medical News*\\n1. *[Headline] – [Date]* · Summary: ... · Why it matters: ... · Status: ... · Source: ...\\n2. *[Headline] – [Date]* · ...
 
 Rules:
 - Prioritize the last {days} days.
@@ -87,7 +103,7 @@ Rules:
 - Do not include greetings.
 - Do not include thank you.
 - Do not include medical advice disclaimer.
-- Before finishing, verify the full output is one line with no \\n, \\r, or \\t characters and no run of 5+ spaces.
+- Before finishing, verify the output uses \\n for breaks (not real newlines/tabs) and has no run of 5+ spaces.
 """
 
 
@@ -96,6 +112,15 @@ def get_report_period_label(days: int) -> str:
 
     # Example: Last 30 Days – June 2026
     return f"Last {days} Days – {today.strftime('%B')} {today.year}"
+
+
+def sanitize_for_meta_template_param(text: str) -> str:
+    """Make generated text safe for Meta WhatsApp template body parameters."""
+    text = text.replace("\t", " ")
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("\n", "\\n")
+    text = re.sub(r" {5,}", "    ", text)
+    return text.strip()
 
 
 def generate_medical_news_report(
@@ -128,7 +153,7 @@ def generate_medical_news_report(
         ],
     )
 
-    report = response.output_text.strip()
+    report = sanitize_for_meta_template_param(response.output_text.strip())
 
     Path(output_file).write_text(report, encoding="utf-8")
 
