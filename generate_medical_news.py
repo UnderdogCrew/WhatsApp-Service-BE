@@ -129,7 +129,7 @@ def get_report_period_label(days: int) -> str:
     today = datetime.now(timezone.utc).date()
 
     # Example: Last 30 Days – June 2026
-    return f"Last {days} Days – {month_name[today.month]} {today.year}"
+    return f"Last {days} Days – {today.strftime('%B')} {today.year}"
 
 
 def generate_medical_news_report(
