@@ -34,6 +34,7 @@ whatsapp_status = {
     "1": "delivered",
     "2": "read",
     "3": "received",
+    "4":"failed",
 }
 
 '''
