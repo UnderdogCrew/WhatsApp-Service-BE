@@ -1294,6 +1294,14 @@ class UserMessageLogs(APIView):
                 description="limit the data",
                 type=openapi.TYPE_INTEGER,
                 required=False,
+            ),
+            openapi.Parameter(
+                "status",
+                openapi.IN_QUERY,
+                description="status of the message",
+                type=openapi.TYPE_STRING,
+                required=False,
+                enum=list(whatsapp_status.keys())
             )
         ],
         responses={
@@ -1330,7 +1338,7 @@ class UserMessageLogs(APIView):
             # Parse optional query parameters
             start_date = request.query_params.get("start_date", None)
             end_date = request.query_params.get("end_date", None)
-            whatsapp_status_text = request.query_params.get("status", None)
+            status_param = request.query_params.get("status", None)
             skip = int(request.query_params.get("skip", 0))
             limit = int(request.query_params.get("limit", 20))
 
@@ -1377,30 +1385,91 @@ class UserMessageLogs(APIView):
             db = MongoDB()
 
             # Build query filter based on dates
+            base_filter = {"user_id": user_id}
             query_filter = {"user_id": user_id}
-            text_filter = {"user_id": user_id}
             if start_date:
+                base_filter["created_at"] = {"$gte": start_date}
                 query_filter["created_at"] = {"$gte": start_date}
-                text_filter["created_at"] = {"$gte": start_date}
             if end_date:
-                if "created_at" in query_filter:
+                if "created_at" in base_filter:
+                    base_filter["created_at"]["$lte"] = end_date
                     query_filter["created_at"]["$lte"] = end_date
-                    text_filter["created_at"]["$lte"] = end_date
                 else:
+                    base_filter["created_at"] = {"$lte": end_date}
                     query_filter["created_at"] = {"$lte": end_date}
-                    text_filter["created_at"] = {"$lte": end_date}
-            if whatsapp_status_text:
-                if whatsapp_status_text in whatsapp_status:
-                    query_filter['message_status'] = whatsapp_status[whatsapp_status_text]
-                    text_filter['message_status'] = whatsapp_status[whatsapp_status_text]
-            
-            print(f"text filter: {text_filter}")
+            if status_param:
+                if status_param in whatsapp_status:
+                    query_filter['message_status'] = whatsapp_status[status_param]
+
+            counts_pipeline = [
+                {"$match": base_filter},
+                {
+                    "$group": {
+                        "_id": None,
+                        "total_logs": {"$sum": 1},
+                        "delivered": {
+                            "$sum": {
+                                "$cond": [
+                                    {"$in": ["$message_status", ["delivered", "read"]]},
+                                    1,
+                                    0,
+                                ]
+                            }
+                        },
+                        "read": {
+                            "$sum": {
+                                "$cond": [
+                                    {"$eq": ["$message_status", "read"]},
+                                    1,
+                                    0,
+                                ]
+                            }
+                        },
+                        "failed": {
+                            "$sum": {
+                                "$cond": [
+                                    {"$in": ["$message_status", ["failed", "error"]]},
+                                    1,
+                                    0,
+                                ]
+                            }
+                        },
+                        "pending": {
+                            "$sum": {
+                                "$cond": [
+                                    {
+                                        "$not": {
+                                            "$in": [
+                                                "$message_status",
+                                                ["delivered", "read", "failed", "error"],
+                                            ]
+                                        }
+                                    },
+                                    1,
+                                    0,
+                                ]
+                            }
+                        },
+                    }
+                },
+            ]
+            counts_result = db.aggregate("whatsapp_message_logs", counts_pipeline)
+            status_counts = counts_result[0] if counts_result else {}
+            message_counts = {
+                "total_logs": status_counts.get("total_logs", 0),
+                "delivered": status_counts.get("delivered", 0),
+                "read": status_counts.get("read", 0),
+                "failed": status_counts.get("failed", 0),
+                "pending": status_counts.get("pending", 0),
+            }
+
+            print(f"query filter: {query_filter}")
             # Fetch data from database
             sort_order = [("_id", -1)]  # Sorting in descending order
             skip_count = skip
             limit_count = limit
             total_message = db.find_documents("whatsapp_message_logs", query_filter, sort=sort_order, skip=skip_count, limit=limit_count)
-            total_message_count = len(db.find_documents("whatsapp_message_logs", query_filter))
+            total_message_count = db.find_documents_count("whatsapp_message_logs", query_filter)
 
             message_list = []
             for _message in total_message:
@@ -1487,13 +1556,15 @@ class UserMessageLogs(APIView):
             if len(message_list) > 0:
                 response_data = {
                     "data": message_list,
-                    "count": total_message_count
+                    "count": total_message_count,
+                    "counts": message_counts,
                 }
                 return JsonResponse(response_data, status=status.HTTP_200_OK)
             else:
                 response_data = {
                     "data": [],
-                    "count": 0
+                    "count": 0,
+                    "counts": message_counts,
                 }
                 return JsonResponse(response_data, status=status.HTTP_404_NOT_FOUND)
 
