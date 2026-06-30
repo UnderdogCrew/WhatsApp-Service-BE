@@ -1436,6 +1436,15 @@ class UserMessageLogs(APIView):
                                 ]
                             }
                         },
+                        "received": {
+                            "$sum": {
+                                "$cond": [
+                                    {"$eq": ["$message_status", "received"]},
+                                    1,
+                                    0,
+                                ]
+                            }
+                        },
                         "pending": {
                             "$sum": {
                                 "$cond": [
@@ -1443,7 +1452,7 @@ class UserMessageLogs(APIView):
                                         "$not": {
                                             "$in": [
                                                 "$message_status",
-                                                ["delivered", "read", "failed", "error"],
+                                                ["delivered", "read", "failed", "error", "received"],
                                             ]
                                         }
                                     },
@@ -1462,6 +1471,7 @@ class UserMessageLogs(APIView):
                 "delivered": status_counts.get("delivered", 0),
                 "read": status_counts.get("read", 0),
                 "failed": status_counts.get("failed", 0),
+                "received": status_counts.get("received", 0),
                 "pending": status_counts.get("pending", 0),
             }
 
