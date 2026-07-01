@@ -1365,7 +1365,7 @@ class CustomerAPIView(APIView):
             for customer in customers:
                 customer['number'] = str(customer['number'])
                 customer['id'] = str(customer['_id'])
-                customer['updated_at'] = customer['updated_at'].strftime("%Y-%m-%d %H:%M:%S") if "updated_at" in customer and customer['updated_at'] is not None else None
+                customer['updated_at'] = customer['updated_at'] if "updated_at" in customer and customer['updated_at'] is not None else customer['created_at']
                 del customer['_id']
 
             return JsonResponse({
