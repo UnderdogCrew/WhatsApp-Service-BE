@@ -72,6 +72,16 @@ def decode_token(token):
         return {'message': str(e)}
 
 
+def generate_password_reset_token(user_id, user_email):
+    token = jwt.encode({
+        'user_id': str(user_id),
+        'user_email': user_email,
+        'exp': datetime.utcnow() + timedelta(hours=1),
+        'type': 'password_reset'
+    }, settings.SECRET_KEY, algorithm='HS256')
+    return token
+
+
 def generate_webhook_api_key(user_id, user_email):
     """
     Generate a JWT token for webhook API key without expiry.

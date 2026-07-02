@@ -68,6 +68,12 @@ redis_client = redis.Redis(
 # New configuration variable
 SEND_LIVE_OTP = os.getenv('SEND_LIVE_OTP', 'false').lower() == 'true'
 
+# SendGrid email settings
+SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
+SENDGRID_FROM_EMAIL = os.getenv('SENDGRID_FROM_EMAIL', 'hello@theunderdogcrew.com')
+SENDGRID_FROM_NAME = os.getenv('SENDGRID_FROM_NAME', 'WapNexus')
+PASSWORD_RESET_URL = os.getenv('PASSWORD_RESET_URL', 'https://app.wapnexus.com/user/reset-password')
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 

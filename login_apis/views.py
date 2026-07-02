@@ -6,15 +6,16 @@ from drf_yasg import openapi
 from bson import ObjectId
 from drf_yasg.utils import swagger_auto_schema
 from utils.database import MongoDB
-from utils.auth import generate_tokens, token_required, decode_token, current_dollar_price, generate_webhook_api_key
-from .serializers import SignupSerializer, LoginSerializer, FileUploadSerializer, FileUploadResponseSerializer, BusinessDetailsSerializer, CustomerSerializer, CustomerUpdateSerializer
+from utils.auth import generate_tokens, token_required, decode_token, current_dollar_price, generate_webhook_api_key, generate_password_reset_token
+from .serializers import SignupSerializer, LoginSerializer, FileUploadSerializer, FileUploadResponseSerializer, BusinessDetailsSerializer, CustomerSerializer, CustomerUpdateSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
 from utils.s3_helper import S3Helper
 from .utils import get_file_extension, validate_file
 from rest_framework.parsers import MultiPartParser, FormParser
 from utils.twilio_otp import generate_otp, send_otp
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import twilio
-from UnderdogCrew.settings import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, SECRET_KEY, WEBHOOK_URL, WEBHOOK_VERIFY_TOKEN
+from UnderdogCrew.settings import SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, SECRET_KEY, WEBHOOK_URL, WEBHOOK_VERIFY_TOKEN, PASSWORD_RESET_URL
+from utils.sendgrid_email import send_password_reset_email
 import re
 import jwt
 import random
@@ -1683,4 +1684,159 @@ class RegenerateAPIKeyView(APIView):
             return JsonResponse({
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
+
+class ForgotPasswordView(APIView):
+    @swagger_auto_schema(
+        operation_description="Send password reset link to user's email",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='User email'),
+            },
+            required=['email']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            400: 'Bad Request',
+            404: 'Not Found',
+            500: 'Internal Server Error'
+        }
+    )
+    def post(self, request):
+        try:
+            serializer = ForgotPasswordSerializer(data=request.data)
+            if not serializer.is_valid():
+                return JsonResponse({
+                    'message': 'Validation error',
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            email = serializer.validated_data['email']
+            db = MongoDB()
+            user = db.find_document('users', {'email': email})
+
+            if not user:
+                return JsonResponse({
+                    'message': 'No account found with this email address'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            user_id = str(user['_id'])
+            reset_token = generate_password_reset_token(user_id, email)
+
+            db.create_document('password_reset_tokens', {
+                'email': email,
+                'user_id': user_id,
+                'token': reset_token,
+                'is_used': False,
+                'expires_at': datetime.now(timezone.utc) + timedelta(hours=1),
+            })
+
+            reset_link = f"{PASSWORD_RESET_URL}?token={reset_token}"
+            user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+            send_password_reset_email(email, reset_link, user_name or None)
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Password reset link has been sent to your email'
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ResetPasswordView(APIView):
+    @swagger_auto_schema(
+        operation_description="Reset user password using token from email link",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'token': openapi.Schema(type=openapi.TYPE_STRING, description='Password reset token from email link'),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description='New password'),
+            },
+            required=['token', 'password']
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                }
+            )),
+            400: 'Bad Request',
+            401: 'Unauthorized',
+            500: 'Internal Server Error'
+        }
+    )
+    def post(self, request):
+        try:
+            serializer = ResetPasswordSerializer(data=request.data)
+            if not serializer.is_valid():
+                return JsonResponse({
+                    'message': 'Validation error',
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            token = serializer.validated_data['token']
+            new_password = serializer.validated_data['password']
+
+            try:
+                payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            except jwt.ExpiredSignatureError:
+                return JsonResponse({
+                    'message': 'Password reset link has expired. Please request a new one.'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return JsonResponse({
+                    'message': 'Invalid or expired reset token'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+
+            if payload.get('type') != 'password_reset':
+                return JsonResponse({
+                    'message': 'Invalid reset token'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+
+            db = MongoDB()
+            stored_token = db.find_document('password_reset_tokens', {
+                'token': token,
+                'is_used': False,
+            })
+
+            if not stored_token:
+                return JsonResponse({
+                    'message': 'Invalid or already used reset token'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+
+            user_id = payload['user_id']
+            user = db.find_document('users', {'_id': ObjectId(user_id)})
+
+            if not user:
+                return JsonResponse({
+                    'message': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            db.update_document('users', {'_id': ObjectId(user_id)}, {
+                'password': make_password(new_password),
+                'base_encoded_password': new_password,
+            })
+            db.update_document('password_reset_tokens', {'token': token}, {'is_used': True})
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Password has been reset successfully'
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse({
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
