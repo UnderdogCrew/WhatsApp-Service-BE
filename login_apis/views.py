@@ -1710,48 +1710,48 @@ class ForgotPasswordView(APIView):
         }
     )
     def post(self, request):
-        try:
-            serializer = ForgotPasswordSerializer(data=request.data)
-            if not serializer.is_valid():
-                return JsonResponse({
-                    'message': 'Validation error',
-                    'errors': serializer.errors
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-            email = serializer.validated_data['email']
-            db = MongoDB()
-            user = db.find_document('users', {'email': email})
-
-            if not user:
-                return JsonResponse({
-                    'message': 'No account found with this email address'
-                }, status=status.HTTP_404_NOT_FOUND)
-
-            user_id = str(user['_id'])
-            reset_token = generate_password_reset_token(user_id, email)
-
-            db.create_document('password_reset_tokens', {
-                'email': email,
-                'user_id': user_id,
-                'token': reset_token,
-                'is_used': False,
-                'expires_at': datetime.now(timezone.utc) + timedelta(hours=1),
-            })
-
-            reset_link = f"{PASSWORD_RESET_URL}?token={reset_token}"
-            user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
-            send_password_reset_email(email, reset_link, user_name or None)
-
+        # try:
+        serializer = ForgotPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
             return JsonResponse({
-                'status': 'success',
-                'message': 'Password reset link has been sent to your email'
-            }, status=status.HTTP_200_OK)
+                'message': 'Validation error',
+                'errors': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-        except Exception as e:
-            print(e)
+        email = serializer.validated_data['email']
+        db = MongoDB()
+        user = db.find_document('users', {'email': email})
+
+        if not user:
             return JsonResponse({
-                'message': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'message': 'No account found with this email address'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        user_id = str(user['_id'])
+        reset_token = generate_password_reset_token(user_id, email)
+
+        db.create_document('password_reset_tokens', {
+            'email': email,
+            'user_id': user_id,
+            'token': reset_token,
+            'is_used': False,
+            'expires_at': datetime.now(timezone.utc) + timedelta(hours=1),
+        })
+
+        reset_link = f"{PASSWORD_RESET_URL}?token={reset_token}"
+        user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+        send_password_reset_email(email, reset_link, user_name or None)
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Password reset link has been sent to your email'
+        }, status=status.HTTP_200_OK)
+
+        # except Exception as e:
+        #     print(e)
+        #     return JsonResponse({
+        #         'message': str(e)
+        #     }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ResetPasswordView(APIView):
