@@ -70,7 +70,7 @@ SEND_LIVE_OTP = os.getenv('SEND_LIVE_OTP', 'false').lower() == 'true'
 
 # SendGrid email settings
 SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
-SENDGRID_FROM_EMAIL = os.getenv('SENDGRID_FROM_EMAIL', 'hello@theunderdogcrew.com')
+SENDGRID_FROM_EMAIL = os.getenv('SENDGRID_FROM_EMAIL', 'noreply@wapnexus.com')
 SENDGRID_FROM_NAME = os.getenv('SENDGRID_FROM_NAME', 'WapNexus')
 PASSWORD_RESET_URL = os.getenv('PASSWORD_RESET_URL', 'https://app.wapnexus.com/user/reset-password')
 

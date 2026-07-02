@@ -1,7 +1,27 @@
+import json
+import logging
+
 from django.template.loader import render_to_string
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from UnderdogCrew import settings
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_sendgrid_error(exc):
+    error_body = getattr(exc, 'body', None)
+    if isinstance(error_body, bytes):
+        error_body = error_body.decode()
+    if isinstance(error_body, str):
+        try:
+            parsed = json.loads(error_body)
+            messages = [e.get('message', '') for e in parsed.get('errors', []) if e.get('message')]
+            if messages:
+                return '; '.join(messages)
+        except json.JSONDecodeError:
+            return error_body
+    return getattr(exc, 'message', None) or str(exc)
 
 
 def send_email(to_email, subject, html_content, from_email=None, from_name=None):
@@ -11,7 +31,14 @@ def send_email(to_email, subject, html_content, from_email=None, from_name=None)
     Returns a dict with status_code, body, and headers on success.
     Raises the underlying SendGrid exception on failure.
     """
-    from_addr = from_email or settings.SENDGRID_FROM_EMAIL
+    api_key = (settings.SENDGRID_API_KEY or '').strip()
+    if not api_key:
+        raise ValueError('SENDGRID_API_KEY is not configured')
+
+    from_addr = (from_email or settings.SENDGRID_FROM_EMAIL or '').strip()
+    if not from_addr:
+        raise ValueError('SENDGRID_FROM_EMAIL is not configured')
+
     from_display = from_name if from_name is not None else settings.SENDGRID_FROM_NAME
     from_email_value = (from_addr, from_display) if from_display else from_addr
 
@@ -23,13 +50,10 @@ def send_email(to_email, subject, html_content, from_email=None, from_name=None)
     )
 
     try:
-        sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
-        print(settings.SENDGRID_API_KEY)
+        sg = SendGridAPIClient(api_key)
         # sg.set_sendgrid_data_residency("eu")
         # uncomment the above line if you are sending mail using a regional EU subuser
         response = sg.send(message)
-        print(response)
-        # Make sure body is decoded to string if it's bytes
         body = response.body.decode() if isinstance(response.body, bytes) else response.body
         return {
             'status_code': getattr(response, 'status_code', None) or getattr(response, 'code', None),
@@ -37,15 +61,13 @@ def send_email(to_email, subject, html_content, from_email=None, from_name=None)
             'headers': response.headers,
         }
     except Exception as e:
-        # The error "'bytes' object has no attribute 'code'" suggests we're trying to access .code on a bytes object (probably SendGrid error response)
-        # Provide clearer error with decoding if needed
-        error_body = getattr(e, 'body', None)
-        if isinstance(error_body, bytes):
-            error_message = error_body.decode()
-        elif error_body is not None:
-            error_message = error_body
-        else:
-            error_message = getattr(e, 'message', None) or str(e)
+        error_message = _parse_sendgrid_error(e)
+        logger.error(
+            'SendGrid email failed (to=%s, from=%s): %s',
+            to_email,
+            from_addr,
+            error_message,
+        )
         raise type(e)(error_message) from e
 
 
