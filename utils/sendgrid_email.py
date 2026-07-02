@@ -27,13 +27,24 @@ def send_email(to_email, subject, html_content, from_email=None, from_name=None)
         # sg.set_sendgrid_data_residency("eu")
         # uncomment the above line if you are sending mail using a regional EU subuser
         response = sg.send(message)
+        print(response)
+        # Make sure body is decoded to string if it's bytes
+        body = response.body.decode() if isinstance(response.body, bytes) else response.body
         return {
-            'status_code': response.status_code,
-            'body': response.body,
+            'status_code': getattr(response, 'status_code', None) or getattr(response, 'code', None),
+            'body': body,
             'headers': response.headers,
         }
     except Exception as e:
-        error_message = getattr(e, 'body', None) or getattr(e, 'message', None) or str(e)
+        # The error "'bytes' object has no attribute 'code'" suggests we're trying to access .code on a bytes object (probably SendGrid error response)
+        # Provide clearer error with decoding if needed
+        error_body = getattr(e, 'body', None)
+        if isinstance(error_body, bytes):
+            error_message = error_body.decode()
+        elif error_body is not None:
+            error_message = error_body
+        else:
+            error_message = getattr(e, 'message', None) or str(e)
         raise type(e)(error_message) from e
 
 
