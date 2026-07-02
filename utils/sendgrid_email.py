@@ -24,6 +24,7 @@ def send_email(to_email, subject, html_content, from_email=None, from_name=None)
 
     try:
         sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
+        print(settings.SENDGRID_API_KEY)
         # sg.set_sendgrid_data_residency("eu")
         # uncomment the above line if you are sending mail using a regional EU subuser
         response = sg.send(message)
