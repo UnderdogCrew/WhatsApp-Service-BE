@@ -1,12 +1,31 @@
+import base64
 import json
 import logging
+from pathlib import Path
 
 from django.template.loader import render_to_string
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from sendgrid.helpers.mail import (
+    Attachment,
+    ContentId,
+    Disposition,
+    FileContent,
+    FileName,
+    FileType,
+    Mail,
+)
 from UnderdogCrew import settings
 
 logger = logging.getLogger(__name__)
+
+WAPNEXUS_LOGO_CID = 'wapnexus_logo'
+WAPNEXUS_LOGO_PATH = (
+    Path(__file__).resolve().parent.parent
+    / 'login_apis'
+    / 'static'
+    / 'emails'
+    / 'wapnexus-logo.png'
+)
 
 
 def _parse_sendgrid_error(exc):
@@ -24,7 +43,18 @@ def _parse_sendgrid_error(exc):
     return getattr(exc, 'message', None) or str(exc)
 
 
-def send_email(to_email, subject, html_content, from_email=None, from_name=None):
+def _add_inline_attachment(message, file_path, content_id):
+    encoded = base64.b64encode(file_path.read_bytes()).decode()
+    message.add_attachment(Attachment(
+        FileContent(encoded),
+        FileName(file_path.name),
+        FileType('image/png'),
+        Disposition('inline'),
+        ContentId(content_id),
+    ))
+
+
+def send_email(to_email, subject, html_content, from_email=None, from_name=None, inline_attachments=None):
     """
     Send an HTML email via SendGrid.
 
@@ -48,6 +78,9 @@ def send_email(to_email, subject, html_content, from_email=None, from_name=None)
         subject=subject,
         html_content=html_content,
     )
+
+    for attachment in inline_attachments or []:
+        _add_inline_attachment(message, attachment['path'], attachment['content_id'])
 
     try:
         sg = SendGridAPIClient(api_key)
@@ -78,8 +111,16 @@ def send_password_reset_email(to_email, reset_link, user_name=None):
         'reset_link': reset_link,
     })
 
+    inline_attachments = []
+    if WAPNEXUS_LOGO_PATH.exists():
+        inline_attachments.append({
+            'path': WAPNEXUS_LOGO_PATH,
+            'content_id': WAPNEXUS_LOGO_CID,
+        })
+
     return send_email(
         to_email=to_email,
         subject='Reset your WapNexus password',
         html_content=html_content,
+        inline_attachments=inline_attachments,
     )
