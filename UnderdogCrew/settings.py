@@ -102,6 +102,7 @@ INSTALLED_APPS = [
     'whatsapp_apis',
     'login_apis',
     'subscriptions',
+    'developer_apis',
     'drf_yasg',
 ]
 

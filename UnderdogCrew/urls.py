@@ -20,6 +20,7 @@ from ai_apis import views
 from whatsapp_apis import views as whatsapp_apis
 from login_apis import views as login_service
 from subscriptions import views as subscription_views
+from developer_apis import views as developer_views
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
@@ -89,4 +90,5 @@ urlpatterns = [
     path('user/webhook/details', views.UserWebhookDetails.as_view(), name='user-webhook-details'),
     path('api-key/regenerate', login_service.RegenerateAPIKeyView.as_view(), name='regenerate-api-key'),
     path("api/templates/generate", whatsapp_apis.GenerateAITemplateView.as_view(), name='generate-ai-template'),
+    path('developer/api/try-now', developer_views.TryNowView.as_view(), name='developer-try-now'),
 ]
