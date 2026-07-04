@@ -45,7 +45,8 @@ def token_required(f):
 
         try:
             data = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-            if data.get('type') != 'access':
+            print(f"data: {data['type']}")
+            if data.get('type') != 'access' and data.get('type') != 'webhook_api_key':
                 raise jwt.InvalidTokenError('Invalid token type')
             current_user_id = data['user_id']
             current_user_email = data['user_email']
@@ -69,6 +70,16 @@ def decode_token(token):
         return {'message': 'Token has expired'}
     except jwt.InvalidTokenError as e:
         return {'message': str(e)}
+
+
+def generate_password_reset_token(user_id, user_email):
+    token = jwt.encode({
+        'user_id': str(user_id),
+        'user_email': user_email,
+        'exp': datetime.utcnow() + timedelta(hours=1),
+        'type': 'password_reset'
+    }, settings.SECRET_KEY, algorithm='HS256')
+    return token
 
 
 def generate_webhook_api_key(user_id, user_email):

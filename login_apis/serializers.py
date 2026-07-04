@@ -79,3 +79,20 @@ class CustomerUpdateSerializer(serializers.Serializer):
     source = serializers.CharField(max_length=50, required=False, allow_blank=True)
 
 
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    password = serializers.CharField(min_length=8, max_length=50)
+
+    def validate_password(self, value):
+        if not re.match(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$', value):
+            raise serializers.ValidationError(
+                "Password must be at least 8 characters long and contain at least one letter, "
+                "one number, and one special character (@$!%*#?&)"
+            )
+        return value
+
+
