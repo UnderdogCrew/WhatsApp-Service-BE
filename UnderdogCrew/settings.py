@@ -48,6 +48,7 @@ RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 
 
 REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_PORT = os.getenv("REDIS_PORT")
 REDIS_DATABASE = os.getenv("REDIS_DATABASE")
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 REDIS_USER = os.getenv("REDIS_USER")
@@ -61,8 +62,11 @@ WEBHOOK_VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN")
 # Connect to Redis (update with your Redis instance details)
 redis_client = redis.Redis(
     host=REDIS_HOST,  # Change this if your Redis is hosted remotely
-    port=6379,         # Default Redis port
-    db=0               # Default DB
+    port=REDIS_PORT,         # Default Redis port
+    db=REDIS_DATABASE,               # Default DB
+    password=REDIS_PASSWORD,
+    decode_responses=True,
+    username=REDIS_USER
 )
 
 # New configuration variable
