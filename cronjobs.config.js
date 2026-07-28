@@ -16,6 +16,22 @@ module.exports = {
         NODE_ENV: 'production',
         DJANGO_SETTINGS_MODULE: 'UnderdogCrew.settings',
       }
+    },
+    {
+      name: 'redis-scheduled-message-worker',
+      script: 'process_redis_scheduled_messages.py',
+      interpreter: '/opt/whatsapp_service/enve/bin/python3',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '1G',
+      env: {
+        NODE_ENV: 'development',
+        DJANGO_SETTINGS_MODULE: 'UnderdogCrew.settings',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        DJANGO_SETTINGS_MODULE: 'UnderdogCrew.settings',
+      }
     }
   ]
 };

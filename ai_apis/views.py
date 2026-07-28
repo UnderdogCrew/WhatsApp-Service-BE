@@ -23,6 +23,7 @@ from utils.auth import current_dollar_price
 from utils.send_message_data import TokenBucketLimiter
 import logging
 from utils.s3_helper import S3Helper
+from utils.scheduled_message_redis import parse_scheduled_at, store_scheduled_message
 from io import BytesIO
 
 
@@ -131,6 +132,8 @@ class SendMessage(APIView):
             type=openapi.TYPE_OBJECT,
             properties={
                 "schedule_type": openapi.Schema(type=openapi.TYPE_INTEGER, description='Type of the message which needs to send message for instante or schedule(1 for instante and 2 for schedule)'),
+                'scheduled_at': openapi.Schema(type=openapi.TYPE_STRING, description='ISO datetime when message should be sent (required when schedule_type=2)'),
+                'schedule_timezone': openapi.Schema(type=openapi.TYPE_STRING, description='Timezone for scheduled_at when no offset is provided (e.g. Asia/Calcutta)'),
                 'text': openapi.Schema(type=openapi.TYPE_STRING, description='Text message to send'),
                 'fileUrl': openapi.Schema(type=openapi.TYPE_STRING, description='URL of the Excel file'),
                 'image_url': openapi.Schema(type=openapi.TYPE_STRING, description='Image URL (optional)'),
@@ -306,7 +309,7 @@ class SendMessage(APIView):
                     status=422
                 )
 
-            if schedule_type == 2 and file_path == "":
+            if schedule_type == 2 and file_path == "" and message_type == 1:
                 return JsonResponse(
                     {"message": "file is required for message_type 1"},
                     safe=False,
@@ -319,6 +322,66 @@ class SendMessage(APIView):
                 message_thread.start()  # Start the thread
                 return JsonResponse(
                     {"message": "Message scheduled successfully"},
+                    safe=False,
+                    status=200
+                )
+
+            if schedule_type == 2:
+                scheduled_at = request_data.get("scheduled_at")
+                schedule_timezone = request_data.get("schedule_timezone", "UTC")
+                if not scheduled_at:
+                    return JsonResponse(
+                        {"message": "scheduled_at is required for schedule_type 2"},
+                        safe=False,
+                        status=422
+                    )
+                try:
+                    scheduled_at_utc = parse_scheduled_at(scheduled_at, schedule_timezone)
+                except ValueError as exc:
+                    return JsonResponse({"message": str(exc)}, safe=False, status=422)
+
+                if scheduled_at_utc <= datetime.datetime.now(datetime.timezone.utc):
+                    return JsonResponse(
+                        {"message": "scheduled_at must be a future datetime"},
+                        safe=False,
+                        status=422
+                    )
+
+                schedule_payload = {
+                    "user_id": user_id,
+                    "text": text,
+                    "template_name": template_name,
+                    "message_type": message_type,
+                    "numbers": numbers,
+                    "metadata": msg_metadata,
+                    "image_url": image_url,
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "location_name": location_name,
+                    "address": address,
+                    "params_fallback_value": params_fallback_value,
+                    "button_value": button_value,
+                    "scheduled_at": scheduled_at,
+                    "schedule_timezone": schedule_timezone,
+                    "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                }
+                try:
+                    schedule_id = store_scheduled_message(schedule_payload, scheduled_at_utc)
+                except Exception as redis_exc:
+                    print(f"Redis schedule store failed: {redis_exc}")
+                    return JsonResponse(
+                        {"message": "Failed to schedule message"},
+                        safe=False,
+                        status=500
+                    )
+
+                return JsonResponse(
+                    {
+                        "message": "Message scheduled successfully",
+                        "schedule_id": schedule_id,
+                        "scheduled_at": scheduled_at_utc.isoformat(),
+                        "numbers_count": len(schedule_payload["numbers"]),
+                    },
                     safe=False,
                     status=200
                 )
