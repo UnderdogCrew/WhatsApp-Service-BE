@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'send-message-scheduler',
       script: 'send_scheduled_message.py',
-      interpreter: '/opt/whatsapp_service/enve/bin/python3',
+      interpreter: '/opt/python_apis/enve/bin/python3',
       autorestart: false,
       watch: false,
       max_memory_restart: '1G',
@@ -20,7 +20,7 @@ module.exports = {
     {
       name: 'redis-scheduled-message-worker',
       script: 'process_redis_scheduled_messages.py',
-      interpreter: '/opt/whatsapp_service/enve/bin/python3',
+      interpreter: '/opt/python_apis/enve/bin/python3',
       autorestart: true,
       watch: false,
       max_memory_restart: '1G',
