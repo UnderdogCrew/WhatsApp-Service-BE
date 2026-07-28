@@ -12,7 +12,7 @@ from utils.send_message_data import TokenBucketLimiter
 from utils.scheduled_message_redis import claim_due_scheduled_messages
 from utils.whatsapp_message_data import send_message_data
 
-POLL_INTERVAL_SECONDS = 5
+POLL_INTERVAL_SECONDS = 60
 
 
 def send_scheduled_whatsapp_message(payload):
