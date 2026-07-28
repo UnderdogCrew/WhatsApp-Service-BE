@@ -728,6 +728,7 @@ class FacebookWebhook(APIView):
                 message = ""
                 error_data = ""
                 recipient_id = ""
+                status_id = ""
                 try:
                     errors = statuses[0]['errors'][0]
                     recipient_id = statuses[0]['recipient_id']
