@@ -743,8 +743,12 @@ class FacebookWebhook(APIView):
                 if status_webhook_url is not None and status_webhook_url != "":
                     ## we need to send the status webhook to the url
                     status_webhook_response = f"?To={recipient_id}&From={user['number']}&REASON_CODE=200&GUID={status_id}&MSG_STATUS={statuses[0]['status']}&DELIVERED_DATE={statuses[0]['timestamp']}&SUBMIT_DATE={statuses[0]['timestamp']}"
+                    logging.info(f"Status webhook response: {status_webhook_url + status_webhook_response}")
                     status_webhook_response = requests.get(status_webhook_url + status_webhook_response)
-                    logging.info(f"Status webhook response: {status_webhook_response.json()}")
+                    if status_webhook_response.status_code == 200:
+                        logging.info(f"Status webhook sent successfully")
+                    else:
+                        logging.error(f"Failed to send status webhook")
 
                 db.update_document(
                     'whatsapp_message_logs',
