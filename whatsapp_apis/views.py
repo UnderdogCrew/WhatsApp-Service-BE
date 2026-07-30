@@ -1169,12 +1169,12 @@ class UniqueChatList(APIView):
                 
                 # Convert last_message_time to IST (naive, no +05:30 offset in JSON)
                 last_message_time = chat.get("last_message_time")
-                if last_message_time:
-                    if not last_message_time.tzinfo:
-                        # If timestamp is naive, assume it's UTC
-                        last_message_time = pytz.utc.localize(last_message_time)
-                    # Convert to IST, then drop tzinfo so JSON shows wall-clock IST only
-                    last_message_time = last_message_time.astimezone(ist_timezone).replace(tzinfo=None)
+                # if last_message_time:
+                #     if not last_message_time.tzinfo:
+                #         # If timestamp is naive, assume it's UTC
+                #         last_message_time = pytz.utc.localize(last_message_time)
+                #     # Convert to IST, then drop tzinfo so JSON shows wall-clock IST only
+                #     last_message_time = last_message_time.astimezone(ist_timezone).replace(tzinfo=None)
 
                 
                 changed_date = format_date(date_str=last_message_time)
