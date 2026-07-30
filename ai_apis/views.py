@@ -1554,28 +1554,19 @@ class UserMessageLogs(APIView):
             message_list = []
             for _message in total_message:
                 # Convert created_at / updated_at to UTC for display
+                # created_at / updated_at are MongoDB ISODate (UTC); format as UTC
                 try:
                     created_at = _message['created_at']
-                    if isinstance(created_at, datetime.datetime):
-                        if created_at.tzinfo is None:
-                            created_at = created_at.replace(tzinfo=datetime.timezone.utc)
-                        else:
-                            created_at = created_at.astimezone(datetime.timezone.utc)
-                    else:
-                        created_at = datetime.datetime.fromtimestamp(created_at, datetime.timezone.utc)
+                    if created_at.tzinfo is not None:
+                        created_at = created_at.astimezone(datetime.timezone.utc)
                     human_readable = created_at.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     human_readable = ""
 
                 try:
                     updated_at = _message['updated_at']
-                    if isinstance(updated_at, datetime.datetime):
-                        if updated_at.tzinfo is None:
-                            updated_at = updated_at.replace(tzinfo=datetime.timezone.utc)
-                        else:
-                            updated_at = updated_at.astimezone(datetime.timezone.utc)
-                    else:
-                        updated_at = datetime.datetime.fromtimestamp(updated_at, datetime.timezone.utc)
+                    if updated_at.tzinfo is not None:
+                        updated_at = updated_at.astimezone(datetime.timezone.utc)
                     updated_at_human_readable = updated_at.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     updated_at_human_readable = ""
