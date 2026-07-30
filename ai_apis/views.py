@@ -1574,7 +1574,7 @@ class UserMessageLogs(APIView):
 
                 try:
                     # Convert to a datetime object
-                    sent_dt_obj = datetime.datetime.utcfromtimestamp(_message['sent_at'])
+                    sent_dt_obj = datetime.datetime.fromtimestamp(_message['sent_at'], datetime.timezone.utc)
 
                     # Format it into a readable format
                     sent_dt_readable = sent_dt_obj.strftime("%Y-%m-%d %H:%M:%S")
@@ -1583,7 +1583,7 @@ class UserMessageLogs(APIView):
                 
                 try:
                     # Convert to a datetime object
-                    read_at_obj = datetime.datetime.utcfromtimestamp(_message['read_at'])
+                    read_at_obj = datetime.datetime.fromtimestamp(_message['read_at'], datetime.timezone.utc)
 
                     # Format it into a readable format
                     read_at_readable = read_at_obj.strftime("%Y-%m-%d %H:%M:%S")
@@ -1593,7 +1593,7 @@ class UserMessageLogs(APIView):
 
                 try:
                     # Convert to a datetime object
-                    delivered_at_obj = datetime.datetime.utcfromtimestamp(_message['delivered_at'])
+                    delivered_at_obj = datetime.datetime.fromtimestamp(_message['delivered_at'], datetime.timezone.utc)
 
                     # Format it into a readable format
                     delivered_at_readable = delivered_at_obj.strftime("%Y-%m-%d %H:%M:%S")
@@ -1603,7 +1603,7 @@ class UserMessageLogs(APIView):
 
                 try:
                     # Convert to a datetime object
-                    failed_at_obj = datetime.datetime.utcfromtimestamp(_message['failed_at'])
+                    failed_at_obj = datetime.datetime.fromtimestamp(_message['failed_at'], datetime.timezone.utc)
 
                     # Format it into a readable format
                     failed_at_readable = failed_at_obj.strftime("%Y-%m-%d %H:%M:%S")
