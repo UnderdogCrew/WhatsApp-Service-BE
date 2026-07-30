@@ -1552,13 +1552,16 @@ class UserMessageLogs(APIView):
             total_message_count = db.find_documents_count("whatsapp_message_logs", query_filter)
 
             message_list = []
+            ist_timezone = pytz.timezone('Asia/Kolkata')
             for _message in total_message:
-                # Convert created_at / updated_at to UTC for display
-                # created_at / updated_at are MongoDB ISODate (UTC); format as UTC
+                # created_at / updated_at were stored via datetime.now() (IST wall clock)
+                # but Mongo tags them as UTC. Treat as IST, convert to real UTC so the
+                # UI's UTC→IST conversion shows the correct local time.
                 try:
                     created_at = _message['created_at']
                     if created_at.tzinfo is not None:
-                        created_at = created_at.astimezone(datetime.timezone.utc)
+                        created_at = created_at.replace(tzinfo=None)
+                    created_at = ist_timezone.localize(created_at).astimezone(datetime.timezone.utc)
                     human_readable = created_at.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     human_readable = ""
@@ -1566,7 +1569,8 @@ class UserMessageLogs(APIView):
                 try:
                     updated_at = _message['updated_at']
                     if updated_at.tzinfo is not None:
-                        updated_at = updated_at.astimezone(datetime.timezone.utc)
+                        updated_at = updated_at.replace(tzinfo=None)
+                    updated_at = ist_timezone.localize(updated_at).astimezone(datetime.timezone.utc)
                     updated_at_human_readable = updated_at.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     updated_at_human_readable = ""
