@@ -961,8 +961,8 @@ class CustomersChatLogs(APIView):
                         "message": _customer['message'],
                         "attachment": _customer['attachment'] if "attachment" in _customer else False,
                         "attachment_url": _customer['attachment_url'] if "attachment_url" in _customer else None,
-                        "created_at": convert_to_ist(_customer.get('created_at')),
-                        "updated_at": convert_to_ist(_customer.get('updated_at')),
+                        "created_at": _customer.get('created_at'),
+                        "updated_at": _customer.get('updated_at'),
                         "sent_at": convert_to_ist(_customer.get('sent_at')),
                         "read_at": convert_to_ist(_customer.get('read_at')),
                         "status": _customer['message_status'],
@@ -1167,14 +1167,14 @@ class UniqueChatList(APIView):
                 msg_type = chat.get("msg_type", 2)
                 profile_name = chat.get("profile_name", "Unknown")
                 
-                # Convert last_message_time to IST
+                # Convert last_message_time to IST (naive, no +05:30 offset in JSON)
                 last_message_time = chat.get("last_message_time")
                 if last_message_time:
                     if not last_message_time.tzinfo:
                         # If timestamp is naive, assume it's UTC
                         last_message_time = pytz.utc.localize(last_message_time)
-                    # Convert to IST
-                    last_message_time = last_message_time.astimezone(ist_timezone)
+                    # Convert to IST, then drop tzinfo so JSON shows wall-clock IST only
+                    last_message_time = last_message_time.astimezone(ist_timezone).replace(tzinfo=None)
 
                 
                 changed_date = format_date(date_str=last_message_time)
