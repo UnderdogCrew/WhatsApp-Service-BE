@@ -32,6 +32,94 @@ def sse_event(obj: dict) -> str:
 
 
 
+def _normalized_phone_expr(number_expr):
+    """Strip +, spaces, and dashes from a phone stored as a string or number."""
+    return {
+        "$replaceAll": {
+            "input": {
+                "$replaceAll": {
+                    "input": {
+                        "$replaceAll": {
+                            "input": {"$toString": {"$ifNull": [number_expr, ""]}},
+                            "find": "+",
+                            "replacement": "",
+                        }
+                    },
+                    "find": " ",
+                    "replacement": "",
+                }
+            },
+            "find": "-",
+            "replacement": "",
+        }
+    }
+
+
+def _last_10_digits_expr(number_expr):
+    """Aggregation expression: last 10 digits of a phone stored as string or number."""
+    return {
+        "$cond": {
+            "if": {"$gt": [{"$strLenCP": _normalized_phone_expr(number_expr)}, 10]},
+            "then": {
+                "$substrCP": [
+                    _normalized_phone_expr(number_expr),
+                    {"$subtract": [{"$strLenCP": _normalized_phone_expr(number_expr)}, 10]},
+                    10,
+                ]
+            },
+            "else": _normalized_phone_expr(number_expr),
+        }
+    }
+
+
+def phone_number_candidates(number):
+    """Values a customer.number may be stored as for the same phone."""
+    raw = str(number).strip() if number is not None else ""
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    last10 = digits[-10:] if len(digits) >= 10 else digits
+    candidates = []
+
+    def add(value):
+        if value is None or value == "" or value in candidates:
+            return
+        candidates.append(value)
+
+    add(raw)
+    add(digits)
+    add(last10)
+    if last10:
+        add(f"91{last10}")
+        add(f"+91{last10}")
+    if digits:
+        add(f"+{digits}")
+    for value in (digits, last10, f"91{last10}" if last10 else ""):
+        if value.isdigit():
+            add(int(value))
+    return candidates
+
+
+def find_customer_by_phone(db, user_id, number):
+    candidates = phone_number_candidates(number)
+    if not candidates:
+        return None
+    return db.find_document("customers", {
+        "user_id": user_id,
+        "number": {"$in": candidates},
+    })
+
+
+def customer_display_name(customer, fallback=""):
+    if not customer:
+        return fallback
+    name = customer.get("name")
+    if name is None:
+        return fallback
+    name = str(name).strip()
+    if name in ("", "nan", "NaN"):
+        return fallback
+    return name
+
+
 def format_date(date_str, date_format="%d/%m/%Y"):
     # Convert string to date object
     if isinstance(date_str, str):
@@ -866,7 +954,7 @@ class CustomersView(APIView):
 class CustomersChatLogs(APIView):
 
     @swagger_auto_schema(
-        operation_description="Get all the customers list",
+        operation_description="Get chat history for a customer number, including the customer name.",
         manual_parameters=[
             openapi.Parameter(
                 'Authorization',
@@ -925,13 +1013,10 @@ class CustomersChatLogs(APIView):
             
             query_filter = {"user_id": user_id, "number": f"91{number}"}
             print(f"query filter: {query_filter}")
-            # Fetch data from database
-            customer_query = {
-                "number": int(number)
-            }
             sort_order = [("_id", 1)]  # Sorting in descending order
 
-            customer_details = db.find_document(collection_name="customers", query=customer_query)
+            customer_details = find_customer_by_phone(db, user_id, number)
+            customer_name = customer_display_name(customer_details, fallback=f"{number}")
 
             # if customer_details is None:
             #     return JsonResponse({"message": "Number is invalid"}, status=422)
@@ -958,6 +1043,7 @@ class CustomersChatLogs(APIView):
                 customer_chat_details.append(
                     {
                         "number": _customer['number'],
+                        "customer_name": customer_name,
                         "message": _customer['message'],
                         "attachment": _customer['attachment'] if "attachment" in _customer else False,
                         "attachment_url": _customer['attachment_url'] if "attachment_url" in _customer else None,
@@ -971,7 +1057,8 @@ class CustomersChatLogs(APIView):
                 )
 
             customers = {
-                "name": customer_details['name'] if customer_details is not None else f"{number}",
+                "name": customer_name,
+                "customer_name": customer_name,
                 "number": str(customer_details['number']) if customer_details is not None else f"{number}"
             }
 
@@ -980,13 +1067,16 @@ class CustomersChatLogs(APIView):
                     'status': 'success',
                     'message': 'Customer retrieved successfully',
                     'data': customer_chat_details,
-                    "customer": customers
+                    "customer": customers,
+                    "customer_name": customer_name,
                 }, status=status.HTTP_200_OK)
             else:
                 return JsonResponse({
                     'status': 'success',
                     'message': 'Customer not Found',
-                    'data': customer_chat_details
+                    'data': customer_chat_details,
+                    'customer': customers,
+                    'customer_name': customer_name,
                 }, status=status.HTTP_404_NOT_FOUND)
 
         except Exception as e:
@@ -1068,46 +1158,29 @@ class UniqueChatList(APIView):
             # Aggregation Query to Get Unique Numbers with Latest Messages and Join with Customers
             search_text = request.query_params.get('search', '').strip()
 
+            customer_match = {
+                "$expr": {
+                    "$and": [
+                        {"$eq": ["$user_id", user_id]},
+                        {"$eq": [_last_10_digits_expr("$number"), "$$phone_digits"]},
+                        {"$ne": ["$$phone_digits", ""]},
+                    ]
+                }
+            }
+            if search_text:
+                customer_match["name"] = {"$regex": search_text, "$options": "i"}
+
             pipeline = [
-                # First lookup customers to get matching names
+                # Match customers whether number is stored as 10 digits, 91-prefix, +91, string, or int
                 {"$lookup": {
                     "from": "customers",
-                    "let": { 
-                        "phone_str": {
-                            "$replaceAll": {
-                                "input": {"$substr": ["$number", 2, -1]},
-                                "find": " ",
-                                "replacement": ""
-                            }
-                        }
+                    "let": {
+                        "phone_digits": _last_10_digits_expr("$number")
                     },
                     "pipeline": [
-                        {
-                            "$match": {
-                                "$expr": {
-                                    '$and': [
-                                        {
-                                            '$eq': [
-                                            '$number',
-                                            {
-                                                '$toDouble': {
-                                                '$replaceAll': {
-                                                    'input': '$$phone_str',
-                                                    'find': ' ',
-                                                    'replacement': ''
-                                                }
-                                                }
-                                            }
-                                            ]
-                                        },
-                                        {
-                                            '$eq': ['$user_id', user_id]
-                                        }
-                                    ]
-                                },
-                                **({'name': {'$regex': search_text, '$options': 'i'}} if search_text else {})
-                            }
-                        }
+                        {"$match": customer_match},
+                        {"$project": {"name": 1}},
+                        {"$limit": 1},
                     ],
                     "as": "customer_info"
                 }},
@@ -1133,6 +1206,7 @@ class UniqueChatList(APIView):
                     "preserveNullAndEmptyArrays": True
                 }},
                 {"$project": {
+                    "customer_name": {"$ifNull": ["$customer_info.name", ""]},
                     "profile_name": {"$ifNull": ["$customer_info.name", "$_id"]},
                     "last_message": 1,
                     "last_message_time": 1,
@@ -1166,7 +1240,13 @@ class UniqueChatList(APIView):
 
             for chat in chat_list_data:
                 msg_type = chat.get("msg_type", 2)
-                profile_name = chat.get("profile_name", "Unknown")
+                customer_name = chat.get("customer_name") or ""
+                if not isinstance(customer_name, str):
+                    customer_name = str(customer_name)
+                customer_name = customer_name.strip()
+                if customer_name in ("nan", "NaN"):
+                    customer_name = ""
+                profile_name = customer_name or chat.get("profile_name", "Unknown")
                 
                 # Convert last_message_time to IST (naive, no +05:30 offset in JSON)
                 last_message_time = chat.get("last_message_time")
@@ -1186,6 +1266,7 @@ class UniqueChatList(APIView):
                 else:
                     chat_list.append({
                         "number": chat.get("_id")[2:] if chat.get("_id") else "",
+                        "customer_name": customer_name or profile_name,
                         "profile_name": profile_name,
                         "last_message": chat.get("last_message", ""),
                         "last_message_time": last_message_time,
