@@ -429,7 +429,7 @@ class FacebookWebhook(APIView):
         try:
             db = MongoDB()
             data = request.data
-            logging.info(f"data: {data}")
+            print("data: ", data)
             entry = data['entry']
             changes = entry[0]['changes']
             guid = entry[0]['id']
@@ -522,7 +522,7 @@ class FacebookWebhook(APIView):
                                         metadata=metadata,
                                         entry=metadata
                                     )
-                        logging.info(f"messages_type: {messages_type}")
+                        print("messages_type: ", messages_type)
                         if messages_type == "text" or messages_type == "button":
                             reply_payload['message'] = messages
                             whatsapp_status_logs = {
@@ -546,7 +546,7 @@ class FacebookWebhook(APIView):
                                 "read_at" : int(value['messages'][0]['timestamp'])
                             }
                             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
-                            logging.info("Replied Saved in database")
+                            print("Replied Saved in database")
                         
                         if messages_type == "interactive":
                             interactive = value['messages'][0]['interactive']['nfm_reply'] if "nfm_reply" in value['messages'][0]['interactive'] else None
@@ -644,9 +644,9 @@ class FacebookWebhook(APIView):
                         if reply_webhook_url is not None and reply_webhook_url != "":
                             reply_webhook_response = reply_payload
                             reply_webhook_response = requests.post(reply_webhook_url, json=reply_webhook_response)
-                            logging.info(f"Reply webhook response: {reply_webhook_response.json()}")
+                            print("Reply webhook response: ", reply_webhook_response.json())
                             if reply_webhook_response.status_code == 200:
-                                logging.info(f"Reply webhook sent successfully")
+                                print("Reply webhook sent successfully")
                             else:
                                 logging.error(f"Failed to send reply webhook")
                         
@@ -716,7 +716,7 @@ class FacebookWebhook(APIView):
                                 db.create_document('whatsapp_message_logs', whatsapp_status_logs)
 
                 except Exception as error:
-                    logging.error(f"Error coming: {str(error)}")
+                    print("Error coming: ", str(error))
                 
                 return HttpResponse(hub_challenge)
 
@@ -746,9 +746,9 @@ class FacebookWebhook(APIView):
                     logging.info(f"Status webhook response: {status_webhook_url + status_webhook_response}")
                     status_webhook_response = requests.get(status_webhook_url + status_webhook_response)
                     if status_webhook_response.status_code == 200:
-                        logging.info(f"Status webhook sent successfully")
+                        print("Status webhook sent successfully")
                     else:
-                        logging.error(f"Failed to send status webhook")
+                        print("Failed to send status webhook")
 
                 db.update_document(
                     'whatsapp_message_logs',
@@ -782,8 +782,8 @@ class FacebookWebhook(APIView):
                 from_number = ""
                 msg_type = ""
             
-            logging.info(f"msg_type: {msg_type}")
-            logging.info(f"messages: {messages}")
+            print("msg_type: ", msg_type)
+            print("messages: ", messages)
             
             if msg_type == "text":
                 ## need to send message back
@@ -799,7 +799,7 @@ class FacebookWebhook(APIView):
                         }
                     }
                 )
-                logging.info("from_number", from_number)
+                print("from_number: ", from_number)
                 headers = {
                     'Authorization': 'Bearer ' + API_TOKEN,
                     'Content-Type': 'application/json',
@@ -807,7 +807,7 @@ class FacebookWebhook(APIView):
                 }
                 url = "https://graph.facebook.com/v19.0/450885871446042/messages"
                 response = requests.request("POST", url, headers=headers, data=payload)
-                logging.info(response.json())
+                print("response: ", response.json())
 
             response_data = {
                 "message": "Message send successfully",
