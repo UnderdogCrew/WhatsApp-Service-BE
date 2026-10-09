@@ -1141,6 +1141,7 @@ class UniqueChatList(APIView):
                     "sent_at": 1,
                     "delivered_at": 1,
                     "failed_at": 1,
+                    "attachment_url": 1,
                     "msg_type": {
                         "$cond": {
                             "if": {"$in": ["$message_status", ["read", "delivered", "sent", "error"]]},
@@ -1196,7 +1197,8 @@ class UniqueChatList(APIView):
                         "unread_count": 0 if msg_type == 1 else 1,
                         "failed_at": chat.get("failed_at"),
                         "msg_type": chat.get("msg_type", 2),  # Default to 2 if not found
-                        "is_within_24_hours": bool(chat.get("is_within_24_hours", False))
+                        "is_within_24_hours": bool(chat.get("is_within_24_hours", False)),
+                        "attachment_url": chat.get("attachment_url", "")
                     })
 
             if len(chat_list) > 0:

@@ -1624,6 +1624,7 @@ class UserMessageLogs(APIView):
                         "message_status" : _message['message_status'],
                         "created_at" : human_readable,
                         "template_name" : _message['template_name'],
+                        "attachment_url" : _message['attachment_url'] if "attachment_url" in _message else "",
                         "updated_at": updated_at_human_readable,
                         "sent_at": sent_dt_readable,
                         "delivered_at": delivered_at_readable,
