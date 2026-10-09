@@ -999,7 +999,7 @@ class CustomersChatLogs(APIView):
 class UniqueChatList(APIView):
 
     @swagger_auto_schema(
-        operation_description="Get the latest message for each unique user number, including customer names",
+        operation_description="Get the latest message for each unique user number, including customer names. Each chat includes is_within_24_hours: true when the latest message is within the last 24 hours, otherwise false.",
         manual_parameters=[
             openapi.Parameter(
                 'Authorization',
@@ -1062,9 +1062,6 @@ class UniqueChatList(APIView):
                 "user_id": user_id,
                 "$expr": {
                     "$eq": [{"$strLenCP": "$number"}, 12]
-                },
-                "updated_at": {
-                    "$gte": twenty_four_hours_ago
                 }
             }
 
@@ -1150,6 +1147,9 @@ class UniqueChatList(APIView):
                             "then": 1,
                             "else": 2
                         }
+                    },
+                    "is_within_24_hours": {
+                        "$gte": ["$last_message_time", twenty_four_hours_ago]
                     }
                 }},
                 {"$sort": {"last_message_time": -1}}
@@ -1195,7 +1195,8 @@ class UniqueChatList(APIView):
                         "delivered_at": chat.get("delivered_at"),
                         "unread_count": 0 if msg_type == 1 else 1,
                         "failed_at": chat.get("failed_at"),
-                        "msg_type": chat.get("msg_type", 2)  # Default to 2 if not found
+                        "msg_type": chat.get("msg_type", 2),  # Default to 2 if not found
+                        "is_within_24_hours": bool(chat.get("is_within_24_hours", False))
                     })
 
             if len(chat_list) > 0:
