@@ -751,8 +751,11 @@ class FacebookWebhook(APIView):
                         print("Failed to send status webhook")
 
                 if code == 131047:
-                    title = "24-hour customer service window has expired."
-                    message = "24-hour customer service window has expired."
+                    title = "Message failed to send because more than 24 hours have passed since the customer last replied to this number."
+                    message = "Message failed to send because more than 24 hours have passed since the customer last replied to this number."
+                elif code == 131049:
+                    title = "WhatsApp couldn’t deliver your message because it limits how many promotional messages this person can receive. You can try again later."
+                    message = "WhatsApp couldn’t deliver your message because it limits how many promotional messages this person can receive. You can try again later."
                 
 
                 db.update_document(
