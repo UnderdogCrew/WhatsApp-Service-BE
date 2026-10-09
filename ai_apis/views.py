@@ -750,6 +750,11 @@ class FacebookWebhook(APIView):
                     else:
                         print("Failed to send status webhook")
 
+                if code == 131047:
+                    title = "24-hour customer service window has expired."
+                    message = "24-hour customer service window has expired."
+                
+
                 db.update_document(
                     'whatsapp_message_logs',
                     {'_id': user['_id']},
