@@ -751,11 +751,167 @@ class FacebookWebhook(APIView):
                         print("Failed to send status webhook")
 
                 if code == 131047:
-                    title = "Message failed to send because more than 24 hours have passed since the customer last replied to this number."
-                    message = "Message failed to send because more than 24 hours have passed since the customer last replied to this number."
+                    title = "It has been more than 24 hours since this person last messaged you. Use an approved template to continue."
+                    message = "It has been more than 24 hours since this person last messaged you. Use an approved template to continue."
                 elif code == 131049:
                     title = "WhatsApp couldn’t deliver your message because it limits how many promotional messages this person can receive. You can try again later."
                     message = "WhatsApp couldn’t deliver your message because it limits how many promotional messages this person can receive. You can try again later."
+                elif code == 131050:
+                    title = "This person has chosen to stop receiving promotional messages from your business."
+                    message = "This person has chosen to stop receiving promotional messages from your business."
+                elif code == 131026:
+                    title = "WhatsApp couldn’t deliver this message. The person’s number or WhatsApp account may be unable to receive it."
+                    message = "WhatsApp couldn’t deliver this message. The person’s number or WhatsApp account may be unable to receive it."
+                elif code == 131021:
+                    title = "You cannot send a message to your own business number."
+                    message = "You cannot send a message to your own business number."
+                elif code == 130403:
+                    title = "Your business has blocked this person on WhatsApp. Unblock them before sending."
+                    message = "Your business has blocked this person on WhatsApp. Unblock them before sending."
+                elif code == 130472:
+                    title = "WhatsApp has excluded this person from receiving this message as part of a platform test."
+                    message = "WhatsApp has excluded this person from receiving this message as part of a platform test."
+                elif code == 130497:
+                    title = "Your business account cannot send messages to this person’s country or region."
+                    message = "Your business account cannot send messages to this person’s country or region."
+                elif code == 4:
+                    title = "Too many requests were made in a short time. Please try again later."
+                    message = "Too many requests were made in a short time. Please try again later."
+                elif code == 80007:
+                    title = "Your WhatsApp business account has reached its request limit. Please try again later."
+                    message = "Your WhatsApp business account has reached its request limit. Please try again later."
+                elif code == 130429:
+                    title = "Messages are being sent too quickly. Slow down sending and try again."
+                    message = "Messages are being sent too quickly. Slow down sending and try again."
+                elif code == 131048:
+                    title = "WhatsApp has restricted sending from your number, possibly because previous messages were blocked or reported."
+                    message = "WhatsApp has restricted sending from your number, possibly because previous messages were blocked or reported."
+                elif code == 131056:
+                    title = "Too many messages were sent to this person too quickly. Wait before sending another."
+                    message = "Too many messages were sent to this person too quickly. Wait before sending another."
+                elif code == 131057:
+                    title = "Your WhatsApp business account is undergoing maintenance. Please try again later."
+                    message = "Your WhatsApp business account is undergoing maintenance. Please try again later."
+                elif code == 132000:
+                    title = "The number of personalized fields does not match the template. Check the details entered."
+                    message = "The number of personalized fields does not match the template. Check the details entered."
+                elif code == 132001:
+                    title = "This template is unavailable, not approved, or unavailable in the selected language."
+                    message = "This template is unavailable, not approved, or unavailable in the selected language."
+                elif code == 132005:
+                    title = "The completed template message is too long. Shorten its text or personalized details."
+                    message = "The completed template message is too long. Shorten its text or personalized details."
+                elif code == 132007:
+                    title = "This template’s content does not meet WhatsApp’s requirements. Review and update it."
+                    message = "This template’s content does not meet WhatsApp’s requirements. Review and update it."
+                elif code == 132012:
+                    title = "Some personalized details do not match the format required by this template."
+                    message = "Some personalized details do not match the format required by this template."
+                elif code == 132015:
+                    title = "WhatsApp has paused this template because of its quality rating."
+                    message = "WhatsApp has paused this template because of its quality rating."
+                elif code == 132016:
+                    title = "WhatsApp has permanently disabled this template after repeated quality issues. Create a revised template."
+                    message = "WhatsApp has permanently disabled this template after repeated quality issues. Create a revised template."
+                elif code == 132018:
+                    title = "Some template details could not be validated. Check the information entered."
+                    message = "Some template details could not be validated. Check the information entered."
+                elif code == 132068:
+                    title = "WhatsApp has blocked the form or flow used in this message."
+                    message = "WhatsApp has blocked the form or flow used in this message."
+                elif code == 132069:
+                    title = "This form or flow has reached its sending limit. Please try again later."
+                    message = "This form or flow has reached its sending limit. Please try again later."
+                elif code == 0 and statuses[0].get('errors'):
+                    title = "Your connection to Meta could not be verified. Contact your account administrator."
+                    message = "Your connection to Meta could not be verified. Contact your account administrator."
+                elif code == 190:
+                    title = "Your connection to Meta has expired or is no longer valid. Renew the connection."
+                    message = "Your connection to Meta has expired or is no longer valid. Renew the connection."
+                elif code == 3:
+                    title = "Your integration does not have the access needed for this action."
+                    message = "Your integration does not have the access needed for this action."
+                elif code == 10 or code == 131005 or 200 <= code <= 299:
+                    title = "Required account permissions are missing or have been removed. Contact your administrator."
+                    message = "Required account permissions are missing or have been removed. Contact your administrator."
+                elif code == 368:
+                    title = "Meta has restricted your WhatsApp business account for a policy issue. Review your account status."
+                    message = "Meta has restricted your WhatsApp business account for a policy issue. Review your account status."
+                elif code == 131031:
+                    title = "Your WhatsApp business account is locked. Review its status or contact support."
+                    message = "Your WhatsApp business account is locked. Review its status or contact support."
+                elif code == 131037:
+                    title = "This sending number needs an approved business display name before it can send messages."
+                    message = "This sending number needs an approved business display name before it can send messages."
+                elif code == 131042:
+                    title = "There is an issue with your WhatsApp billing or payment setup. Review your payment settings."
+                    message = "There is an issue with your WhatsApp billing or payment setup. Review your payment settings."
+                elif code == 134011:
+                    title = "Accept the WhatsApp Payments terms before using this payment feature."
+                    message = "Accept the WhatsApp Payments terms before using this payment feature."
+                elif code == 100:
+                    title = "Some information in this request is invalid or unsupported. Check the details and try again."
+                    message = "Some information in this request is invalid or unsupported. Check the details and try again."
+                elif code == 131008:
+                    title = "Required information is missing. Complete the missing details before sending."
+                    message = "Required information is missing. Complete the missing details before sending."
+                elif code == 131009:
+                    title = "Some information entered is invalid. Check the details and try again."
+                    message = "Some information entered is invalid. Check the details and try again."
+                elif code == 131051:
+                    title = "This message type is not supported. Choose a supported message format."
+                    message = "This message type is not supported. Choose a supported message format."
+                elif code == 131052:
+                    title = "WhatsApp couldn’t download the attachment received from this person. Ask them to share it another way."
+                    message = "WhatsApp couldn’t download the attachment received from this person. Ask them to share it another way."
+                elif code == 131053:
+                    title = "WhatsApp couldn’t upload your attachment. Check its file type and size, then upload it again."
+                    message = "WhatsApp couldn’t upload your attachment. Check its file type and size, then upload it again."
+                elif code == 1:
+                    title = "The request could not be processed because of a request or service issue."
+                    message = "The request could not be processed because of a request or service issue."
+                elif code == 2 or code == 131016:
+                    title = "WhatsApp is temporarily unavailable. Please try again later."
+                    message = "WhatsApp is temporarily unavailable. Please try again later."
+                elif code == 131000:
+                    title = "Something went wrong while sending your message. Try again; contact support if it continues."
+                    message = "Something went wrong while sending your message. Try again; contact support if it continues."
+                elif code == 135000:
+                    title = "WhatsApp couldn’t process the message details. Contact support if the problem continues."
+                    message = "WhatsApp couldn’t process the message details. Contact support if the problem continues."
+                elif code == 33:
+                    title = "The business number used for this request is unavailable or has been removed. Check the connected number."
+                    message = "The business number used for this request is unavailable or has been removed. Check the connected number."
+                elif code == 131045:
+                    title = "There is a problem with your business number’s registration. Contact support to complete its setup."
+                    message = "There is a problem with your business number’s registration. Contact support to complete its setup."
+                elif code == 133000:
+                    title = "A previous attempt to disconnect this number did not finish. Contact support."
+                    message = "A previous attempt to disconnect this number did not finish. Contact support."
+                elif code == 133004:
+                    title = "WhatsApp’s registration service is temporarily unavailable. Please try again later."
+                    message = "WhatsApp’s registration service is temporarily unavailable. Please try again later."
+                elif code == 133005:
+                    title = "The two-step verification PIN is incorrect. Check the PIN and try again."
+                    message = "The two-step verification PIN is incorrect. Check the PIN and try again."
+                elif code == 133006:
+                    title = "Verify your business phone number before completing registration."
+                    message = "Verify your business phone number before completing registration."
+                elif code == 133008:
+                    title = "Too many incorrect PIN attempts were made. Wait before trying again."
+                    message = "Too many incorrect PIN attempts were made. Wait before trying again."
+                elif code == 133009:
+                    title = "PIN attempts were made too quickly. Wait before trying again."
+                    message = "PIN attempts were made too quickly. Wait before trying again."
+                elif code == 133010:
+                    title = "Your business phone number has not completed registration with WhatsApp."
+                    message = "Your business phone number has not completed registration with WhatsApp."
+                elif code == 133015:
+                    title = "This number was recently removed. Wait a few minutes before registering it again."
+                    message = "This number was recently removed. Wait a few minutes before registering it again."
+                elif code == 133016:
+                    title = "Too many registration attempts were made. Wait until WhatsApp allows another attempt."
+                    message = "Too many registration attempts were made. Wait until WhatsApp allows another attempt."
                 
 
                 db.update_document(
