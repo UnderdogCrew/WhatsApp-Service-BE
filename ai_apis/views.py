@@ -24,6 +24,7 @@ from utils.send_message_data import TokenBucketLimiter
 import logging
 from utils.s3_helper import S3Helper
 from utils.scheduled_message_redis import parse_scheduled_at, store_scheduled_message
+from whatsapp_apis.views import customer_display_name, phone_number_candidates
 from io import BytesIO
 
 
@@ -1496,6 +1497,38 @@ class UserDashboard(APIView):
             return JsonResponse({"message": "Internal Server Error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def _last_10_digits(number):
+    digits = "".join(ch for ch in str(number or "") if ch.isdigit())
+    return digits[-10:] if len(digits) >= 10 else digits
+
+
+def customer_names_for_logs(db, user_id, messages):
+    """Map last-10 phone digits to customer display names for a page of message logs."""
+    candidates = []
+    seen = set()
+    for message in messages:
+        for value in phone_number_candidates(message.get("number")):
+            if value in seen:
+                continue
+            seen.add(value)
+            candidates.append(value)
+
+    if not candidates:
+        return {}
+
+    customers = db.find_documents(
+        "customers",
+        {"user_id": user_id, "number": {"$in": candidates}},
+        projection={"name": 1, "number": 1},
+    )
+    names = {}
+    for customer in customers:
+        key = _last_10_digits(customer.get("number"))
+        if not key or key in names:
+            continue
+        names[key] = customer_display_name(customer, fallback="")
+    return names
+
 
 class UserMessageLogs(APIView):
     @swagger_auto_schema(
@@ -1717,6 +1750,7 @@ class UserMessageLogs(APIView):
 
             message_list = []
             ist_timezone = pytz.timezone('Asia/Kolkata')
+            customer_names = customer_names_for_logs(db, user_id, total_message)
             for _message in total_message:
                 # created_at / updated_at were stored via datetime.now() (IST wall clock)
                 # but Mongo tags them as UTC. Treat as IST, convert to real UTC so the
@@ -1779,10 +1813,14 @@ class UserMessageLogs(APIView):
                     
 
 
+                phone_key = _last_10_digits(_message.get("number"))
+                customer_name = customer_names.get(phone_key) or str(_message.get("number") or "")
+
                 message_list.append(
                     {
                         "id": str(_message['_id']),
                         "number" : _message['number'],
+                        "customer_name": customer_name,
                         "message" : _message['message'],
                         "message_id" : _message['id'],
                         "message_status" : _message['message_status'],
