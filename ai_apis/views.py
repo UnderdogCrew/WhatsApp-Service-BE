@@ -1749,64 +1749,51 @@ class UserMessageLogs(APIView):
             total_message_count = db.find_documents_count("whatsapp_message_logs", query_filter)
 
             message_list = []
-            ist_timezone = pytz.timezone('Asia/Kolkata')
             customer_names = customer_names_for_logs(db, user_id, total_message)
             for _message in total_message:
-                # created_at / updated_at were stored via datetime.now() (IST wall clock)
-                # but Mongo tags them as UTC. Treat as IST, convert to real UTC so the
-                # UI's UTC→IST conversion shows the correct local time.
+                # All log timestamps are returned as GMT (UTC), with no local conversion.
                 try:
                     created_at = _message['created_at']
-                    if created_at.tzinfo is not None:
-                        created_at = created_at.replace(tzinfo=None)
-                    created_at = ist_timezone.localize(created_at).astimezone(datetime.timezone.utc)
+                    if created_at.tzinfo is None:
+                        created_at = created_at.replace(tzinfo=datetime.timezone.utc)
+                    else:
+                        created_at = created_at.astimezone(datetime.timezone.utc)
                     human_readable = created_at.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     human_readable = ""
 
                 try:
                     updated_at = _message['updated_at']
-                    if updated_at.tzinfo is not None:
-                        updated_at = updated_at.replace(tzinfo=None)
-                    updated_at = ist_timezone.localize(updated_at).astimezone(datetime.timezone.utc)
+                    if updated_at.tzinfo is None:
+                        updated_at = updated_at.replace(tzinfo=datetime.timezone.utc)
+                    else:
+                        updated_at = updated_at.astimezone(datetime.timezone.utc)
                     updated_at_human_readable = updated_at.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     updated_at_human_readable = ""
 
                 try:
-                    # Convert to a datetime object
                     sent_dt_obj = datetime.datetime.fromtimestamp(_message['sent_at'], datetime.timezone.utc)
-
-                    # Format it into a readable format
                     sent_dt_readable = sent_dt_obj.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     sent_dt_readable = ""
                 
                 try:
-                    # Convert to a datetime object
                     read_at_obj = datetime.datetime.fromtimestamp(_message['read_at'], datetime.timezone.utc)
-
-                    # Format it into a readable format
                     read_at_readable = read_at_obj.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     read_at_readable = ""
                 
 
                 try:
-                    # Convert to a datetime object
                     delivered_at_obj = datetime.datetime.fromtimestamp(_message['delivered_at'], datetime.timezone.utc)
-
-                    # Format it into a readable format
                     delivered_at_readable = delivered_at_obj.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     delivered_at_readable = ""
 
 
                 try:
-                    # Convert to a datetime object
                     failed_at_obj = datetime.datetime.fromtimestamp(_message['failed_at'], datetime.timezone.utc)
-
-                    # Format it into a readable format
                     failed_at_readable = failed_at_obj.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     failed_at_readable = ""
