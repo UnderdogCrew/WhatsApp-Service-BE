@@ -1754,10 +1754,10 @@ class UserMessageLogs(APIView):
                 # All log timestamps are returned as GMT (UTC), with no local conversion.
                 try:
                     created_at = _message['created_at']
-                    if created_at.tzinfo is None:
-                        created_at = created_at.replace(tzinfo=datetime.timezone.utc)
-                    else:
-                        created_at = created_at.astimezone(datetime.timezone.utc)
+                    # if created_at.tzinfo is None:
+                    #     created_at = created_at.replace(tzinfo=datetime.timezone.utc)
+                    # else:
+                    #     created_at = created_at.astimezone(datetime.timezone.utc)
                     human_readable = created_at.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     human_readable = ""
