@@ -1757,7 +1757,7 @@ class UserMessageLogs(APIView):
                     # if created_at.tzinfo is None:
                     #     created_at = created_at.replace(tzinfo=datetime.timezone.utc)
                     # else:
-                    #     created_at = created_at.astimezone(datetime.timezone.utc)
+                    created_at = created_at.astimezone(datetime.timezone.utc)
                     human_readable = created_at.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     human_readable = ""
