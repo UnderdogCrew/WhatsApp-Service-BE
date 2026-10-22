@@ -1764,10 +1764,10 @@ class UserMessageLogs(APIView):
 
                 try:
                     updated_at = _message['updated_at']
-                    if updated_at.tzinfo is None:
-                        updated_at = updated_at.replace(tzinfo=datetime.timezone.utc)
-                    else:
-                        updated_at = updated_at.astimezone(datetime.timezone.utc)
+                    # if updated_at.tzinfo is None:
+                    #     updated_at = updated_at.replace(tzinfo=datetime.timezone.utc)
+                    # else:
+                    updated_at = updated_at.astimezone(datetime.timezone.utc)
                     updated_at_human_readable = updated_at.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     updated_at_human_readable = ""
