@@ -556,6 +556,38 @@ class FacebookWebhook(APIView):
                             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
                             print("Replied Saved in database")
                         
+                        if messages_type == "contacts":
+                            contacts = value['messages'][0]['contacts'] if "contacts" in value['messages'][0] else []
+                            name = contacts[0]['formatted_name'] if len(contacts) > 0 else ""
+                            phones = contacts[0]['phones'] if len(contacts) > 0 else []
+                            messages = ""
+                            for phone in phones:
+                                messages += f"{phone['number']}\n"
+                            reply_payload['message'] = name + " " + messages
+                            whatsapp_status_logs = {
+                                "number": from_number,
+                                "message": name + " " + messages,
+                                "user_id": str(user_info['_id']),
+                                "price": 0,
+                                "id": value['messages'][0]['id'],
+                                "message_status": "received",
+                                "created_at": datetime.datetime.now(),
+                                "updated_at": datetime.datetime.now(),
+                                "template_name": "contacts",
+                                "code": 0,
+                                "title": "",
+                                "error_message": "",
+                                "attachment": True if meta_media_url != "" else False,
+                                "attachment_url": meta_media_url,
+                                "error_data": "",
+                                "sent_at" : int(value['messages'][0]['timestamp']),
+                                "delivered_at" : int(value['messages'][0]['timestamp']),
+                                "read_at" : int(value['messages'][0]['timestamp'])
+                            }
+                            db.create_document('whatsapp_message_logs', whatsapp_status_logs)
+                            print("Replied Saved in database")
+                            
+                        
                         if messages_type == "interactive":
                             interactive = value['messages'][0]['interactive']['nfm_reply'] if "nfm_reply" in value['messages'][0]['interactive'] else None
                             if interactive:
