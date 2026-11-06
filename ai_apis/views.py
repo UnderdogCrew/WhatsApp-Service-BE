@@ -529,7 +529,7 @@ class FacebookWebhook(APIView):
                                         entry=metadata
                                     )
                         print("messages_type: ", messages_type)
-                        if messages_type == "text" or messages_type == "button":
+                        if messages_type == "text" or messages_type == "button" or messages_type == "reaction":
                             if messages is None or messages == "":
                                 return HttpResponse(hub_challenge)
                             reply_payload['message'] = messages
