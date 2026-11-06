@@ -476,6 +476,9 @@ class FacebookWebhook(APIView):
                             messages = value['messages'][0]['document']['caption']
                         else:
                             messages = ""
+
+                        if messages is None or messages == "":
+                            return HttpResponse(hub_challenge)
                         
                         from_number = value['messages'][0]['from']
                         messages_type = value['messages'][0]['type']
