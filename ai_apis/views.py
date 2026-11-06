@@ -465,18 +465,6 @@ class FacebookWebhook(APIView):
                             messages = value['messages'][0]['button']['payload']
                         elif "reaction" in value['messages'][0]:
                             messages = value['messages'][0]['reaction']['emoji']
-                        elif "image" in value['messages'][0]:
-                            messages = value['messages'][0]['image']['caption']
-                            meta_media_url = value['messages'][0]['image']['url']
-                        elif "video" in value['messages'][0]:
-                            messages = value['messages'][0]['video']['url']
-                            meta_media_url = messages
-                        elif "audio" in value['messages'][0]:
-                            messages = value['messages'][0]['audio']['caption']
-                            meta_media_url = value['messages'][0]['audio']['url']
-                        elif "document" in value['messages'][0]:
-                            messages = value['messages'][0]['document']['caption']
-                            meta_media_url = value['messages'][0]['document']['url']
                         else:
                             messages = ""
 
@@ -598,8 +586,6 @@ class FacebookWebhook(APIView):
                             attachment_url = ""
                             attachment = value['messages'][0][messages_type]['id']
                             caption = value['messages'][0][messages_type]['caption'] if "caption" in value['messages'][0][messages_type] else ""
-                            if caption is None or caption == "":
-                                caption = messages
 
                             url = f"https://graph.facebook.com/v19.0/{attachment}?phone_number_id={phone_number_id}"
 
@@ -643,7 +629,7 @@ class FacebookWebhook(APIView):
                                 reply_payload['guid'] = value['messages'][0]['id']
                                 whatsapp_status_logs = {
                                     "number": from_number,
-                                    "message": caption,
+                                    "message": caption if caption is not None and caption != "" else attachment_url,
                                     "user_id": str(user_info['_id']),
                                     "price": 0,
                                     "id": value['messages'][0]['id'],
