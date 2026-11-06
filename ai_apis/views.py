@@ -466,9 +466,6 @@ class FacebookWebhook(APIView):
                             messages = value['messages'][0]['reaction']['emoji']
                         else:
                             messages = ""
-
-                        if messages is None or messages == "":
-                            return HttpResponse(hub_challenge)
                         
                         from_number = value['messages'][0]['from']
                         messages_type = value['messages'][0]['type']
@@ -478,6 +475,8 @@ class FacebookWebhook(APIView):
                         reply_payload['guid'] = value['messages'][0]['id']
 
                         if str(user_info['_id']) == "67c1cf4c2763ce36e17d145e":
+                            if messages is None or messages == "":
+                                return HttpResponse(hub_challenge)
                             last_send_message = db.find_documents(
                                 collection_name="whatsapp_message_logs",
                                 query={
@@ -531,6 +530,8 @@ class FacebookWebhook(APIView):
                                     )
                         print("messages_type: ", messages_type)
                         if messages_type == "text" or messages_type == "button":
+                            if messages is None or messages == "":
+                                return HttpResponse(hub_challenge)
                             reply_payload['message'] = messages
                             whatsapp_status_logs = {
                                 "number": from_number,
