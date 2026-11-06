@@ -437,7 +437,6 @@ class FacebookWebhook(APIView):
             value = changes[0]['value']
             phone_number_id = value['metadata']['phone_number_id']
             statuses = value['statuses'] if "statuses" in value else []
-            messages = value['messages'] if "messages" in value else []
             hub_challenge = "EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT"
             user_info = db.find_document("users", query={"phone_number_id": phone_number_id})
             if user_info is None:
