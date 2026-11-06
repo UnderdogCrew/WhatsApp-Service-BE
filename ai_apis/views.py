@@ -446,6 +446,7 @@ class FacebookWebhook(APIView):
             auto_reply_enabled = user_info['auto_reply_enabled'] if "auto_reply_enabled" in user_info else False
             reply_webhook_url = user_info.get('reply_webhook_url', "")
             status_webhook_url = user_info.get('status_webhook_url', "")
+            meta_media_url = ""
 
             if len(statuses) == 0:
                 try:
@@ -464,16 +465,18 @@ class FacebookWebhook(APIView):
                             messages = value['messages'][0]['button']['payload']
                         elif "reaction" in value['messages'][0]:
                             messages = value['messages'][0]['reaction']['emoji']
-                        elif "interactive" in value['messages'][0]:
-                            messages = value['messages'][0]['interactive']['nfm_reply']['response_json']
                         elif "image" in value['messages'][0]:
                             messages = value['messages'][0]['image']['caption']
+                            meta_media_url = value['messages'][0]['image']['url']
                         elif "video" in value['messages'][0]:
-                            messages = value['messages'][0]['video']['caption']
+                            messages = value['messages'][0]['video']['url']
+                            meta_media_url = messages
                         elif "audio" in value['messages'][0]:
                             messages = value['messages'][0]['audio']['caption']
+                            meta_media_url = value['messages'][0]['audio']['url']
                         elif "document" in value['messages'][0]:
                             messages = value['messages'][0]['document']['caption']
+                            meta_media_url = value['messages'][0]['document']['url']
                         else:
                             messages = ""
 
@@ -555,8 +558,8 @@ class FacebookWebhook(APIView):
                                 "code": 0,
                                 "title": "",
                                 "error_message": "",
-                                "attachment": False,
-                                "attachment_url": "",
+                                "attachment": True if meta_media_url != "" else False,
+                                "attachment_url": meta_media_url,
                                 "error_data": "",
                                 "sent_at" : int(value['messages'][0]['timestamp']),
                                 "delivered_at" : int(value['messages'][0]['timestamp']),
@@ -582,8 +585,8 @@ class FacebookWebhook(APIView):
                                     "code": 0,
                                     "title": "",
                                     "error_message": "",
-                                    "attachment": False,
-                                    "attachment_url": "",
+                                    "attachment": True if meta_media_url != "" else False,
+                                    "attachment_url": meta_media_url,
                                     "error_data": "",
                                     "sent_at" : int(value['messages'][0]['timestamp']),
                                     "delivered_at" : int(value['messages'][0]['timestamp']),
@@ -595,6 +598,8 @@ class FacebookWebhook(APIView):
                             attachment_url = ""
                             attachment = value['messages'][0][messages_type]['id']
                             caption = value['messages'][0][messages_type]['caption'] if "caption" in value['messages'][0][messages_type] else ""
+                            if caption is None or caption == "":
+                                caption = messages
 
                             url = f"https://graph.facebook.com/v19.0/{attachment}?phone_number_id={phone_number_id}"
 
