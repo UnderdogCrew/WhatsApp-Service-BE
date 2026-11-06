@@ -430,13 +430,14 @@ class FacebookWebhook(APIView):
         try:
             db = MongoDB()
             data = request.data
-            print("data: ", data)
+            logging.info("data: ", data)
             entry = data['entry']
             changes = entry[0]['changes']
             guid = entry[0]['id']
             value = changes[0]['value']
             phone_number_id = value['metadata']['phone_number_id']
             statuses = value['statuses'] if "statuses" in value else []
+            messages = value['messages'] if "messages" in value else []
             hub_challenge = "EAANWlQY0U2gBOxjQ1WIYomX99g9ZBarEiZBAftiZBYGVgvGWJ8OwZBwUdCEmgA1TZBZB9XT"
             user_info = db.find_document("users", query={"phone_number_id": phone_number_id})
             if user_info is None:
@@ -461,6 +462,18 @@ class FacebookWebhook(APIView):
                             messages = value['messages'][0]['text']['body']
                         elif "button" in value['messages'][0]:
                             messages = value['messages'][0]['button']['payload']
+                        elif "reaction" in value['messages'][0]:
+                            messages = value['messages'][0]['reaction']['emoji']
+                        elif "interactive" in value['messages'][0]:
+                            messages = value['messages'][0]['interactive']['nfm_reply']['response_json']
+                        elif "image" in value['messages'][0]:
+                            messages = value['messages'][0]['image']['caption']
+                        elif "video" in value['messages'][0]:
+                            messages = value['messages'][0]['video']['caption']
+                        elif "audio" in value['messages'][0]:
+                            messages = value['messages'][0]['audio']['caption']
+                        elif "document" in value['messages'][0]:
+                            messages = value['messages'][0]['document']['caption']
                         else:
                             messages = ""
                         
