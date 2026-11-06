@@ -430,7 +430,7 @@ class FacebookWebhook(APIView):
         try:
             db = MongoDB()
             data = request.data
-            logging.info("data: ", data)
+            print("data: ", data)
             entry = data['entry']
             changes = entry[0]['changes']
             guid = entry[0]['id']
