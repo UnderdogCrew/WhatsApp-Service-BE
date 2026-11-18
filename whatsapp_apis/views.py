@@ -1021,6 +1021,18 @@ class CustomersChatLogs(APIView):
             # if customer_details is None:
             #     return JsonResponse({"message": "Number is invalid"}, status=422)
 
+            # Mark unread/incoming messages as read when user opens this chat
+            db.update_documents(
+                collection_name="whatsapp_message_logs",
+                query={
+                    **query_filter,
+                    "message_status": "received",
+                    "msg_type": {"$ne": 1},
+                },
+                update_data={"msg_type": 1},
+                set_updated_at=False,
+            )
+
             customer_chat_data = db.find_documents(collection_name="whatsapp_message_logs", query=query_filter, sort=sort_order)
             for _customer in customer_chat_data:
                 if _customer['message_status'] in ['read', 'delivered', 'sent', 'error', 'failed']:
@@ -1199,6 +1211,7 @@ class UniqueChatList(APIView):
                     "sent_at": {"$first": "$sent_at"},
                     "delivered_at": {"$first": "$delivered_at"},
                     "failed_at": {"$first": "$failed_at"},
+                    "stored_msg_type": {"$first": "$msg_type"},
                     "customer_info": {"$first": "$customer_info"}
                 }},
                 {"$unwind": {
@@ -1218,7 +1231,12 @@ class UniqueChatList(APIView):
                     "attachment_url": 1,
                     "msg_type": {
                         "$cond": {
-                            "if": {"$in": ["$message_status", ["read", "delivered", "sent", "error"]]},
+                            "if": {
+                                "$or": [
+                                    {"$in": ["$message_status", ["read", "delivered", "sent", "error"]]},
+                                    {"$eq": ["$stored_msg_type", 1]},
+                                ]
+                            },
                             "then": 1,
                             "else": 2
                         }
@@ -1229,8 +1247,6 @@ class UniqueChatList(APIView):
                 }},
                 {"$sort": {"last_message_time": -1}}
             ]
-
-            print(f"pipeline: {pipeline}")
 
             chat_list_data = db.aggregate(collection_name="whatsapp_message_logs", pipeline=pipeline)
             chat_list = []

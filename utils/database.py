@@ -61,6 +61,12 @@ class MongoDB:
         update_data['updated_at'] = datetime.now()
         return collection.update_one(query, {'$set': update_data})
 
+    def update_documents(self, collection_name, query, update_data, set_updated_at=True):
+        collection = self.get_collection(collection_name)
+        if set_updated_at:
+            update_data = {**update_data, 'updated_at': datetime.now()}
+        return collection.update_many(query, {'$set': update_data})
+
     def delete_document(self, collection_name, query):
         collection = self.get_collection(collection_name)
         return collection.delete_one(query)
