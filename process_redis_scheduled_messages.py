@@ -8,6 +8,7 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "UnderdogCrew.settings")
 django.setup()
 
+from utils.campaigns import mark_campaign_send_finished, mark_campaign_sending
 from utils.send_message_data import TokenBucketLimiter
 from utils.scheduled_message_redis import claim_due_scheduled_messages
 from utils.whatsapp_message_data import send_message_data
@@ -17,23 +18,31 @@ POLL_INTERVAL_SECONDS = 60
 
 def send_scheduled_whatsapp_message(payload):
     numbers = payload.get("numbers") or []
+    campaign_id = payload.get("campaign_id")
+    campaign_code = payload.get("campaign_code")
     limiter = TokenBucketLimiter(rate_per_sec=60)
-    for number in numbers:
-        limiter.acquire()
-        send_message_data(
-            number=number,
-            template_name=payload.get("template_name"),
-            text=payload.get("text") or "",
-            image_url=payload.get("image_url") or "",
-            user_id=payload.get("user_id"),
-            metadata=payload.get("metadata"),
-            latitude=payload.get("latitude"),
-            longitude=payload.get("longitude"),
-            location_name=payload.get("location_name"),
-            address=payload.get("address"),
-            params_fallback_value=payload.get("params_fallback_value"),
-            button_value=payload.get("button_value"),
-        )
+    try:
+        mark_campaign_sending(campaign_id)
+        for number in numbers:
+            limiter.acquire()
+            send_message_data(
+                number=number,
+                template_name=payload.get("template_name"),
+                text=payload.get("text") or "",
+                image_url=payload.get("image_url") or "",
+                user_id=payload.get("user_id"),
+                metadata=payload.get("metadata"),
+                latitude=payload.get("latitude"),
+                longitude=payload.get("longitude"),
+                location_name=payload.get("location_name"),
+                address=payload.get("address"),
+                params_fallback_value=payload.get("params_fallback_value"),
+                button_value=payload.get("button_value"),
+                campaign_id=campaign_id,
+                campaign_code=campaign_code,
+            )
+    finally:
+        mark_campaign_send_finished(campaign_id)
 
 
 def process_due_messages():

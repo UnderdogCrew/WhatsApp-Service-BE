@@ -48,6 +48,7 @@ urlpatterns = [
     path('dashboard', views.UserDashboard.as_view(), name='UserDashboard'),
     path('webhook', views.FacebookWebhook.as_view(), name='FacebookWebhook'),
     path('message/logs', views.UserMessageLogs.as_view(), name='UserMessageLogs'),
+    path('campaign/logs', views.CampaignLogs.as_view(), name='CampaignLogs'),
     path('image-generation', views.ImageGeneration.as_view(), name='ImageGeneration'),
     path('text-generation', views.TextGeneration.as_view(), name='TextGeneration'),
     path('verify-business-number', whatsapp_apis.VerifyBusinessPhoneNumber.as_view(), name='VerifyBusinessPhoneNumber'),

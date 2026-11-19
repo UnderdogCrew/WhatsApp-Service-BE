@@ -24,6 +24,13 @@ from utils.send_message_data import TokenBucketLimiter
 import logging
 from utils.s3_helper import S3Helper
 from utils.scheduled_message_redis import parse_scheduled_at, store_scheduled_message
+from utils.campaigns import (
+    build_campaign_row,
+    campaign_delivery_stats,
+    create_campaign,
+    mark_campaign_send_finished,
+    template_category_from_payload,
+)
 from whatsapp_apis.views import customer_display_name, phone_number_candidates
 from io import BytesIO
 
@@ -106,24 +113,29 @@ def process_components(components, msg_data, image_url):
     return result_list
 
 
-def send_whatsapp_message(numbers, template_name,text, image_url, user_id, msg_metadata, latitude, longitude, location_name, address, params_fallback_value, button_value=None):
+def send_whatsapp_message(numbers, template_name,text, image_url, user_id, msg_metadata, latitude, longitude, location_name, address, params_fallback_value, button_value=None, campaign_id=None, campaign_code=None):
     limiter = TokenBucketLimiter(rate_per_sec=60)  # safe headroom under ~80 MPS default
-    for number in numbers:
-        limiter.acquire()
-        send_message_data(
-            number=number,
-            template_name=template_name,
-            text=text,
-            image_url=image_url,
-            user_id=user_id,
-            metadata=msg_metadata,
-            latitude=latitude,
-            longitude=longitude,
-            location_name=location_name,
-            address=address,
-            params_fallback_value=params_fallback_value,
-            button_value=button_value
-        )
+    try:
+        for number in numbers:
+            limiter.acquire()
+            send_message_data(
+                number=number,
+                template_name=template_name,
+                text=text,
+                image_url=image_url,
+                user_id=user_id,
+                metadata=msg_metadata,
+                latitude=latitude,
+                longitude=longitude,
+                location_name=location_name,
+                address=address,
+                params_fallback_value=params_fallback_value,
+                button_value=button_value,
+                campaign_id=campaign_id,
+                campaign_code=campaign_code,
+            )
+    finally:
+        mark_campaign_send_finished(campaign_id)
     return True
 
 class SendMessage(APIView):
@@ -179,6 +191,10 @@ class SendMessage(APIView):
                     default=False,
                     description='While need to send the message to all customer value should be True'
                 ),
+                "campaign_name": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description='Campaign name for the message'
+                ),
             },
             required=['text', 'message_type', 'template_name']
         ),
@@ -218,8 +234,11 @@ class SendMessage(APIView):
             location_name = request_data.get("location_name", None)
             address = request_data.get("address", None)
             button_value = request_data.get("button_value", None)
+            campaign_name = (request_data.get("campaign_name") or "").strip()
             if template_name == "hotel":
                 template_name = "hello_world"
+
+            
 
             # Validate required fields
             if not request_data:
@@ -275,6 +294,10 @@ class SendMessage(APIView):
             template_response = requests.request("GET", template_url, headers=headers)
             if template_response.status_code != 200:
                 return JsonResponse({"message": "Template is missing"}, safe=False, status=422)
+            try:
+                template_category = template_category_from_payload(template_response.json(), template_name)
+            except Exception:
+                template_category = ""
 
             text = request_data['text']
             schedule_type = request_data['schedule_type'] if "schedule_type" in request_data else 1
@@ -348,6 +371,19 @@ class SendMessage(APIView):
                         status=422
                     )
 
+                campaign_id, campaign_code = create_campaign(
+                    db,
+                    user_id=user_id,
+                    campaign_name=campaign_name or template_name,
+                    template_name=template_name,
+                    template_category=template_category,
+                    recipients=len(numbers),
+                    status="scheduled",
+                    schedule_type=schedule_type,
+                    scheduled_at=scheduled_at,
+                    scheduled_at_utc=scheduled_at_utc,
+                    schedule_timezone=schedule_timezone,
+                )
                 schedule_payload = {
                     "user_id": user_id,
                     "text": text,
@@ -365,16 +401,25 @@ class SendMessage(APIView):
                     "scheduled_at": scheduled_at,
                     "schedule_timezone": schedule_timezone,
                     "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "campaign_id": campaign_id,
+                    "campaign_code": campaign_code,
                 }
                 try:
                     schedule_id = store_scheduled_message(schedule_payload, scheduled_at_utc)
                 except Exception as redis_exc:
                     print(f"Redis schedule store failed: {redis_exc}")
+                    db.delete_document("campaigns", {"_id": ObjectId(campaign_id)})
                     return JsonResponse(
                         {"message": "Failed to schedule message"},
                         safe=False,
                         status=500
                     )
+
+                db.update_document(
+                    "campaigns",
+                    {"_id": ObjectId(campaign_id)},
+                    {"schedule_id": schedule_id},
+                )
 
                 return JsonResponse(
                     {
@@ -382,11 +427,24 @@ class SendMessage(APIView):
                         "schedule_id": schedule_id,
                         "scheduled_at": scheduled_at_utc.isoformat(),
                         "numbers_count": len(schedule_payload["numbers"]),
+                        "campaign_id": campaign_id,
+                        "campaign_code": campaign_code,
                     },
                     safe=False,
                     status=200
                 )
-            
+
+            campaign_id, campaign_code = create_campaign(
+                db,
+                user_id=user_id,
+                campaign_name=campaign_name or template_name,
+                template_name=template_name,
+                template_category=template_category,
+                recipients=len(numbers),
+                status="running",
+                schedule_type=schedule_type,
+                sent_at=datetime.datetime.now(datetime.timezone.utc),
+            )
             threading.Thread(target=send_whatsapp_message, args=(numbers,
                                                              template_name,
                                                              text,
@@ -398,7 +456,9 @@ class SendMessage(APIView):
                                                              location_name,
                                                              address,
                                                              params_fallback_value,
-                                                             button_value,)
+                                                             button_value,
+                                                             campaign_id,
+                                                             campaign_code,)
                                                              ).start()
 
             return JsonResponse({"message": "Messages sent successfully", 
@@ -406,7 +466,9 @@ class SendMessage(APIView):
             "will_send_now": remaining,
             "allowed_today": DAILY_LIMIT,
             "already_sent_today": already_sent,
-            "numbers_to_send": numbers_to_send}, safe=False, status=200)
+            "numbers_to_send": numbers_to_send,
+            "campaign_id": campaign_id,
+            "campaign_code": campaign_code}, safe=False, status=200)
 
         except Exception as ex:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
@@ -1567,6 +1629,82 @@ def customer_names_for_logs(db, user_id, messages):
     return names
 
 
+class CampaignLogs(APIView):
+    @swagger_auto_schema(
+        operation_description="List campaigns for the campaign logs screen",
+        manual_parameters=[
+            openapi.Parameter(
+                "skip",
+                openapi.IN_QUERY,
+                description="Number of campaigns to skip",
+                type=openapi.TYPE_INTEGER,
+                required=False,
+            ),
+            openapi.Parameter(
+                "limit",
+                openapi.IN_QUERY,
+                description="Page size (max 100)",
+                type=openapi.TYPE_INTEGER,
+                required=False,
+            ),
+        ],
+        responses={
+            200: "Campaign logs",
+            401: "Unauthorized",
+            422: "Unprocessable Entity",
+            500: "Internal Server Error",
+        },
+    )
+    @token_required
+    def get(self, request, current_user_id=None, current_user_email=None):
+        try:
+            if not current_user_id:
+                return JsonResponse(
+                    {"message": "Invalid token or user information could not be retrieved"},
+                    status=401,
+                )
+
+            try:
+                skip = max(0, int(request.query_params.get("skip", 0)))
+                limit = int(request.query_params.get("limit", 20))
+            except (TypeError, ValueError):
+                return JsonResponse({"message": "skip and limit must be integers"}, status=422)
+            if limit <= 0:
+                limit = 20
+            limit = min(limit, 100)
+
+            db = MongoDB()
+            query = {"user_id": str(current_user_id)}
+            total = db.find_documents_count("campaigns", query)
+            campaigns = db.find_documents(
+                "campaigns",
+                query,
+                sort=[("created_at", -1)],
+                skip=skip,
+                limit=limit,
+            )
+            stats_by_campaign = campaign_delivery_stats(
+                db,
+                current_user_id,
+                [str(campaign["_id"]) for campaign in campaigns],
+            )
+            data = [
+                build_campaign_row(campaign, stats_by_campaign.get(str(campaign["_id"])))
+                for campaign in campaigns
+            ]
+            return JsonResponse(
+                {
+                    "message": "Campaign logs fetched successfully",
+                    "count": total,
+                    "data": data,
+                },
+                status=200,
+            )
+        except Exception as ex:
+            print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
+            return JsonResponse({"message": "Something went wrong"}, status=500)
+
+
 class UserMessageLogs(APIView):
     @swagger_auto_schema(
         operation_description="Fetch user message logs",
@@ -1606,6 +1744,20 @@ class UserMessageLogs(APIView):
                 type=openapi.TYPE_STRING,
                 required=False,
                 enum=list(whatsapp_status.keys())
+            ),
+            openapi.Parameter(
+                "campaign_id",
+                openapi.IN_QUERY,
+                description="Campaign id saved on the message log",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "campaign_code",
+                openapi.IN_QUERY,
+                description="Campaign code such as CMP-1045",
+                type=openapi.TYPE_STRING,
+                required=False,
             )
         ],
         responses={
@@ -1643,6 +1795,8 @@ class UserMessageLogs(APIView):
             start_date = request.query_params.get("start_date", None)
             end_date = request.query_params.get("end_date", None)
             status_param = request.query_params.get("status", None)
+            campaign_id = request.query_params.get("campaign_id", None)
+            campaign_code = request.query_params.get("campaign_code", None)
             skip = int(request.query_params.get("skip", 0))
             limit = int(request.query_params.get("limit", 20))
 
@@ -1704,6 +1858,12 @@ class UserMessageLogs(APIView):
             if status_param:
                 if status_param in whatsapp_status:
                     query_filter['message_status'] = whatsapp_status[status_param]
+            if campaign_id:
+                base_filter["campaign_id"] = campaign_id
+                query_filter["campaign_id"] = campaign_id
+            elif campaign_code:
+                base_filter["campaign_code"] = campaign_code
+                query_filter["campaign_code"] = campaign_code
 
             counts_pipeline = [
                 {"$match": base_filter},
@@ -1850,6 +2010,8 @@ class UserMessageLogs(APIView):
                         "message_status" : _message['message_status'],
                         "created_at" : human_readable,
                         "template_name" : _message['template_name'],
+                        "campaign_id": _message.get("campaign_id", ""),
+                        "campaign_code": _message.get("campaign_code", ""),
                         "attachment_url" : _message['attachment_url'] if "attachment_url" in _message else "",
                         "updated_at": updated_at_human_readable,
                         "sent_at": sent_dt_readable,

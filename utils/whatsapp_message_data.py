@@ -261,7 +261,9 @@ def send_message_data(
         location_name=None,
         address=None,
         params_fallback_value=None,
-        button_value=None
+        button_value=None,
+        campaign_id=None,
+        campaign_code=None,
     ):
     try:
         
@@ -494,6 +496,10 @@ def send_message_data(
                 "template_name": template_name,
                 "metadata": msg_details,
             }
+            if campaign_id:
+                whatsapp_status_logs["campaign_id"] = campaign_id
+            if campaign_code:
+                whatsapp_status_logs["campaign_code"] = campaign_code
             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
             db.update_document(
                 collection_name="users",
@@ -521,6 +527,10 @@ def send_message_data(
                 "error_data": response.json()['error']['message'],
                 "metadata": msg_details,
             }
+            if campaign_id:
+                whatsapp_status_logs["campaign_id"] = campaign_id
+            if campaign_code:
+                whatsapp_status_logs["campaign_code"] = campaign_code
             db.create_document('whatsapp_message_logs', whatsapp_status_logs)
 
         return True
