@@ -25,10 +25,13 @@ import logging
 from utils.s3_helper import S3Helper
 from utils.scheduled_message_redis import parse_scheduled_at, store_scheduled_message
 from utils.campaigns import (
-    build_campaign_row,
-    campaign_delivery_stats,
+    CAMPAIGN_LOG_SORTS,
+    CAMPAIGN_LOG_STATUSES,
+    build_campaign_logs,
+    campaigns_to_csv,
     create_campaign,
     mark_campaign_send_finished,
+    parse_campaign_log_params,
     template_category_from_payload,
 )
 from whatsapp_apis.views import customer_display_name, phone_number_candidates
@@ -1631,21 +1634,84 @@ def customer_names_for_logs(db, user_id, messages):
 
 class CampaignLogs(APIView):
     @swagger_auto_schema(
-        operation_description="List campaigns for the campaign logs screen",
+        operation_description=(
+            "Campaign logs screen. Summary cards and status counts follow search, "
+            "date, and template. The table, pagination, count, and failure alert "
+            "also follow the status filter. Pass format=csv to download the filtered rows."
+        ),
         manual_parameters=[
+            openapi.Parameter(
+                "search",
+                openapi.IN_QUERY,
+                description="Campaign name, template name, or campaign code",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "start_date",
+                openapi.IN_QUERY,
+                description="Range start, inclusive, YYYY-MM-DD in Asia/Kolkata",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "end_date",
+                openapi.IN_QUERY,
+                description="Range end, inclusive, YYYY-MM-DD in Asia/Kolkata",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "template",
+                openapi.IN_QUERY,
+                description="Template name. Omit or pass all for every template",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "status",
+                openapi.IN_QUERY,
+                description="Table status chip",
+                type=openapi.TYPE_STRING,
+                required=False,
+                enum=list(CAMPAIGN_LOG_STATUSES),
+            ),
+            openapi.Parameter(
+                "sort",
+                openapi.IN_QUERY,
+                description="newest, oldest, name, recipients, or failed",
+                type=openapi.TYPE_STRING,
+                required=False,
+                enum=list(CAMPAIGN_LOG_SORTS),
+            ),
+            openapi.Parameter(
+                "page",
+                openapi.IN_QUERY,
+                description="Page number, starting at 1. Used instead of skip when both are sent",
+                type=openapi.TYPE_INTEGER,
+                required=False,
+            ),
             openapi.Parameter(
                 "skip",
                 openapi.IN_QUERY,
-                description="Number of campaigns to skip",
+                description="Number of campaigns to skip when page is omitted",
                 type=openapi.TYPE_INTEGER,
                 required=False,
             ),
             openapi.Parameter(
                 "limit",
                 openapi.IN_QUERY,
-                description="Page size (max 100)",
+                description="Page size, default 20, max 100",
                 type=openapi.TYPE_INTEGER,
                 required=False,
+            ),
+            openapi.Parameter(
+                "format",
+                openapi.IN_QUERY,
+                description="json (default) or csv",
+                type=openapi.TYPE_STRING,
+                required=False,
+                enum=["json", "csv"],
             ),
         ],
         responses={
@@ -1664,42 +1730,19 @@ class CampaignLogs(APIView):
                     status=401,
                 )
 
-            try:
-                skip = max(0, int(request.query_params.get("skip", 0)))
-                limit = int(request.query_params.get("limit", 20))
-            except (TypeError, ValueError):
-                return JsonResponse({"message": "skip and limit must be integers"}, status=422)
-            if limit <= 0:
-                limit = 20
-            limit = min(limit, 100)
+            filters, error = parse_campaign_log_params(request.query_params)
+            if error:
+                return JsonResponse({"message": error}, status=422)
 
-            db = MongoDB()
-            query = {"user_id": str(current_user_id)}
-            total = db.find_documents_count("campaigns", query)
-            campaigns = db.find_documents(
-                "campaigns",
-                query,
-                sort=[("created_at", -1)],
-                skip=skip,
-                limit=limit,
-            )
-            stats_by_campaign = campaign_delivery_stats(
-                db,
-                current_user_id,
-                [str(campaign["_id"]) for campaign in campaigns],
-            )
-            data = [
-                build_campaign_row(campaign, stats_by_campaign.get(str(campaign["_id"])))
-                for campaign in campaigns
-            ]
-            return JsonResponse(
-                {
-                    "message": "Campaign logs fetched successfully",
-                    "count": total,
-                    "data": data,
-                },
-                status=200,
-            )
+            payload, export_rows = build_campaign_logs(MongoDB(), current_user_id, filters)
+            if filters["format"] == "csv":
+                response = HttpResponse(
+                    campaigns_to_csv(export_rows),
+                    content_type="text/csv; charset=utf-8",
+                )
+                response["Content-Disposition"] = 'attachment; filename="campaign-logs.csv"'
+                return response
+            return JsonResponse(payload, status=200)
         except Exception as ex:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), type(ex).__name__, ex)
             return JsonResponse({"message": "Something went wrong"}, status=500)
