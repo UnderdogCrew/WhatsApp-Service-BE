@@ -717,3 +717,407 @@ def build_campaign_logs(db, user_id, filters):
         "data": page_rows,
     }
     return payload, visible
+
+
+RECIPIENT_STATUSES = ("all", "read", "delivered", "failed", "queued", "replied")
+_SENT_TO_WHATSAPP_STATUSES = {"sent", "accepted", "ok", "delivered", "read", "failed", "error"}
+_FAILURE_TITLES = {
+    131026: "Message undeliverable",
+    131056: "Too many messages to one number",
+    131047: "24-hour window closed",
+    131049: "Held back by Meta's marketing limit",
+    131050: "Promotional messages stopped",
+    131021: "Can't message your own number",
+    130403: "Recipient is blocked",
+    130472: "Excluded by a Meta test",
+    130497: "Country not allowed",
+    131048: "Sending restricted",
+    131042: "Billing problem",
+    132001: "Template unavailable",
+    132015: "Template paused",
+    4: "Sending limit reached",
+    80007: "Sending limit reached",
+    130429: "Sending too quickly",
+}
+
+
+def _last10(number):
+    digits = "".join(ch for ch in str(number or "") if ch.isdigit())
+    return digits[-10:] if len(digits) >= 10 else digits
+
+
+def _number_variants(number):
+    raw = str(number or "").strip()
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    last10 = digits[-10:] if len(digits) >= 10 else digits
+    values = []
+    for value in (
+        raw,
+        digits,
+        last10,
+        f"91{last10}" if last10 else "",
+        f"+91{last10}" if last10 else "",
+        f"+{digits}" if digits else "",
+    ):
+        if value and value not in values:
+            values.append(value)
+    return values
+
+
+def mask_phone_number(number):
+    digits = "".join(ch for ch in str(number or "") if ch.isdigit())
+    national = digits[-10:] if len(digits) >= 10 else digits
+    if len(national) < 4:
+        return str(number or "")
+    if len(national) >= 10:
+        masked = f"{national[:5]} •••{national[-2:]}"
+    else:
+        masked = f"{national[:2]} •••{national[-2:]}"
+    if digits.startswith("91") or len(digits) > 10:
+        return f"+91 {masked}"
+    return masked
+
+
+def contact_initials(name):
+    parts = [part for part in re.split(r"\s+", str(name or "").strip()) if part and part[0].isalpha()]
+    if len(parts) >= 2:
+        return (parts[0][0] + parts[1][0]).upper()
+    if len(parts) == 1:
+        letters = [char for char in parts[0] if char.isalpha()]
+        return "".join(letters[:2]).upper()
+    return ""
+
+
+def format_log_clock(value):
+    if value is None or value == "" or value == 0:
+        return "—"
+    if isinstance(value, (int, float)):
+        moment = datetime.datetime.fromtimestamp(value, datetime.timezone.utc)
+    elif isinstance(value, datetime.datetime):
+        moment = value if value.tzinfo else value.replace(tzinfo=datetime.timezone.utc)
+        moment = moment.astimezone(datetime.timezone.utc)
+    else:
+        return "—"
+    local = moment.astimezone(pytz.timezone("Asia/Kolkata"))
+    return f"{local.strftime('%I')}:{local.strftime('%M')} {local.strftime('%p').lower()}"
+
+
+def format_campaign_date_long(value, tz_name="Asia/Kolkata"):
+    moment = _as_utc(value)
+    if moment is None:
+        return ""
+    try:
+        tz = pytz.timezone(tz_name or "Asia/Kolkata")
+    except pytz.UnknownTimeZoneError:
+        tz = pytz.timezone("Asia/Kolkata")
+    local = moment.astimezone(tz)
+    hour = local.strftime("%I")
+    return f"{local.day} {local.strftime('%b')} {local.year}, {hour}:{local.strftime('%M')} {local.strftime('%p').lower()}"
+
+
+def _status_count(by_status, *names):
+    return sum(int(by_status.get(name) or 0) for name in names)
+
+
+def _campaign_object_id(campaign_id):
+    try:
+        return ObjectId(str(campaign_id))
+    except Exception:
+        return campaign_id
+
+
+def message_log_search_clause(db, user_id, search):
+    search = (search or "").strip()
+    if not search:
+        return None
+    if len(search) > 100:
+        raise ValueError("search must be 100 characters or fewer")
+    pattern = {"$regex": re.escape(search), "$options": "i"}
+    clauses = [{"number": pattern}]
+    digits = "".join(ch for ch in search if ch.isdigit())
+    if digits and digits != search:
+        clauses.append({"number": {"$regex": re.escape(digits)}})
+    user_ids = [user_id]
+    if str(user_id) not in user_ids:
+        user_ids.append(str(user_id))
+    customers = db.find_documents(
+        "customers",
+        {"user_id": {"$in": user_ids}, "name": pattern},
+        projection={"number": 1},
+        limit=200,
+    )
+    numbers = []
+    for customer in customers:
+        for value in _number_variants(customer.get("number")):
+            if value not in numbers:
+                numbers.append(value)
+    if numbers:
+        clauses.append({"number": {"$in": numbers}})
+    if len(clauses) == 1:
+        return clauses[0]
+    return {"$or": clauses}
+
+
+def apply_recipient_status_filter(query_filter, recipient_status, replied_numbers):
+    status_name = (recipient_status or "all").strip().lower()
+    if status_name in ("", "all"):
+        return query_filter, None
+    if status_name not in RECIPIENT_STATUSES:
+        return None, "recipient_status must be one of all, read, delivered, failed, queued, replied"
+    if status_name == "read":
+        query_filter["message_status"] = "read"
+    elif status_name == "delivered":
+        query_filter["message_status"] = "delivered"
+    elif status_name == "failed":
+        query_filter["message_status"] = {"$in": ["failed", "error"]}
+    elif status_name == "queued":
+        query_filter["message_status"] = {
+            "$nin": ["read", "delivered", "failed", "error", "sent", "accepted", "ok", "received"]
+        }
+    elif status_name == "replied":
+        query_filter["number"] = {"$in": list(replied_numbers or [])}
+    return query_filter, None
+
+
+def _failure_reason_rows(grouped):
+    by_code = {}
+    for row in grouped:
+        identity = row.get("_id") or {}
+        try:
+            code = int(identity.get("code") or 0)
+        except (TypeError, ValueError):
+            code = 0
+        count = int(row.get("count") or 0)
+        message = (identity.get("message") or identity.get("title") or "").strip()
+        bucket = by_code.setdefault(code, {"count": 0, "message": "", "best": 0})
+        bucket["count"] += count
+        if count >= bucket["best"] and message:
+            bucket["message"] = message
+            bucket["best"] = count
+    reasons = []
+    failed_total = sum(bucket["count"] for bucket in by_code.values())
+    for code, bucket in by_code.items():
+        title = _FAILURE_TITLES.get(code) or "Failed"
+        reasons.append(
+            {
+                "code": code or None,
+                "title": title,
+                "message": bucket["message"] or title,
+                "count": bucket["count"],
+                "percentage": _percent(bucket["count"], failed_total),
+            }
+        )
+    reasons.sort(key=lambda item: (-item["count"], item["title"]))
+    return failed_total, reasons
+
+
+def _replied_numbers(db, user_id, numbers, campaign):
+    raw_numbers = [row.get("_id") for row in numbers if row.get("_id")]
+    if not raw_numbers or not campaign:
+        return set(), []
+    start = _as_utc(campaign.get("sent_at") or campaign.get("created_at"))
+    if start is None:
+        return set(), []
+    variants = []
+    raw_by_key = {}
+    for number in raw_numbers:
+        key = _last10(number)
+        raw_by_key.setdefault(key, [])
+        if number not in raw_by_key[key]:
+            raw_by_key[key].append(number)
+        for value in _number_variants(number):
+            if value not in variants:
+                variants.append(value)
+    user_ids = [user_id]
+    if str(user_id) not in user_ids:
+        user_ids.append(str(user_id))
+    received = db.find_documents(
+        "whatsapp_message_logs",
+        {
+            "user_id": {"$in": user_ids},
+            "message_status": "received",
+            "number": {"$in": variants},
+            "created_at": {"$gte": start},
+        },
+        projection={"number": 1},
+    )
+    replied_keys = {_last10(row.get("number")) for row in received if _last10(row.get("number"))}
+    replied_values = []
+    for key in replied_keys:
+        for number in raw_by_key.get(key, []):
+            if number not in replied_values:
+                replied_values.append(number)
+    return replied_keys, replied_values
+
+
+def build_message_campaign_detail(db, user_id, campaign_id, campaign_code, base_filter):
+    user_ids = [str(user_id)]
+    if user_id not in user_ids:
+        user_ids.append(user_id)
+    campaign_query = {"user_id": {"$in": user_ids}}
+    if campaign_id:
+        campaign_query["_id"] = _campaign_object_id(campaign_id)
+    else:
+        campaign_query["campaign_code"] = campaign_code
+    campaign = db.find_document("campaigns", campaign_query)
+
+    facets = db.aggregate(
+        "whatsapp_message_logs",
+        [
+            {"$match": base_filter},
+            {
+                "$facet": {
+                    "by_status": [{"$group": {"_id": "$message_status", "count": {"$sum": 1}}}],
+                    "failures": [
+                        {"$match": {"message_status": {"$in": ["failed", "error"]}}},
+                        {
+                            "$group": {
+                                "_id": {
+                                    "code": "$code",
+                                    "title": "$title",
+                                    "message": "$error_message",
+                                },
+                                "count": {"$sum": 1},
+                            }
+                        },
+                    ],
+                    "numbers": [{"$group": {"_id": "$number"}}],
+                }
+            },
+        ],
+    )
+    facet = facets[0] if facets else {}
+    by_status = {
+        (row.get("_id") or ""): int(row.get("count") or 0)
+        for row in facet.get("by_status") or []
+    }
+    read = _status_count(by_status, "read")
+    delivered_only = _status_count(by_status, "delivered")
+    delivered = delivered_only + read
+    failed = _status_count(by_status, "failed", "error")
+    sent_waiting = _status_count(by_status, "sent", "accepted", "ok")
+    logged = sum(by_status.values())
+    sent = sum(count for status_name, count in by_status.items() if status_name in _SENT_TO_WHATSAPP_STATUSES)
+    recipients = int((campaign or {}).get("recipients") or 0) or logged
+    queued = max(0, recipients - sent)
+    replied_keys, replied_values = _replied_numbers(db, user_id, facet.get("numbers") or [], campaign)
+    failed_total, reasons = _failure_reason_rows(facet.get("failures") or [])
+
+    if campaign and campaign.get("status") == "scheduled":
+        timing_label = "Scheduled"
+        timing_value = format_campaign_date_long(
+            campaign.get("scheduled_at_utc") or campaign.get("created_at"),
+            (campaign or {}).get("schedule_timezone") or "Asia/Kolkata",
+        )
+        screen_status = "Scheduled"
+    else:
+        timing_label = "Started"
+        timing_source = (campaign or {}).get("sent_at") or (campaign or {}).get("created_at")
+        timing_value = format_campaign_date_long(timing_source, "Asia/Kolkata")
+        stats = {"logged": logged, "delivered": delivered, "read": read, "failed": failed}
+        if campaign:
+            screen_status = build_campaign_row(campaign, stats)["status"]
+        else:
+            screen_status = "Running" if queued else "Completed"
+
+    audience_name = ((campaign or {}).get("audience_name") or "").strip()
+    audience_label = f"{audience_name} · {recipients}" if audience_name else str(recipients)
+    denominator = recipients or logged
+    funnel = [
+        {"key": "recipients", "label": "Recipients", "count": recipients, "percentage": 100 if denominator else 0},
+        {"key": "sent", "label": "Sent to WhatsApp", "count": sent, "percentage": _percent(sent, denominator)},
+        {"key": "delivered", "label": "Delivered", "count": delivered, "percentage": _percent(delivered, denominator)},
+        {"key": "read", "label": "Read", "count": read, "percentage": _percent(read, denominator)},
+        {
+            "key": "replied",
+            "label": "Replied",
+            "count": len(replied_keys),
+            "percentage": _percent(len(replied_keys), denominator),
+        },
+    ]
+    detail = {
+        "id": str(campaign["_id"]) if campaign else (campaign_id or ""),
+        "campaign_name": (campaign or {}).get("campaign_name") or "",
+        "campaign_code": (campaign or {}).get("campaign_code") or (campaign_code or ""),
+        "status": screen_status,
+        "template_name": (campaign or {}).get("template_name") or "",
+        "template_category": category_label((campaign or {}).get("template_category")),
+        "audience_name": audience_name,
+        "audience_label": audience_label,
+        "recipients": recipients,
+        "timing_label": timing_label,
+        "timing_value": timing_value,
+        "progress_sent": sent,
+        "progress_label": f"{sent} of {recipients} sent",
+        "funnel": funnel,
+        "failures": {"failed": failed_total, "reasons": reasons},
+        "recipient_counts": {
+            "all": recipients,
+            "read": read,
+            "delivered": delivered_only,
+            "failed": failed,
+            "queued": queued,
+            "replied": len(replied_keys),
+            "sent": sent_waiting,
+        },
+    }
+    return detail, replied_keys, replied_values
+
+
+def _recipient_status_label(message_status):
+    status_name = (message_status or "").lower()
+    if status_name == "read":
+        return "Read"
+    if status_name == "delivered":
+        return "Delivered"
+    if status_name in ("failed", "error"):
+        return "Failed"
+    if status_name in ("sent", "accepted", "ok"):
+        return "Sent"
+    return "Queued"
+
+
+def recipient_row_fields(message, customer_name, replied_keys):
+    status_name = (message.get("message_status") or "").lower()
+    sent_time = format_log_clock(message.get("sent_at"))
+    if sent_time == "—" :
+        sent_time = format_log_clock(message.get("created_at"))
+    note = ""
+    if status_name in ("failed", "error"):
+        try:
+            code = int(message.get("code") or 0)
+        except (TypeError, ValueError):
+            code = 0
+        note = _FAILURE_TITLES.get(code) or (message.get("error_message") or message.get("title") or "")
+    phone_key = _last10(message.get("number"))
+    return {
+        "contact_initials": contact_initials(customer_name),
+        "phone_masked": mask_phone_number(message.get("number")),
+        "status_label": _recipient_status_label(status_name),
+        "sent_time": sent_time,
+        "delivered_time": format_log_clock(message.get("delivered_at")),
+        "read_time": format_log_clock(message.get("read_at")),
+        "note": note,
+        "replied": bool(phone_key and phone_key in replied_keys),
+    }
+
+
+def campaign_recipient_rows_to_csv(rows):
+    buffer = io.StringIO()
+    buffer.write("\ufeff")
+    writer = csv.writer(buffer)
+    writer.writerow(["Contact", "Phone", "Status", "Sent", "Delivered", "Read", "Note", "Replied"])
+    for row in rows:
+        writer.writerow(
+            [
+                row.get("customer_name") or "",
+                row.get("number") or "",
+                row.get("status_label") or row.get("message_status") or "",
+                row.get("sent_time") or "",
+                row.get("delivered_time") or "",
+                row.get("read_time") or "",
+                row.get("note") or "",
+                "Yes" if row.get("replied") else "No",
+            ]
+        )
+    return buffer.getvalue()

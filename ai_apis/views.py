@@ -27,11 +27,17 @@ from utils.scheduled_message_redis import parse_scheduled_at, store_scheduled_me
 from utils.campaigns import (
     CAMPAIGN_LOG_SORTS,
     CAMPAIGN_LOG_STATUSES,
+    RECIPIENT_STATUSES,
+    apply_recipient_status_filter,
     build_campaign_logs,
+    build_message_campaign_detail,
+    campaign_recipient_rows_to_csv,
     campaigns_to_csv,
     create_campaign,
     mark_campaign_send_finished,
+    message_log_search_clause,
     parse_campaign_log_params,
+    recipient_row_fields,
     template_category_from_payload,
 )
 from whatsapp_apis.views import customer_display_name, phone_number_candidates
@@ -1750,7 +1756,11 @@ class CampaignLogs(APIView):
 
 class UserMessageLogs(APIView):
     @swagger_auto_schema(
-        operation_description="Fetch user message logs",
+        operation_description=(
+            "Fetch user message logs. Existing data, count, and counts stay the same. "
+            "When campaign_id or campaign_code is set, the response also includes campaign, "
+            "and each row gains contact, time, and note fields for the campaign detail screen."
+        ),
         manual_parameters=[
             openapi.Parameter(
                 "start_date",
@@ -1801,7 +1811,30 @@ class UserMessageLogs(APIView):
                 description="Campaign code such as CMP-1045",
                 type=openapi.TYPE_STRING,
                 required=False,
-            )
+            ),
+            openapi.Parameter(
+                "search",
+                openapi.IN_QUERY,
+                description="Recipient name or phone. Filters the table only",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "recipient_status",
+                openapi.IN_QUERY,
+                description="Campaign recipient chip. Requires campaign_id or campaign_code",
+                type=openapi.TYPE_STRING,
+                required=False,
+                enum=list(RECIPIENT_STATUSES),
+            ),
+            openapi.Parameter(
+                "format",
+                openapi.IN_QUERY,
+                description="json (default) or csv. csv is used for Copy all / Copy failed on a campaign",
+                type=openapi.TYPE_STRING,
+                required=False,
+                enum=["json", "csv"],
+            ),
         ],
         responses={
             200: openapi.Response(
@@ -1840,8 +1873,20 @@ class UserMessageLogs(APIView):
             status_param = request.query_params.get("status", None)
             campaign_id = request.query_params.get("campaign_id", None)
             campaign_code = request.query_params.get("campaign_code", None)
+            search = (request.query_params.get("search") or "").strip()
+            recipient_status = (request.query_params.get("recipient_status") or "all").strip().lower()
+            export_format = (request.query_params.get("format") or "json").strip().lower()
             skip = int(request.query_params.get("skip", 0))
             limit = int(request.query_params.get("limit", 20))
+            if len(search) > 100:
+                return JsonResponse({"message": "search must be 100 characters or fewer"}, status=422)
+            if recipient_status not in RECIPIENT_STATUSES:
+                return JsonResponse(
+                    {"message": "recipient_status must be one of all, read, delivered, failed, queued, replied"},
+                    status=422,
+                )
+            if export_format not in ("json", "csv"):
+                return JsonResponse({"message": "format must be json or csv"}, status=422)
 
             # Validate and process date formats
             if start_date:
@@ -1980,11 +2025,42 @@ class UserMessageLogs(APIView):
                 "pending": status_counts.get("pending", 0),
             }
 
+            campaign_requested = bool(campaign_id or campaign_code)
+            campaign_detail = None
+            replied_keys = set()
+            if campaign_requested:
+                campaign_detail, replied_keys, replied_numbers = build_message_campaign_detail(
+                    db,
+                    user_id,
+                    campaign_id,
+                    campaign_code,
+                    base_filter,
+                )
+                campaign_detail["filters"] = {
+                    "search": search,
+                    "recipient_status": recipient_status,
+                }
+                query_filter, status_error = apply_recipient_status_filter(
+                    query_filter,
+                    recipient_status,
+                    replied_numbers,
+                )
+                if status_error:
+                    return JsonResponse({"message": status_error}, status=422)
+            if search:
+                try:
+                    search_clause = message_log_search_clause(db, user_id, search)
+                except ValueError as exc:
+                    return JsonResponse({"message": str(exc)}, status=422)
+                if search_clause:
+                    query_filter = {"$and": [query_filter, search_clause]}
+
             print(f"query filter: {query_filter}")
             # Fetch data from database
             sort_order = [("_id", -1)]  # Sorting in descending order
-            skip_count = skip
-            limit_count = limit
+            export_csv = campaign_requested and export_format == "csv"
+            skip_count = 0 if export_csv else skip
+            limit_count = 5000 if export_csv else limit
             total_message = db.find_documents("whatsapp_message_logs", query_filter, sort=sort_order, skip=skip_count, limit=limit_count)
             total_message_count = db.find_documents_count("whatsapp_message_logs", query_filter)
 
@@ -2043,8 +2119,7 @@ class UserMessageLogs(APIView):
                 phone_key = _last_10_digits(_message.get("number"))
                 customer_name = customer_names.get(phone_key) or str(_message.get("number") or "")
 
-                message_list.append(
-                    {
+                row = {
                         "id": str(_message['_id']),
                         "number" : _message['number'],
                         "customer_name": customer_name,
@@ -2066,7 +2141,17 @@ class UserMessageLogs(APIView):
                         "title": _message['title'] if "title" in _message else "",
                         "error_message": _message['error_message'] if "error_message" in _message else ""
                     }
+                if campaign_requested:
+                    row.update(recipient_row_fields(_message, customer_name, replied_keys))
+                message_list.append(row)
+
+            if export_csv:
+                response = HttpResponse(
+                    campaign_recipient_rows_to_csv(message_list),
+                    content_type="text/csv; charset=utf-8",
                 )
+                response["Content-Disposition"] = 'attachment; filename="campaign-recipients.csv"'
+                return response
 
             if len(message_list) > 0:
                 response_data = {
@@ -2074,6 +2159,8 @@ class UserMessageLogs(APIView):
                     "count": total_message_count,
                     "counts": message_counts,
                 }
+                if campaign_detail is not None:
+                    response_data["campaign"] = campaign_detail
                 return JsonResponse(response_data, status=status.HTTP_200_OK)
             else:
                 response_data = {
@@ -2081,6 +2168,8 @@ class UserMessageLogs(APIView):
                     "count": 0,
                     "counts": message_counts,
                 }
+                if campaign_detail is not None:
+                    response_data["campaign"] = campaign_detail
                 return JsonResponse(response_data, status=status.HTTP_404_NOT_FOUND)
 
         except Exception as ex:
