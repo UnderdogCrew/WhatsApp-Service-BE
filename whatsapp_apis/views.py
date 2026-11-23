@@ -1787,6 +1787,68 @@ class ContactExportView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+AI_TEMPLATE_BUTTON_TYPES = ("QUICK_REPLY", "MARKETING_OPT_OUT", "URL", "PHONE_NUMBER", "COPY_CODE")
+# Max buttons per type, matching WhatsApp limits shown in the template builder UI
+AI_TEMPLATE_BUTTON_LIMITS = {
+    "QUICK_REPLY": 10,
+    "MARKETING_OPT_OUT": 1,
+    "URL": 2,
+    "PHONE_NUMBER": 1,
+    "COPY_CODE": 1,
+}
+AI_TEMPLATE_MAX_BUTTONS = 10
+
+
+def _normalize_ai_template_buttons(buttons, template_category):
+    """Clean AI generated buttons: valid types, per-type limits and field lengths."""
+    counts = {}
+    cleaned = []
+    for btn in buttons or []:
+        if isinstance(btn, str):
+            btn = {"type": "QUICK_REPLY", "text": btn}
+        if not isinstance(btn, dict):
+            continue
+        btn_type = str(btn.get("type", "")).upper()
+        if btn_type not in AI_TEMPLATE_BUTTON_TYPES:
+            continue
+        if btn_type == "MARKETING_OPT_OUT" and template_category != "MARKETING":
+            continue
+        if counts.get(btn_type, 0) >= AI_TEMPLATE_BUTTON_LIMITS[btn_type]:
+            continue
+        if len(cleaned) >= AI_TEMPLATE_MAX_BUTTONS:
+            break
+
+        text = str(btn.get("text") or "").strip()
+        if btn_type == "MARKETING_OPT_OUT":
+            text = "Stop promotions"
+        elif btn_type == "COPY_CODE":
+            text = "Copy offer code"
+        if not text:
+            continue
+
+        cleaned.append({
+            "type": btn_type,
+            "text": text[:25],
+            "url": str(btn.get("url") or "").strip() if btn_type == "URL" else "",
+            "phone_number": str(btn.get("phone_number") or "").strip() if btn_type == "PHONE_NUMBER" else "",
+            "offer_code": str(btn.get("offer_code") or "").strip()[:15] if btn_type == "COPY_CODE" else "",
+        })
+        counts[btn_type] = counts.get(btn_type, 0) + 1
+    return cleaned
+
+
+def _normalize_ai_template_variants(data, template_category):
+    variants = data.get("variants", []) if isinstance(data, dict) else []
+    for variant in variants:
+        buttons = _normalize_ai_template_buttons(
+            variant.get("buttons", variant.get("button", [])), template_category
+        )
+        variant["buttons"] = buttons
+        # Kept for backward compatibility: plain list of button labels
+        variant["button"] = [b["text"] for b in buttons]
+    return {"variants": variants}
+
+
 class GenerateAITemplateView(APIView):
     @swagger_auto_schema(
         operation_description="Generate a WhatsApp template using AI",
@@ -1857,20 +1919,40 @@ class GenerateAITemplateView(APIView):
         system_prompt = (
             "You are a WhatsApp Business template generator.\n\n"
             "Return EXACTLY 3 variants as VALID JSON (no markdown, no extra text).\n\n"
-            "Output format must be a JSON array of 3 objects. Each object MUST have:\n"
+            "Output format must be a JSON object with a \"variants\" array of 3 objects. Each object MUST have:\n"
             '- "index": 0, 1, 2\n'
-            '- "name": short template name string\n'
+            '- "name": short template name (lowercase letters, numbers and underscores only)\n'
             '- "message": generated WhatsApp message text\n'
-            '- "button": array of 0-2 CTA button labels (strings)\n'
-            '- "template_header": always the string "Text"\n\n'
-            '- "variables": array of 0-5 variables (strings)\n'
+            '- "buttons": array of 0-4 button objects (see BUTTONS below)\n'
+            '- "template_header": always the string "Text"\n'
+            '- "variables": array of 0-5 variables used in the message (strings like "{{1}}")\n\n'
+            "BUTTONS - each button object MUST have all of these keys:\n"
+            '- "type": one of "QUICK_REPLY", "MARKETING_OPT_OUT", "URL", "PHONE_NUMBER", "COPY_CODE"\n'
+            '- "text": button label, max 25 characters, no variables\n'
+            '- "url": website URL for type URL, otherwise ""\n'
+            '- "phone_number": phone number with country code (e.g. "+919876543210") for type PHONE_NUMBER, otherwise ""\n'
+            '- "offer_code": coupon/offer code (max 15 characters) for type COPY_CODE, otherwise ""\n'
+            "Button types:\n"
+            "- QUICK_REPLY: custom quick reply the customer taps to respond (e.g. \"Interested\", \"Tell me more\").\n"
+            "- MARKETING_OPT_OUT: lets customers stop marketing messages. text MUST be \"Stop promotions\". "
+            "Only for MARKETING templates, max 1.\n"
+            "- URL: \"Visit website\" call-to-action (e.g. \"Shop Now\"). Max 2.\n"
+            "- PHONE_NUMBER: \"Call Phone Number\" call-to-action (e.g. \"Call Us\"). Max 1.\n"
+            "- COPY_CODE: \"Copy offer code\" button. text MUST be \"Copy offer code\". Max 1. "
+            "When used, do not also put the code as a variable in the message.\n"
+            "Button rules:\n"
+            "- Pick button types that fit the message and optimizationChoice: prefer URL / COPY_CODE / PHONE_NUMBER for "
+            "\"Click Rate\" and QUICK_REPLY for \"Reply Rate\".\n"
+            "- Never invent URLs, phone numbers or offer codes. Use them only if given in userPrompt; otherwise leave that field \"\".\n"
+            "- Variants should use different button combinations where it makes sense.\n\n"
             "Rules:\n"
             "- Output ONLY JSON.\n"
             "- Each variant must be different in hook and CTA.\n"
-            "- Use placeholders only when needed, max 5: {{1}}, {{2}}, {{3}}, {{4}}, {{5}}.\n"
-            "- If missing details (coupon, link, expiry, CTA label), use placeholders instead of guessing.\n"
+            "- Use placeholders only when needed, max 5: {{1}}, {{2}}, {{3}}, {{4}}, {{5}}, numbered in order.\n"
+            "- Do not start or end the message with a placeholder.\n"
+            "- If missing details (coupon, link, expiry), use placeholders instead of guessing.\n"
             "- MARKETING: keep message short (1–7 lines). Include a CTA line when appropriate.\n"
-            "- UTILITY: keep clear and concise (1–6 lines).\n"
+            "- UTILITY: keep clear and concise (1–6 lines). Do not use MARKETING_OPT_OUT.\n"
             "- If includeEmojis=true, use 1–4 relevant emojis; if false, use none.\n"
             "- Do not use any variables in button text."
         )
@@ -1903,16 +1985,30 @@ class GenerateAITemplateView(APIView):
                                     "items": {
                                         "type": "object",
                                         "additionalProperties": False,
-                                        "required": ["index", "name", "message", "button", "template_header", "variables"],
+                                        "required": ["index", "name", "message", "buttons", "template_header", "variables"],
                                         "properties": {
                                             "index": {"type": "integer", "minimum": 0, "maximum": 2},
                                             "name": {"type": "string"},
                                             "message": {"type": "string"},
-                                            "button": {
+                                            "buttons": {
                                                 "type": "array",
-                                                "items": {"type": "string"},
                                                 "minItems": 0,
-                                                "maxItems": 2,
+                                                "maxItems": 4,
+                                                "items": {
+                                                    "type": "object",
+                                                    "additionalProperties": False,
+                                                    "required": ["type", "text", "url", "phone_number", "offer_code"],
+                                                    "properties": {
+                                                        "type": {
+                                                            "type": "string",
+                                                            "enum": list(AI_TEMPLATE_BUTTON_TYPES),
+                                                        },
+                                                        "text": {"type": "string"},
+                                                        "url": {"type": "string"},
+                                                        "phone_number": {"type": "string"},
+                                                        "offer_code": {"type": "string"},
+                                                    },
+                                                },
                                             },
                                             "template_header": {"type": "string", "enum": ["Text"]},
                                             "variables": {
@@ -1945,6 +2041,10 @@ class GenerateAITemplateView(APIView):
 
             # Directly use the sample response from OpenAI as the normalized output
             normalized = json.loads(full_text)
+            normalized = _normalize_ai_template_variants(
+                normalized,
+                str(payload.get('templateCategory', 'MARKETING')).upper(),
+            )
             response_data = {
                 'status': 'success',
                 'message': 'WhatsApp template generated successfully',
