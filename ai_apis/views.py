@@ -41,6 +41,7 @@ from utils.campaigns import (
     template_category_from_payload,
 )
 from whatsapp_apis.views import customer_display_name, phone_number_candidates
+from utils.dashboard_insights import build_dashboard_insights, build_daily_read_map
 from io import BytesIO
 
 
@@ -2389,7 +2390,7 @@ class UserDashboardData(APIView):
             start_date = request.query_params.get("start_date", None)
             end_date = request.query_params.get("end_date", None)
 
-            if start_date is None and end_date is None:
+            if start_date is None or end_date is None:
                 return JsonResponse({"message": "Start date and end date are required"}, status=400)
 
             # Validate and process date formats
@@ -2428,29 +2429,48 @@ class UserDashboardData(APIView):
                 'Authorization': f'Bearer {api_key}',
                 'Content-Type': 'application/json'
             }
-            response = requests.get(api_url, headers=headers)
-            if response.status_code == 200:
-                if "analytics" in response.json():
-                    if "data_points" in response.json()['analytics']:
-                        analytics_data = response.json()['analytics']['data_points']
-                        for data in analytics_data:
-                            sent_count += data['sent'] if 'sent' in data else 0
-                            delivered_count += data['delivered'] if 'delivered' in data else 0
-                            read_count += data['read'] if 'read' in data else 0
-                        return JsonResponse(
-                            {
-                                "sent_count": sent_count,
-                                "delivered_count": delivered_count,
-                                "read_count": read_count,
-                                "message": "Analytics data fetched successfully",
-                                "data": analytics_data
-                            }, status=status.HTTP_200_OK)
-                    else:
-                        return JsonResponse({"message": "No analytics data found"}, status=404)
-                else:
-                    return JsonResponse({"message": "No analytics data found"}, status=404)
-            else:
+            response = requests.get(api_url, headers=headers, timeout=15)
+            if response.status_code != 200:
                 return JsonResponse({"message": response.text}, status=response.status_code)
+
+            analytics_data = (response.json().get('analytics') or {}).get('data_points') or []
+            analytics_data = sorted(analytics_data, key=lambda point: point.get('start', 0))
+
+            # Per-day read counts come from our webhook logs (Meta analytics does not return them).
+            try:
+                daily_read = build_daily_read_map(db, str(user_id), start_date, end_date)
+            except Exception as read_ex:
+                print(f"Dashboard daily read error: {read_ex}")
+                daily_read = {}
+
+            for data in analytics_data:
+                data['read'] = data.get('read') or daily_read.get(
+                    datetime.datetime.fromtimestamp(int(data.get('start', 0)), pytz.timezone("Asia/Kolkata")).strftime("%Y-%m-%d"), 0
+                )
+                sent_count += data.get('sent', 0)
+                delivered_count += data.get('delivered', 0)
+                read_count += data.get('read', 0)
+
+            range_days = max(1, round((end_date - start_date) / 86400))
+            insights = build_dashboard_insights(
+                db=db,
+                user_info=user_info,
+                user_id=str(user_id),
+                start_ts=start_date,
+                end_ts=end_date,
+                meta_totals={"sent": sent_count, "delivered": delivered_count, "read": read_count} if analytics_data else None,
+                range_days=range_days,
+            )
+
+            return JsonResponse(
+                {
+                    "sent_count": sent_count,
+                    "delivered_count": delivered_count,
+                    "read_count": read_count,
+                    "message": "Analytics data fetched successfully" if analytics_data else "No analytics data found",
+                    "data": analytics_data,
+                    **insights,
+                }, status=status.HTTP_200_OK)
 
         except Exception as ex:
             print(f"Error: {ex}")
