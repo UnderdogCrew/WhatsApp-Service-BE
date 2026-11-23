@@ -17,6 +17,7 @@ import pytz
 import csv
 import io
 import json
+import re
 from django.http import StreamingHttpResponse, JsonResponse
 from openai import OpenAI
 from UnderdogCrew.settings import OPEN_AI_KEY
@@ -1818,7 +1819,9 @@ def _normalize_ai_template_buttons(buttons, template_category):
         if len(cleaned) >= AI_TEMPLATE_MAX_BUTTONS:
             break
 
-        text = str(btn.get("text") or "").strip()
+        text = str(btn.get("text") or "")
+        text = re.sub(r"\{\{.*?\}\}", "", text)
+        text = re.sub(r"[ ]{2,}", " ", text).strip()
         if btn_type == "MARKETING_OPT_OUT":
             text = "Stop promotions"
         elif btn_type == "COPY_CODE":
@@ -1837,15 +1840,119 @@ def _normalize_ai_template_buttons(buttons, template_category):
     return cleaned
 
 
-def _normalize_ai_template_variants(data, template_category):
+_TEMPLATE_VARIABLE_RE = re.compile(r"\{\{\s*([^{}]*?)\s*\}\}", re.DOTALL)
+
+
+def _template_language_fillers(language):
+    """Short words used only when a generated body breaks Meta variable rules."""
+    lang = str(language or "english").strip().lower()
+    if "hindi" in lang or lang in {"hi", "hi_in"}:
+        return "नमस्ते, ", " धन्यवाद।", " और "
+    if "gujarati" in lang or lang in {"gu", "gu_in"}:
+        return "નમસ્તે, ", " આભાર.", " અને "
+    if "marathi" in lang or lang in {"mr", "mr_in"}:
+        return "नमस्कार, ", " धन्यवाद.", " आणि "
+    return "Hello, ", " Thank you.", " and "
+
+
+def _normalize_template_name(name, index, used_names):
+    raw = str(name or "").strip().lower()
+    raw = re.sub(r"[^a-z0-9_]+", "_", raw)
+    raw = re.sub(r"_+", "_", raw).strip("_")
+    raw = re.sub(r"^[0-9_]+", "", raw)
+    if not raw:
+        raw = f"template_variant_{index}"
+    base = raw[:60]
+    candidate = base
+    suffix_n = 2
+    while candidate in used_names:
+        suffix = f"_{suffix_n}"
+        candidate = f"{base[:60 - len(suffix)]}{suffix}"
+        suffix_n += 1
+    used_names.add(candidate)
+    return candidate
+
+
+def _body_edge_is_variable(text, edge):
+    if edge == "start":
+        value = text.lstrip(" \n")
+        value = re.sub(r"^[*_~`]+", "", value)
+        return bool(re.match(r"\{\{\d+\}\}", value))
+    value = text.rstrip()
+    value = re.sub(r"[*_~`]+$", "", value).rstrip()
+    value = re.sub(r"[.!?।]+$", "", value).rstrip()
+    return bool(re.search(r"\{\{\d+\}\}$", value))
+
+
+def _normalize_template_message(message, language):
+    """Apply Meta body rules: sequential variables, spacing, and clear context."""
+    text = str(message or "").replace("\r\n", "\n").replace("\r", "\n").replace("\t", " ")
+    prefix, suffix, connector = _template_language_fillers(language)
+    kept_keys = []
+
+    def _replace_variable(match):
+        inner = match.group(1).replace("\n", "").replace("\r", "")
+        if re.search(r"[#$%]", inner):
+            inner = re.sub(r"[#$%]", "", inner)
+        number = re.search(r"\d+", inner)
+        if not number or not re.fullmatch(r"\d+", inner.strip()):
+            if not number:
+                return ""
+        key = number.group(0)
+        if key not in kept_keys:
+            if len(kept_keys) >= 5:
+                return ""
+            kept_keys.append(key)
+        return "{{" + str(kept_keys.index(key) + 1) + "}}"
+
+    text = _TEMPLATE_VARIABLE_RE.sub(_replace_variable, text)
+
+    for _ in range(5):
+        updated = re.sub(
+            r"(\{\{\d+\}\})\s*(\{\{\d+\}\})",
+            lambda match: match.group(1) + connector + match.group(2),
+            text,
+        )
+        if updated == text:
+            break
+        text = updated
+
+    text = text.strip()
+    if text and _body_edge_is_variable(text, "start"):
+        text = prefix + text.lstrip()
+    if text and _body_edge_is_variable(text, "end"):
+        text = re.sub(r"[.!?।]+$", "", text.rstrip()).rstrip() + suffix
+
+    text = re.sub(r"[ ]{2,}", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"[ ]+\n", "\n", text).strip()
+
+    variables = []
+    for token in re.findall(r"\{\{\d+\}\}", text):
+        if token not in variables:
+            variables.append(token)
+    return text, variables
+
+
+def _normalize_ai_template_variants(data, template_category, template_language="English"):
     variants = data.get("variants", []) if isinstance(data, dict) else []
-    for variant in variants:
+    used_names = set()
+    for index, variant in enumerate(variants):
         buttons = _normalize_ai_template_buttons(
             variant.get("buttons", variant.get("button", [])), template_category
         )
         variant["buttons"] = buttons
         # Kept for backward compatibility: plain list of button labels
         variant["button"] = [b["text"] for b in buttons]
+        variant["name"] = _normalize_template_name(variant.get("name"), index, used_names)
+        message, variables = _normalize_template_message(
+            variant.get("message", ""), template_language
+        )
+        variant["message"] = message
+        variant["variables"] = variables
+        # Text headers cannot carry emojis, markup, or newlines. This generator
+        # keeps the header type as Text and puts formatted copy in the body.
+        variant["template_header"] = "Text"
     return {"variants": variants}
 
 
@@ -1947,30 +2054,50 @@ class GenerateAITemplateView(APIView):
             "- Variants should use different button combinations where it makes sense.\n\n"
             "MESSAGE FORMATTING (mandatory — this is how the message must look in WhatsApp):\n"
             "- Write a short multi-line message, never one flat paragraph.\n"
-            "- Use real line breaks. Separate the hook, the offer, and the CTA with a blank line.\n"
-            "- Use only WhatsApp formatting characters:\n"
+            "- Use real line breaks. Separate the hook, the offer, and the CTA with one blank line.\n"
+            "- Never use more than two newline characters in a row, and never more than four spaces in a row.\n"
+            "- Use only WhatsApp formatting characters in the body:\n"
             "  *bold* for the headline, the discount or key number, and the date or deadline.\n"
             "  _italic_ for at most one short supporting phrase.\n"
             "- Do NOT use markdown headings (#), HTML, **double asterisks**, or bullet lists.\n"
-            "- Put the emoji on the headline line only. Do not scatter emojis through the body.\n"
-            "- Keep a placeholder inline with the words around it. Never put {{1}} on its own line.\n"
-            "- Do not start or end the message with a placeholder. End with normal text.\n"
+            "- Put the emoji on the headline line of the body only. Do not scatter emojis through the body.\n"
             "- Follow this shape exactly:\n"
             "  *Headline* <emoji if allowed>\n"
             "  <blank line>\n"
             "  Offer sentence with the key detail in *bold*.\n"
             "  <blank line>\n"
-            "  Short CTA sentence that does not end on a placeholder.\n"
+            "  Short CTA sentence with any variable in the middle of the sentence.\n"
             "Example message value:\n"
-            "\"*Diwali special* 🪔\\n\\nEnjoy *20% off* on all items until *30 Nov*.\\n\\nHurry and shop now.\"\n\n"
+            "\"*Diwali special* 🪔\\n\\nEnjoy *20% off* on all items until *30 Nov*.\\n\\nUse code {{1}} at checkout today.\"\n\n"
+            "FORMATTING AND VARIABLE RULES (mandatory):\n"
+            "- Naming: template name uses only lowercase letters, numbers, and underscores. "
+            "It must start with a letter and be unique across the 3 variants.\n"
+            "- Language: write the message and custom button labels in templateLanguage. "
+            "Use correct spelling and grammar. Keep the fixed labels \"Stop promotions\" and "
+            "\"Copy offer code\" in English.\n"
+            "- Placeholders: use sequential variables starting at {{1}}, then {{2}}, {{3}}, up to {{5}}. "
+            "Do not skip numbers. The same number may repeat when it is the same value.\n"
+            "- Do not place variables next to each other. Put real words between them.\n"
+            "- Do not start or end the body with a variable. Surround every variable with clear text "
+            "so a reviewer can tell what will be inserted. Never leave a variable on its own line.\n"
+            "- A variable contains only the number. Do not put newlines, spaces, or the symbols #, $, or % inside {{ }}.\n"
+            "- If a detail is missing (name, coupon, date, link), use the next placeholder instead of inventing it.\n"
+            "- Headers: template_header is always \"Text\". Do not invent header text. "
+            "Text headers cannot contain emojis, formatting markup, or newlines, so keep those only in the body. "
+            "Do not request an image, video, or document header, because those need a sample media file.\n\n"
+            "COMPLIANCE AND QUALITY (mandatory):\n"
+            "- Write only for people who have already opted in. Do not include opt-in asks, threats, "
+            "or pressure aimed at people who have not consented.\n"
+            "- Never include abusive, threatening, hateful, deceptive, or restricted content. "
+            "Do not promote drugs, weapons, tobacco, adult content, gambling, or other regulated goods.\n"
+            "- Keep the copy specific, accurate, and easy to read. No ALL CAPS, no repeated punctuation, "
+            "and no vague spam. Low-quality or spammy wording can cause Meta to pace or block delivery.\n\n"
             "Rules:\n"
             "- Output ONLY JSON.\n"
-            "- Each variant must be different in hook and CTA, but every variant must use the formatting above.\n"
-            "- Use placeholders only when needed, max 5: {{1}}, {{2}}, {{3}}, {{4}}, {{5}}, numbered in order.\n"
-            "- If missing details (coupon, link, expiry), use placeholders instead of guessing.\n"
+            "- Each variant must be different in hook and CTA, and every variant must follow the rules above.\n"
             "- MARKETING: 3 short blocks (hook, offer, CTA), about 4–7 lines including blank lines.\n"
             "- UTILITY: clear and concise, same line-break formatting, no MARKETING_OPT_OUT.\n"
-            "- If includeEmojis=true, use 1 emoji on the headline; if false, use none.\n"
+            "- If includeEmojis=true, use 1 emoji on the body headline; if false, use none.\n"
             "- Match mood and style in the wording. Keep the line breaks and *bold* either way.\n"
             "- Do not use any variables in button text."
         )
@@ -1983,6 +2110,8 @@ class GenerateAITemplateView(APIView):
             f"mood: {payload.get('mood','None')}\n"
             f"style: {payload.get('style','None')}\n"
             f"userPrompt: {payload.get('prompt','')}\n"
+            "Write every message in templateLanguage, with WhatsApp *bold* and blank lines between sections.\n"
+            "Follow the variable, spacing, header, and compliance rules from the system instructions.\n"
         )
         try:
             resp = client.responses.create(
@@ -2062,6 +2191,7 @@ class GenerateAITemplateView(APIView):
             normalized = _normalize_ai_template_variants(
                 normalized,
                 str(payload.get('templateCategory', 'MARKETING')).upper(),
+                str(payload.get('templateLanguage', 'English')),
             )
             response_data = {
                 'status': 'success',
