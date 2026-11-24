@@ -1,9 +1,12 @@
 import os
 import sys
 import django
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 import traceback
+
+import requests
+from bson import ObjectId
 
 current_path = os.path.abspath(os.getcwd())
 base_path = os.path.dirname(current_path)  # This will give you /opt/whatsapp_service/WhatsApp-Service-BE
@@ -16,6 +19,11 @@ django.setup()
 
 from utils.database import MongoDB
 from utils.whatsapp_message_data import send_message_data
+from utils.campaigns import (
+    create_campaign,
+    mark_campaign_send_finished,
+    template_category_from_payload,
+)
 
 # Define the target date ranges
 target_days = {0, 1, 2, 3, 10}
@@ -25,6 +33,31 @@ target_images = {
     10: "https://whatsapp-ai.s3.ap-south-1.amazonaws.com/67c1cf4c2763ce36e17d145e/images/10-days.png",
     30: "https://whatsapp-ai.s3.ap-south-1.amazonaws.com/67c1cf4c2763ce36e17d145e/images/30-days.png"
 }
+
+
+def resolve_template_category(db, user_id, template_name):
+    try:
+        user_info = db.find_document(
+            collection_name="users",
+            query={"_id": ObjectId(user_id)},
+        )
+        if not user_info:
+            return ""
+        template_url = (
+            f"https://graph.facebook.com/v21.0/{user_info['waba_id']}"
+            f"/message_templates?name={template_name}"
+        )
+        response = requests.get(
+            template_url,
+            headers={"Authorization": f"Bearer {user_info['api_key']}"},
+            timeout=30,
+        )
+        if response.status_code != 200:
+            return ""
+        return template_category_from_payload(response.json(), template_name)
+    except Exception as exc:
+        print(f"Failed to resolve template category for {template_name}: {exc}")
+        return ""
 
 
 def fetch_scheduled_messages():
@@ -91,14 +124,14 @@ def fetch_scheduled_messages():
 
         print(f"filtered_records: {filtered_records}")
 
-        # Send messages
+        messages_by_template = {}
         for user in filtered_records:
             image_url = ""
-            template_name="insurance_policy"
+            template_name = "insurance_policy"
             days_difference = user['date'] - today
             if days_difference.days in [1, 10, 30]:
                 image_url = target_images[days_difference.days]
-                template_name="insurance_policy_with_image"
+                template_name = "insurance_policy_with_image"
 
             reg_number = user.get('reg_number', '')
             model = user.get('model', '')
@@ -110,15 +143,48 @@ def fetch_scheduled_messages():
                 "policy": policy,
                 "date": user['date'].strftime("%d-%m-%Y")
             }
-            send_message_data(
-                number=user['number'],
+            messages_by_template.setdefault(template_name, []).append({
+                "number": user['number'],
+                "template_name": template_name,
+                "text": user.get('text', ''),
+                "image_url": image_url,
+                "user_id": user['user_id'],
+                "metadata": metadata,
+            })
+
+        for template_name, messages in messages_by_template.items():
+            user_id = messages[0]["user_id"]
+            campaign_id, campaign_code = create_campaign(
+                db,
+                user_id=user_id,
+                campaign_name=f"{template_name} {today.strftime('%d-%m-%Y')}",
                 template_name=template_name,
-                text=user.get('text', ''),
-                image_url=image_url,
-                user_id=user['user_id'],
-                metadata=metadata,
-                entry=metadata
+                template_category=resolve_template_category(db, user_id, template_name),
+                recipients=len(messages),
+                status="running",
+                schedule_type=1,
+                sent_at=datetime.now(timezone.utc),
             )
+            print(
+                f"Created campaign {campaign_code} ({campaign_id}) "
+                f"for {len(messages)} recipients"
+            )
+            try:
+                for message in messages:
+                    send_message_data(
+                        number=message["number"],
+                        template_name=message["template_name"],
+                        text=message["text"],
+                        image_url=message["image_url"],
+                        user_id=message["user_id"],
+                        metadata=message["metadata"],
+                        entry=message["metadata"],
+                        campaign_id=campaign_id,
+                        campaign_code=campaign_code,
+                    )
+            finally:
+                mark_campaign_send_finished(campaign_id)
+
         print("Message send successfully......!!!!!!!")
         return True
 
